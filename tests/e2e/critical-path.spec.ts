@@ -69,3 +69,18 @@ test("admin can open settings; pages are role-gated", async ({ page }) => {
   await page.goto("/settings");
   await expect(page.getByRole("heading", { name: "Admin Settings" })).toBeVisible();
 });
+
+test.describe("shipments", () => {
+  test("shipments page renders with risk column", async ({ page }) => {
+    await devLogin(page);
+    await page.goto("/shipments");
+    await expect(page.getByRole("heading", { name: "Shipments" })).toBeVisible();
+    await expect(page.getByText("Window risk")).toBeVisible();
+  });
+
+  test("quick receive page renders", async ({ page }) => {
+    await devLogin(page);
+    await page.goto("/receive");
+    await expect(page.getByPlaceholder("Sample number…")).toBeVisible();
+  });
+});

@@ -46,3 +46,14 @@ export async function nextPoNumber(tx: Prisma.TransactionClient): Promise<string
       tx.purchaseOrder.count({ where: { poNumber: { startsWith: py } } }),
   });
 }
+
+export async function nextShipmentRef(tx: Prisma.TransactionClient): Promise<string> {
+  const year = new Date().getFullYear();
+  return nextNumber(tx, {
+    prefix: "SHP",
+    year,
+    start: 1,
+    existsForYear: (py) =>
+      tx.shipment.count({ where: { shipmentRef: { startsWith: py } } }),
+  });
+}

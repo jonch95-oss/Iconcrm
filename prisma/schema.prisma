@@ -94,6 +94,36 @@ enum ParseStatus {
 enum EtaParentType {
   sample
   po
+  shipment
+}
+
+
+enum ShipmentStatus {
+  booked
+  in_transit
+  arrived_port
+  inland
+  delivered
+  cancelled
+}
+
+enum RiskStatus {
+  on_track
+  at_risk
+  late_for_window
+  early_for_window
+  no_window
+}
+
+enum ProductionStage {
+  pp  // pre-production sample
+  top // top-of-production sample
+}
+
+enum ProductionApproval {
+  pending
+  approved
+  rejected
 }
 
 // ---------------------------------------------------------------------------
@@ -120,6 +150,7 @@ model User {
   issuedPOs        PurchaseOrder[] @relation("IssuedPOs")
   auditLogs        AuditLog[]
   etaRevisions     EtaRevision[]
+  productionReviews ProductionSample[] @relation("ProductionReviews")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -209,6 +240,11 @@ model Sample {
 
   // Customer sell price per style (for margin %). Stored alongside currency above.
   customerSellPrice Decimal? @db.Decimal(12, 4)
+
+  // Landed cost inputs (per unit). Landed = FOB + duty% of FOB + freight + inland.
+  dutyRatePercent Decimal? @db.Decimal(6, 3)  // e.g. 17.500 = 17.5%
+  freightPerUnit  Decimal? @db.Decimal(12, 4)
+  inlandPerUnit   Decimal? @db.Decimal(12, 4)
 
   factoryId String?
   factory   Factory? @relation(fields: [factoryId], references: [id])
@@ -388,6 +424,8 @@ model PurchaseOrder {
 
   customerPoLinks CustomerPoLink[]
   packingLists    PackingList[]
+  shipments       Shipment[] @relation("ShipmentPOs")
+  productionSamples ProductionSample[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -401,7 +439,13 @@ model CustomerPO {
   totalValue      Decimal? @db.Decimal(14, 2)
   currency        Currency @default(USD)
 
+  // Delivery window: goods must arrive at the customer DC between these dates.
+  startShipDate    DateTime? // earliest acceptable delivery
+  cancelDate       DateTime? // hard deadline — PO can be cancelled after this
+  deliveryLocation String?   // customer DC name/city
+
   links CustomerPoLink[]
+  shipmentRisks ShipmentRisk[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -428,6 +472,8 @@ model PackingList {
   po          PurchaseOrder?  @relation(fields: [poId], references: [id])
   shipmentRef String?
   vesselOrAwb String?
+  shipmentId  String?
+  shipment    Shipment? @relation(fields: [shipmentId], references: [id])
   etd         DateTime?
   eta         DateTime?
   receivedAt  DateTime?
@@ -500,6 +546,95 @@ model Attachment {
   createdAt  DateTime @default(now())
 
   @@index([parentType, parentId])
+}
+
+
+// ---------------------------------------------------------------------------
+// Container / shipment tracking
+// ---------------------------------------------------------------------------
+
+model Shipment {
+  id          String  @id @default(cuid())
+  shipmentRef String  @unique // SHP-YYYY-####
+
+  // Tracking identifiers — at least one should be present.
+  containerNumber String?
+  mblNumber       String?
+  bookingNumber   String?
+
+  carrierScac      String?
+  vesselName       String?
+  voyage           String?
+  pol              String? // port of lading
+  pod              String? // port of discharge
+  finalDestination String?
+
+  // Original = set once when tracking starts, never overwritten.
+  originalEtd DateTime?
+  originalEta DateTime?
+  currentEtd  DateTime?
+  currentEta  DateTime?
+  atd         DateTime? // actual departure
+  ata         DateTime? // actual arrival at POD
+
+  // Days from port arrival to delivered at the customer DC.
+  inlandBufferDays Int @default(5)
+
+  status ShipmentStatus @default(booked)
+
+  trackingProvider       String? // "terminal49" | "manual"
+  trackingSubscriptionId String?
+  lastTrackingSyncAt     DateTime?
+  milestones             Json    @default("[]") // raw provider event history
+
+  notes String? @db.Text
+
+  packingLists   PackingList[]
+  purchaseOrders PurchaseOrder[] @relation("ShipmentPOs")
+  risks          ShipmentRisk[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([containerNumber])
+}
+
+// Computed risk of a shipment vs one customer PO's delivery window.
+model ShipmentRisk {
+  id           String     @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment   @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  customerPoId String
+  customerPo   CustomerPO @relation(fields: [customerPoId], references: [id], onDelete: Cascade)
+
+  status                RiskStatus
+  projectedDeliveryDate DateTime?
+  slipDays              Int? // currentEta - originalEta, in days
+  computedAt            DateTime @default(now())
+
+  @@unique([shipmentId, customerPoId])
+  @@index([status])
+}
+
+// PP / TOP production sample approvals per purchase order.
+model ProductionSample {
+  id    String          @id @default(cuid())
+  poId  String
+  po    PurchaseOrder   @relation(fields: [poId], references: [id], onDelete: Cascade)
+  stage ProductionStage
+
+  status     ProductionApproval @default(pending)
+  notes      String?            @db.Text
+  dueDate    DateTime?
+  reviewedById String?
+  reviewedBy   User?            @relation("ProductionReviews", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([poId])
 }
 
 // Singleton-ish key/value app settings (parsing regexes, recipient lists,

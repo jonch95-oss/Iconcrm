@@ -149,6 +149,12 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
       fobPort: d.fobPort ?? before.fobPort,
       customerSellPrice:
         d.customerSellPrice !== undefined ? toDecimal(d.customerSellPrice) : before.customerSellPrice,
+      dutyRatePercent:
+        d.dutyRatePercent !== undefined ? toDecimal(d.dutyRatePercent) : before.dutyRatePercent,
+      freightPerUnit:
+        d.freightPerUnit !== undefined ? toDecimal(d.freightPerUnit) : before.freightPerUnit,
+      inlandPerUnit:
+        d.inlandPerUnit !== undefined ? toDecimal(d.inlandPerUnit) : before.inlandPerUnit,
       sampleReceivedDate: received,
       sampleEta: newEta,
       status,

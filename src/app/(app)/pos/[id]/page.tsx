@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { PO_PIPELINE, PO_STATUS_LABEL, poRank } from "@/lib/status";
 import { PoControls } from "./po-controls";
 import { formatDate, toDateInputValue } from "@/lib/date";
+import { ProductionSamples, type ProductionRow } from "./production-samples";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,11 @@ export default async function PoDetailPage({
       pi: { select: { id: true, piNumber: true, paymentTerms: true, factory: { select: { id: true, name: true } } } },
       customerPoLinks: { include: { customerPo: true } },
       packingLists: { select: { id: true, shipmentRef: true, receivedAt: true } },
+      productionSamples: {
+        orderBy: { createdAt: "asc" },
+        include: { reviewedBy: { select: { name: true, email: true } } },
+      },
+      shipments: { select: { id: true, shipmentRef: true, currentEta: true, status: true } },
     },
   });
   if (!po) notFound();
@@ -40,6 +46,16 @@ export default async function PoDetailPage({
 
   const canEdit = hasRole(user.role, "member");
   const currentRank = poRank(po.status);
+
+  const productionRows: ProductionRow[] = po.productionSamples.map((ps) => ({
+    id: ps.id,
+    stage: ps.stage,
+    status: ps.status,
+    notes: ps.notes,
+    dueDate: ps.dueDate ? formatDate(ps.dueDate) : null,
+    reviewedBy: ps.reviewedBy?.name ?? ps.reviewedBy?.email ?? null,
+    reviewedAt: ps.reviewedAt ? formatDate(ps.reviewedAt) : null,
+  }));
 
   return (
     <div>
@@ -138,6 +154,37 @@ export default async function PoDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle>Production sample approvals (PP / TOP)</CardTitle></CardHeader>
+        <CardContent>
+          <ProductionSamples poId={po.id} rows={productionRows} canEdit={canEdit} />
+        </CardContent>
+      </Card>
+
+      <Card className="mt-4">
+        <CardHeader><CardTitle>Shipments</CardTitle></CardHeader>
+        <CardContent>
+          {po.shipments.length === 0 ? (
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Not on a shipment yet. Link this PO from a shipment&apos;s page to track its
+              container ETA against customer PO windows.
+            </p>
+          ) : (
+            <div className="flex flex-wrap gap-2">
+              {po.shipments.map((sh) => (
+                <Link
+                  key={sh.id}
+                  href={`/shipments/${sh.id}`}
+                  className="rounded border border-[var(--border)] px-2 py-1 text-sm text-[var(--primary)] hover:bg-[var(--accent)]"
+                >
+                  {sh.shipmentRef} · ETA {formatDate(sh.currentEta)}
+                </Link>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }

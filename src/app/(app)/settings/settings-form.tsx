@@ -45,6 +45,8 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
         <Field name="poNumberStart" label="PO number start" value={String(settings.poNumberStart)} type="number" />
         <Field name="orderFormPrefix" label="Order form prefix" value={settings.orderFormPrefix} />
         <Field name="followUpCadenceDays" label="Follow-up cadence (days)" value={String(settings.followUpCadenceDays)} type="number" />
+        <Field name="inlandBufferDaysDefault" label="Port-to-customer days (default)" value={String(settings.inlandBufferDaysDefault)} type="number" />
+        <Field name="riskThresholdDays" label="At-risk warning (days before cancel)" value={String(settings.riskThresholdDays)} type="number" />
       </div>
 
       <Button type="submit" disabled={pending}>{pending ? "Saving…" : "Save settings"}</Button>

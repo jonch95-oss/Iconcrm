@@ -72,3 +72,9 @@ export function magicLink(
   const token = signToken(purpose, sampleId, ttlMs);
   return `${base}${path}?token=${encodeURIComponent(token)}`;
 }
+
+/** Absolute app URL for links in emails. */
+export function appUrl(path: string): string {
+  const base = process.env.APP_BASE_URL ?? "http://localhost:3000";
+  return `${base}${path}`;
+}

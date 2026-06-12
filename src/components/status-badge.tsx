@@ -1,10 +1,14 @@
 import { Badge } from "@/components/ui/badge";
-import type { SampleStatus, POStatus, PIStatus, PackingMatchStatus } from "@prisma/client";
+import type { SampleStatus, POStatus, PIStatus, PackingMatchStatus, ShipmentStatus, RiskStatus } from "@prisma/client";
 import {
   SAMPLE_STATUS_LABEL,
   SAMPLE_STATUS_TONE,
   PO_STATUS_LABEL,
   PO_STATUS_TONE,
+  SHIPMENT_STATUS_LABEL,
+  SHIPMENT_STATUS_TONE,
+  RISK_STATUS_LABEL,
+  RISK_STATUS_TONE,
   type BadgeTone,
 } from "@/lib/status";
 
@@ -43,4 +47,12 @@ const MATCH_TONE: Record<PackingMatchStatus, BadgeTone> = {
 
 export function MatchStatusBadge({ status }: { status: PackingMatchStatus }) {
   return <Badge variant={MATCH_TONE[status]} className="capitalize">{status}</Badge>;
+}
+
+export function ShipmentStatusBadge({ status }: { status: ShipmentStatus }) {
+  return <Badge variant={SHIPMENT_STATUS_TONE[status]}>{SHIPMENT_STATUS_LABEL[status]}</Badge>;
+}
+
+export function RiskBadge({ status }: { status: RiskStatus }) {
+  return <Badge variant={RISK_STATUS_TONE[status]}>{RISK_STATUS_LABEL[status]}</Badge>;
 }

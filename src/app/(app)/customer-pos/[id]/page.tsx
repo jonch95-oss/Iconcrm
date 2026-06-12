@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LinkManager, type LinkRow, type PoOption } from "./link-manager";
 import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/date";
+import { RiskBadge } from "@/components/status-badge";
+import { WindowEditor } from "./window-editor";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +23,7 @@ export default async function CustomerPoDetailPage({
   const cpo = await prisma.customerPO.findUnique({
     where: { id },
     include: {
+      shipmentRisks: { include: { shipment: { select: { id: true, shipmentRef: true, currentEta: true } } } },
       links: {
         include: {
           purchaseOrder: {
@@ -83,6 +86,45 @@ export default async function CustomerPoDetailPage({
             <Row label="Total value" value={formatMoney(cpo.totalValue, cpo.currency)} />
             <Row label="Received" value={formatDate(cpo.receivedDate)} />
             <Row label="Created" value={formatDate(cpo.createdAt)} />
+            <Row label="Deliver to" value={cpo.deliveryLocation ?? "—"} />
+            <Row label="Window start" value={formatDate(cpo.startShipDate)} />
+            <Row label="Cancel date" value={formatDate(cpo.cancelDate)} />
+            {canEdit && (
+              <WindowEditor
+                customerPoId={cpo.id}
+                startShipDate={cpo.startShipDate?.toISOString().slice(0, 10) ?? ""}
+                cancelDate={cpo.cancelDate?.toISOString().slice(0, 10) ?? ""}
+                deliveryLocation={cpo.deliveryLocation ?? ""}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="lg:col-span-3">
+          <CardHeader><CardTitle>Shipments carrying this PO</CardTitle></CardHeader>
+          <CardContent>
+            {cpo.shipmentRisks.length === 0 ? (
+              <p className="text-sm text-[var(--muted-foreground)]">
+                No shipments are linked yet. When a shipment carrying this PO is tracked, its
+                arrival is checked against the window above automatically.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {cpo.shipmentRisks.map((r) => (
+                  <Link
+                    key={r.id}
+                    href={`/shipments/${r.shipment.id}`}
+                    className="flex items-center gap-2 rounded-md border border-[var(--border)] px-3 py-2 text-sm hover:bg-[var(--accent)]"
+                  >
+                    <span className="font-medium text-[var(--primary)]">{r.shipment.shipmentRef}</span>
+                    <span className="text-[var(--muted-foreground)]">
+                      arrives {formatDate(r.projectedDeliveryDate)}
+                    </span>
+                    <RiskBadge status={r.status} />
+                  </Link>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

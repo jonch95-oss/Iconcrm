@@ -21,6 +21,8 @@ const NAV = [
   { href: "/pos", label: "Purchase Orders" },
   { href: "/customer-pos", label: "Customer POs" },
   { href: "/packing-lists", label: "Packing Lists" },
+  { href: "/shipments", label: "Shipments" },
+  { href: "/receive", label: "Receive Samples" },
   { href: "/needs-review", label: "Needs Review" },
   { href: "/factories", label: "Factories" },
   { href: "/settings", label: "Admin Settings" },

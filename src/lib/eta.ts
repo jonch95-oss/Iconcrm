@@ -38,10 +38,15 @@ export async function changeEta(input: ChangeEtaInput) {
         where: { id: input.parentId },
         data: { sampleEta: input.newEta },
       });
-    } else {
+    } else if (input.parentType === "po") {
       await tx.purchaseOrder.update({
         where: { id: input.parentId },
         data: { factoryEta: input.newEta },
+      });
+    } else {
+      await tx.shipment.update({
+        where: { id: input.parentId },
+        data: { currentEta: input.newEta },
       });
     }
 

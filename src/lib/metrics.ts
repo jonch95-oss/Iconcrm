@@ -3,6 +3,12 @@ import { computeThreeWay, isFullyMatched } from "@/lib/match";
 
 /** Dashboard KPI counts. */
 export async function dashboardMetrics() {
+  const shipmentsLate = await prisma.shipmentRisk.count({
+    where: { status: "late_for_window" },
+  });
+  const shipmentsAtRisk = await prisma.shipmentRisk.count({
+    where: { status: { in: ["at_risk", "early_for_window"] } },
+  });
   const now = new Date();
 
   const [openSamples, overdueSamples, pisAwaiting, unresolvedVariances, posInProduction] =
@@ -46,6 +52,9 @@ export async function dashboardMetrics() {
   }
 
   return {
+    shipmentsLate,
+    shipmentsAtRisk,
+
     openSamples,
     overdueSamples,
     pisAwaiting,

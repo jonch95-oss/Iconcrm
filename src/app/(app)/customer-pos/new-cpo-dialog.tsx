@@ -62,6 +62,20 @@ export function NewCpoDialog() {
               <Input id="totalValue" name="totalValue" type="number" step="0.01" />
             </div>
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="startShipDate">Window start date</Label>
+              <Input id="startShipDate" name="startShipDate" type="date" />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="cancelDate">Cancel date</Label>
+              <Input id="cancelDate" name="cancelDate" type="date" />
+            </div>
+          </div>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Goods must arrive at the customer between these dates. Shipment ETAs are checked
+            against this window automatically.
+          </p>
           <DialogFooter>
             <Button type="submit" disabled={pending}>{pending ? "Creating…" : "Create"}</Button>
           </DialogFooter>

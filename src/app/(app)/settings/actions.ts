@@ -30,6 +30,8 @@ export async function saveSettings(formData: FormData): Promise<ActionResult> {
     poNumberStart: Number(formData.get("poNumberStart") ?? 1) || 1,
     orderFormPrefix: String(formData.get("orderFormPrefix") ?? "OF").trim() || "OF",
     followUpCadenceDays: Number(formData.get("followUpCadenceDays") ?? 7) || 7,
+    inlandBufferDaysDefault: Number(formData.get("inlandBufferDaysDefault") ?? 5) || 5,
+    riskThresholdDays: Number(formData.get("riskThresholdDays") ?? 7) || 7,
   });
   await logAudit({ entityType: "settings", entityId: "app_settings", action: "updated", userId: user.id });
   revalidatePath("/settings");

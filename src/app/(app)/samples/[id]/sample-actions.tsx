@@ -39,6 +39,9 @@ export interface SampleEditData {
   currency: string;
   fobPort: string;
   customerSellPrice: string;
+  dutyRatePercent: string;
+  freightPerUnit: string;
+  inlandPerUnit: string;
   factoryId: string;
   status: string;
 }
@@ -119,6 +122,9 @@ export function SampleActions({
             </div>
             <F label="FOB port" name="fobPort" defaultValue={data.fobPort} />
             <F label="Customer sell price" name="customerSellPrice" defaultValue={data.customerSellPrice} type="number" step="0.01" />
+            <F label="Duty rate %" name="dutyRatePercent" defaultValue={data.dutyRatePercent} type="number" step="0.001" />
+            <F label="Freight / unit" name="freightPerUnit" defaultValue={data.freightPerUnit} type="number" step="0.01" />
+            <F label="Inland / unit" name="inlandPerUnit" defaultValue={data.inlandPerUnit} type="number" step="0.01" />
             <div className="col-span-2 space-y-1.5">
               <Label>Factory</Label>
               <Select value={factoryId} onValueChange={setFactoryId}>

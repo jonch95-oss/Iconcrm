@@ -110,3 +110,56 @@ export async function updatePoDetails(formData: FormData): Promise<ActionResult>
   revalidatePath(`/pos/${poId}`);
   return { ok: true };
 }
+
+// ---------------------------------------------------------------------------
+// PP / TOP production sample approvals
+// ---------------------------------------------------------------------------
+
+export async function addProductionSample(formData: FormData): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const poId = String(formData.get("poId") ?? "");
+  const stage = String(formData.get("stage") ?? "");
+  const dueDate = parseDateInput(String(formData.get("dueDate") ?? "") || null);
+  const notes = String(formData.get("notes") ?? "") || null;
+  if (!poId || (stage !== "pp" && stage !== "top")) {
+    return { ok: false, error: "Choose PP or TOP." };
+  }
+  const row = await prisma.productionSample.create({
+    data: { poId, stage: stage as "pp" | "top", dueDate, notes },
+  });
+  await logAudit({
+    entityType: "po",
+    entityId: poId,
+    action: "production_sample_added",
+    userId: user.id,
+    after: { stage, productionSampleId: row.id },
+  });
+  revalidatePath(`/pos/${poId}`);
+  return { ok: true };
+}
+
+export async function reviewProductionSample(
+  id: string,
+  decision: "approved" | "rejected",
+  notes?: string,
+): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const row = await prisma.productionSample.update({
+    where: { id },
+    data: {
+      status: decision,
+      notes: notes || undefined,
+      reviewedById: user.id,
+      reviewedAt: new Date(),
+    },
+  });
+  await logAudit({
+    entityType: "po",
+    entityId: row.poId,
+    action: `production_sample_${decision}`,
+    userId: user.id,
+    after: { stage: row.stage, productionSampleId: id },
+  });
+  revalidatePath(`/pos/${row.poId}`);
+  return { ok: true };
+}

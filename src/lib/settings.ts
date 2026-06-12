@@ -22,6 +22,9 @@ export interface AppSettings {
   // Option lists.
   brands: string[];
   categories: string[];
+  // Shipment tracking.
+  inlandBufferDaysDefault: number; // days from port arrival to customer DC
+  riskThresholdDays: number;       // "at risk" when within N days of cancel date
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -40,6 +43,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   followUpCadenceDays: 7,
   brands: ["Aurora", "Northwind", "Coastline", "Vertex", "Maple & Co"],
   categories: ["Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Footwear"],
+  inlandBufferDaysDefault: 5,
+  riskThresholdDays: 7,
 };
 
 const SETTINGS_KEY = "app_settings";

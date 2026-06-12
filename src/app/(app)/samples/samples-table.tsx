@@ -518,6 +518,15 @@ export function SamplesTable({
               <FileSpreadsheet className="h-4 w-4" /> Create Order Form
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() =>
+              window.open(`/api/line-sheet?ids=${selectedIds.join(",")}`, "_blank")
+            }
+          >
+            <Download className="h-4 w-4" /> Line sheet PDF
+          </Button>
           <Button size="sm" variant="ghost" onClick={() => setRowSelection({})}>
             Clear
           </Button>

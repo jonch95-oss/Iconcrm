@@ -1,4 +1,4 @@
-import type { SampleStatus, POStatus } from "@prisma/client";
+import type { SampleStatus, POStatus, ShipmentStatus, RiskStatus } from "@prisma/client";
 
 // ---------------------------------------------------------------------------
 // Sample lifecycle pipeline (single source of truth)
@@ -129,3 +129,58 @@ export const DROPPED_REASON_LABEL: Record<string, string> = {
   factory_issue: "Factory issue",
   other: "Other",
 };
+
+export const SHIPMENT_PIPELINE: ShipmentStatus[] = [
+  "booked",
+  "in_transit",
+  "arrived_port",
+  "inland",
+  "delivered",
+];
+
+export const SHIPMENT_STATUS_LABEL: Record<ShipmentStatus, string> = {
+  booked: "Booked",
+  in_transit: "On the water",
+  arrived_port: "Arrived at port",
+  inland: "Inland to customer",
+  delivered: "Delivered",
+  cancelled: "Cancelled",
+};
+
+export const SHIPMENT_STATUS_TONE: Record<ShipmentStatus, BadgeTone> = {
+  booked: "secondary",
+  in_transit: "default",
+  arrived_port: "default",
+  inland: "default",
+  delivered: "success",
+  cancelled: "destructive",
+};
+
+export const RISK_STATUS_LABEL: Record<RiskStatus, string> = {
+  on_track: "On track",
+  at_risk: "At risk",
+  late_for_window: "Late for window",
+  early_for_window: "Early for window",
+  no_window: "No window set",
+};
+
+export const RISK_STATUS_TONE: Record<RiskStatus, BadgeTone> = {
+  on_track: "success",
+  at_risk: "warning",
+  late_for_window: "destructive",
+  early_for_window: "warning",
+  no_window: "secondary",
+};
+
+/** Worst-of for a set of risk statuses (for table rollups). */
+const RISK_RANK: Record<RiskStatus, number> = {
+  no_window: 0,
+  on_track: 1,
+  early_for_window: 2,
+  at_risk: 3,
+  late_for_window: 4,
+};
+export function worstRisk(statuses: RiskStatus[]): RiskStatus | null {
+  if (statuses.length === 0) return null;
+  return statuses.reduce((a, b) => (RISK_RANK[b] > RISK_RANK[a] ? b : a));
+}

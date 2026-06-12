@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { SampleStatusBadge } from "@/components/status-badge";
 import { PipelineChain, type ChainNode } from "@/components/pipeline-chain";
 import { formatMoney, formatPercent, marginPercent } from "@/lib/money";
+import { landedCost } from "@/lib/landed";
 import { formatDate, formatDateTime, isOverdue } from "@/lib/date";
 import { DROPPED_REASON_LABEL } from "@/lib/status";
 import { SampleActions } from "./sample-actions";
@@ -83,6 +84,8 @@ export default async function SampleDetailPage({
   const canEdit = hasRole(user.role, "member");
   const isAdmin = hasRole(user.role, "admin");
   const margin = marginPercent(sample.customerSellPrice, sample.fobCost);
+  const landed = landedCost(sample);
+  const landedMargin = marginPercent(sample.customerSellPrice, landed);
   const overdue = !sample.sampleReceivedDate && isOverdue(sample.sampleEta);
 
   // Build the linked chain breadcrumb.
@@ -152,6 +155,9 @@ export default async function SampleDetailPage({
             currency: sample.currency,
             fobPort: sample.fobPort ?? "",
             customerSellPrice: sample.customerSellPrice?.toString() ?? "",
+            dutyRatePercent: sample.dutyRatePercent?.toString() ?? "",
+            freightPerUnit: sample.freightPerUnit?.toString() ?? "",
+            inlandPerUnit: sample.inlandPerUnit?.toString() ?? "",
             factoryId: sample.factoryId ?? "",
             status: sample.status,
           }}
@@ -178,7 +184,9 @@ export default async function SampleDetailPage({
             <Detail label="FOB cost" value={formatMoney(sample.fobCost, sample.currency)} />
             <Detail label="FOB port" value={sample.fobPort ?? "—"} />
             <Detail label="Customer sell price" value={formatMoney(sample.customerSellPrice, sample.currency)} />
-            <Detail label="Margin" value={margin ? formatPercent(margin) : "—"} />
+            <Detail label="FOB margin" value={margin ? formatPercent(margin) : "—"} />
+            <Detail label="Landed cost (FOB + duty + freight + inland)" value={formatMoney(landed, sample.currency)} />
+            <Detail label="Landed margin" value={landedMargin ? formatPercent(landedMargin) : "—"} />
             <Detail label="Target customer" value={sample.targetCustomer ?? "—"} />
             <Detail label="Sample ETA" value={formatDate(sample.sampleEta)} />
             <Detail label="Received" value={formatDate(sample.sampleReceivedDate)} />

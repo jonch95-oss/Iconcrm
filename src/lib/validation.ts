@@ -59,6 +59,9 @@ export const sampleCreateSchema = z.object({
   currency: currencyEnum.default("USD"),
   fobPort: optionalString,
   customerSellPrice: decimalString,
+  dutyRatePercent: decimalString,
+  freightPerUnit: decimalString,
+  inlandPerUnit: decimalString,
   sampleEta: optionalDate,
   sampleReceivedDate: optionalDate,
 });

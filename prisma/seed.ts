@@ -360,6 +360,9 @@ async function main() {
         receivedDate: daysFromNow(-randInt(5, 30)),
         totalValue: new Prisma.Decimal(randInt(20000, 200000)),
         currency: "USD",
+        startShipDate: daysFromNow(randInt(10, 25)),
+        cancelDate: daysFromNow(randInt(35, 60)),
+        deliveryLocation: pick(["Edison NJ DC", "Columbus OH DC", "Ontario CA DC"]),
       },
     });
     // Link to 1-2 internal POs (many-to-many).
@@ -401,6 +404,79 @@ async function main() {
         action: pick(["status_changed", "fob_changed", "eta_changed", "created"]),
         after: { status: s.status },
         createdAt: daysFromNow(-randInt(0, 5)),
+      },
+    });
+  }
+
+  // Landed cost inputs on a slice of samples.
+  for (const smp of samples.slice(0, 12)) {
+    await prisma.sample.update({
+      where: { id: smp.id },
+      data: {
+        dutyRatePercent: new Prisma.Decimal(pick([8.4, 12.5, 17.5, 32])),
+        freightPerUnit: new Prisma.Decimal(randInt(40, 180) / 100),
+        inlandPerUnit: new Prisma.Decimal(randInt(10, 60) / 100),
+      },
+    });
+  }
+
+  // Shipments in various risk states (manual mode).
+  let shpSeq = 1;
+  const cpos = await prisma.customerPO.findMany({ include: { links: true } });
+  for (const scenario of ["on_track", "at_risk", "late", "early"] as const) {
+    const cpo = cpos[shpSeq % Math.max(1, cpos.length)];
+    if (!cpo || cpo.links.length === 0) continue;
+    const originalEta = daysFromNow(scenario === "late" ? 50 : 20);
+    const currentEta =
+      scenario === "on_track"
+        ? originalEta
+        : scenario === "at_risk"
+          ? daysFromNow(38)
+          : scenario === "late"
+            ? daysFromNow(70)
+            : daysFromNow(2);
+    const shipment = await prisma.shipment.create({
+      data: {
+        shipmentRef: `SHP-${new Date().getFullYear()}-${String(shpSeq++).padStart(4, "0")}`,
+        containerNumber: `MSCU${randInt(1000000, 9999999)}`,
+        carrierScac: pick(["MAEU", "MSCU", "CMDU", "ONEY"]),
+        pol: pick(["CNSHA", "CNNGB", "VNSGN"]),
+        pod: pick(["USNYC", "USLAX", "USSAV"]),
+        vesselName: pick(["EVER ACE", "MSC OSCAR", "ONE INNOVATION"]),
+        originalEta,
+        currentEta,
+        inlandBufferDays: 5,
+        status: scenario === "early" ? "arrived_port" : "in_transit",
+        trackingProvider: "manual",
+        purchaseOrders: { connect: { id: cpo.links[0].purchaseOrderId } },
+      },
+    });
+    if (currentEta.getTime() !== originalEta.getTime()) {
+      await prisma.etaRevision.create({
+        data: {
+          parentType: "shipment",
+          parentId: shipment.id,
+          oldEta: originalEta,
+          newEta: currentEta,
+          reason: "Carrier schedule change",
+        },
+      });
+    }
+    const { recomputeShipmentRisks } = await import("../src/lib/tracking/risk");
+    await recomputeShipmentRisks(shipment.id);
+  }
+
+  // PP/TOP production samples on a few POs.
+  for (const po of issuedPOs.slice(0, 4)) {
+    await prisma.productionSample.create({
+      data: {
+        poId: po.id,
+        stage: "pp",
+        status: pick(["approved", "pending"]),
+        dueDate: daysFromNow(randInt(-5, 10)),
+        notes: "Check against approved counter sample.",
+        reviewedById: pick(users).id,
+        reviewedAt: daysFromNow(-randInt(0, 3)),
       },
     });
   }
