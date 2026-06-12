@@ -7,6 +7,7 @@ import { updateSettings } from "@/lib/settings";
 import { prisma } from "@/lib/db";
 import type { Role } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
+import { isOwner } from "@/lib/owner";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -44,6 +45,15 @@ const roleSchema = z.object({
 });
 
 export async function updateUserRole(userId: string, role: Role): Promise<ActionResult> {
+  {
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (target && isOwner(target.email) && role !== "admin") {
+      return { ok: false, error: "The owner account is always the admin." };
+    }
+    if (target && !isOwner(target.email) && role === "admin") {
+      return { ok: false, error: "Only the owner account can be an admin. Grant \"Can edit\" instead." };
+    }
+  }
   const admin = await assertRole("admin");
   const parsed = roleSchema.safeParse({ userId, role });
   if (!parsed.success) return { ok: false, error: "Invalid" };
@@ -62,6 +72,12 @@ export async function updateUserRole(userId: string, role: Role): Promise<Action
 }
 
 export async function toggleUserActive(userId: string, isActive: boolean): Promise<ActionResult> {
+  {
+    const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });
+    if (target && isOwner(target.email) && !isActive) {
+      return { ok: false, error: "The owner account can't be deactivated." };
+    }
+  }
   const admin = await assertRole("admin");
   await prisma.user.update({ where: { id: userId }, data: { isActive } });
   await logAudit({ entityType: "user", entityId: userId, action: isActive ? "activated" : "deactivated", userId: admin.id });
@@ -73,7 +89,8 @@ export async function inviteUser(formData: FormData): Promise<ActionResult> {
   const admin = await assertRole("admin");
   const email = String(formData.get("email") ?? "").toLowerCase().trim();
   const name = String(formData.get("name") ?? "").trim();
-  const role = String(formData.get("role") ?? "viewer") as Role;
+  let role = String(formData.get("role") ?? "viewer") as Role;
+  if (role === "admin") role = "member"; // only the owner account is admin
   if (!email) return { ok: false, error: "Email required" };
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "User already exists" };

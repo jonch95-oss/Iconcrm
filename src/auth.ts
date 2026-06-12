@@ -5,6 +5,7 @@ import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
+import { OWNER_EMAIL, isOwner } from "@/lib/owner";
 import type { Role } from "@prisma/client";
 
 const providers: NextAuthConfig["providers"] = [];
@@ -48,16 +49,27 @@ if (process.env.APP_PASSWORD) {
         if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
 
         let user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-          // First-ever sign-in on an empty database becomes the admin.
-          const total = await prisma.user.count();
-          if (total === 0) {
-            user = await prisma.user.create({
-              data: { email, role: "admin", name: email.split("@")[0] },
-            });
-          } else {
-            return null; // invite-only after bootstrap
-          }
+
+        if (isOwner(email)) {
+          // The owner is always an active admin — created on first sign-in,
+          // repaired on every sign-in, impossible to lock out.
+          user = user
+            ? await prisma.user.update({
+                where: { id: user.id },
+                data: { role: "admin", isActive: true },
+              })
+            : await prisma.user.create({
+                data: { email: OWNER_EMAIL, role: "admin", name: email.split("@")[0] },
+              });
+          // Owner is the ONLY admin: demote anyone else holding admin.
+          await prisma.user.updateMany({
+            where: { role: "admin", NOT: { id: user.id } },
+            data: { role: "member" },
+          });
+        } else if (!user) {
+          // Invite-only: non-owner emails must be added by the admin first.
+          // (On an empty database, only the owner can perform first sign-in.)
+          return null;
         }
         if (!user.isActive) return null;
         return {

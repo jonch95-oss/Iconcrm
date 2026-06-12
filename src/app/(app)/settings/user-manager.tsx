@@ -73,24 +73,29 @@ export function UserManager({ users }: { users: UserRow[] }) {
                   <div className="text-xs text-[var(--muted-foreground)]">{u.email}</div>
                 </TableCell>
                 <TableCell>
-                  <select
-                    value={u.role}
-                    onChange={(e) => setRole(u.id, e.target.value as Role)}
-                    disabled={pending}
-                    className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-sm"
-                  >
-                    <option value="admin">Admin — full control</option>
-                    <option value="member">Can edit</option>
-                    <option value="viewer">View only</option>
-                  </select>
+                  {u.role === "admin" ? (
+                    <Badge className="bg-[var(--bronze)] text-[var(--bronze-foreground)]">Owner · Admin</Badge>
+                  ) : (
+                    <select
+                      value={u.role}
+                      onChange={(e) => setRole(u.id, e.target.value as Role)}
+                      disabled={pending}
+                      className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-sm"
+                    >
+                      <option value="member">Can edit</option>
+                      <option value="viewer">View only</option>
+                    </select>
+                  )}
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.isActive ? "success" : "secondary"}>{u.isActive ? "active" : "inactive"}</Badge>
                 </TableCell>
                 <TableCell>
-                  <Button size="sm" variant="ghost" onClick={() => toggle(u.id, !u.isActive)} disabled={pending}>
-                    {u.isActive ? "Deactivate" : "Activate"}
-                  </Button>
+                  {u.role !== "admin" && (
+                    <Button size="sm" variant="ghost" onClick={() => toggle(u.id, !u.isActive)} disabled={pending}>
+                      {u.isActive ? "Deactivate" : "Activate"}
+                    </Button>
+                  )}
                 </TableCell>
               </TableRow>
             ))}
@@ -110,7 +115,6 @@ export function UserManager({ users }: { users: UserRow[] }) {
         <div className="space-y-1">
           <label className="text-xs">Role</label>
           <select name="role" defaultValue="viewer" className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-xs">
-            <option value="admin">Admin — full control</option>
             <option value="member">Can edit</option>
             <option value="viewer">View only</option>
           </select>
