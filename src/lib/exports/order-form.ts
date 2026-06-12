@@ -1,7 +1,7 @@
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 
-const COMPANY_NAME = "Wholesale Co. — Sample-to-PO";
+const COMPANY_NAME = "ICON LUXURY GROUP";
 
 export interface OrderFormExportData {
   orderFormNumber: string;
@@ -15,6 +15,7 @@ export interface OrderFormExportData {
     color: string;
     fob: string;
     currency: string;
+    imageUrl: string | null;
     quantities: Record<string, number>;
     total: number;
   }[];
@@ -49,6 +50,7 @@ export async function getOrderFormExportData(orderFormId: string): Promise<Order
         color,
         fob: l.fobCostSnapshot?.toString() ?? l.sample.fobCost?.toString() ?? "",
         currency: l.currency,
+        imageUrl: l.sample.imageUrl,
         quantities: {},
         total: 0,
       });
@@ -93,9 +95,25 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
   ws.getCell("A4").value = `Factory: ${data.factory.name}${data.factory.country ? ` (${data.factory.country})` : ""}`;
   ws.getCell("A5").value = `Contact: ${data.factory.contactName ?? "—"} ${data.factory.contactEmail ?? ""}`;
 
-  // Size grid header (row 7).
+  // Fetch product photos in parallel (skip any that fail — never block export).
+  const imageBuffers = await Promise.all(
+    data.rows.map(async (r) => {
+      if (!r.imageUrl || !r.imageUrl.startsWith("http")) return null;
+      try {
+        const res = await fetch(r.imageUrl);
+        if (!res.ok) return null;
+        const type = res.headers.get("content-type") ?? "";
+        const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : "jpeg";
+        return { buffer: Buffer.from(await res.arrayBuffer()), ext: ext as "png" | "gif" | "jpeg" };
+      } catch {
+        return null;
+      }
+    }),
+  );
+
+  // Size grid header (row 7). Column A is the photo.
   const headerRow = 7;
-  const headers = ["Style #", "Style name", "Color", "FOB", ...data.sizes, "Total"];
+  const headers = ["Image", "Style #", "Style name", "Color", "FOB", ...data.sizes, "Total"];
   headers.forEach((h, i) => {
     const cell = ws.getCell(headerRow, i + 1);
     cell.value = h;
@@ -106,25 +124,35 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
 
   data.rows.forEach((r, idx) => {
     const row = headerRow + 1 + idx;
-    ws.getCell(row, 1).value = r.styleNumber;
-    ws.getCell(row, 2).value = r.styleName;
-    ws.getCell(row, 3).value = r.color;
-    ws.getCell(row, 4).value = r.fob ? Number(r.fob) : "";
+    const img = imageBuffers[idx];
+    if (img) {
+      const imageId = wb.addImage({ buffer: img.buffer as unknown as ExcelJS.Buffer, extension: img.ext });
+      ws.addImage(imageId, {
+        tl: { col: 0.1, row: row - 1 + 0.08 },
+        ext: { width: 72, height: 72 },
+      });
+      ws.getRow(row).height = 58;
+    }
+    ws.getCell(row, 2).value = r.styleNumber;
+    ws.getCell(row, 3).value = r.styleName;
+    ws.getCell(row, 4).value = r.color;
+    ws.getCell(row, 5).value = r.fob ? Number(r.fob) : "";
     data.sizes.forEach((size, i) => {
-      ws.getCell(row, 5 + i).value = r.quantities[size] ?? 0;
+      ws.getCell(row, 6 + i).value = r.quantities[size] ?? 0;
     });
-    ws.getCell(row, 5 + data.sizes.length).value = r.total;
+    ws.getCell(row, 6 + data.sizes.length).value = r.total;
   });
 
   // Grand total row.
   const totalRow = headerRow + 1 + data.rows.length;
-  ws.getCell(totalRow, 4).value = "Grand total";
-  ws.getCell(totalRow, 4).font = { bold: true };
-  ws.getCell(totalRow, 5 + data.sizes.length).value = data.grandTotal;
-  ws.getCell(totalRow, 5 + data.sizes.length).font = { bold: true };
+  ws.getCell(totalRow, 5).value = "Grand total";
+  ws.getCell(totalRow, 5).font = { bold: true };
+  ws.getCell(totalRow, 6 + data.sizes.length).value = data.grandTotal;
+  ws.getCell(totalRow, 6 + data.sizes.length).font = { bold: true };
 
   ws.columns.forEach((c) => (c.width = 14));
-  ws.getColumn(2).width = 24;
+  ws.getColumn(1).width = 11;
+  ws.getColumn(3).width = 24;
 
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);

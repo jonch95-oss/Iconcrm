@@ -59,6 +59,7 @@ import { toast } from "sonner";
 export interface SampleRow {
   id: string;
   sampleNumber: string;
+  imageUrl: string | null;
   brand: string;
   category: string;
   styleName: string;
@@ -218,12 +219,24 @@ export function SamplesTable({
         accessorKey: "sampleNumber",
         header: ({ column }) => <SortBtn column={column} label="Sample #" />,
         cell: ({ row }) => (
-          <Link
-            href={`/samples/${row.original.id}`}
-            className="font-medium text-[var(--primary)] hover:underline"
-          >
-            {row.original.sampleNumber}
-          </Link>
+          <span className="flex items-center gap-2">
+            {row.original.imageUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={row.original.imageUrl}
+                alt=""
+                className="h-8 w-8 shrink-0 rounded border border-[var(--border)] bg-white object-contain"
+              />
+            ) : (
+              <span className="h-8 w-8 shrink-0 rounded border border-dashed border-[var(--border)]" />
+            )}
+            <Link
+              href={`/samples/${row.original.id}`}
+              className="font-medium text-[var(--primary)] hover:underline"
+            >
+              {row.original.sampleNumber}
+            </Link>
+          </span>
         ),
       },
       { accessorKey: "brand", header: ({ column }) => <SortBtn column={column} label="Brand" /> },

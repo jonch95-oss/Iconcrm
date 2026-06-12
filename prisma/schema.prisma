@@ -241,6 +241,10 @@ model Sample {
   // Customer sell price per style (for margin %). Stored alongside currency above.
   customerSellPrice Decimal? @db.Decimal(12, 4)
 
+  // Primary product image (Vercel Blob URL) — carried into order forms,
+  // line sheets, and PI views.
+  imageUrl String?
+
   // Landed cost inputs (per unit). Landed = FOB + duty% of FOB + freight + inland.
   dutyRatePercent Decimal? @db.Decimal(6, 3)  // e.g. 17.500 = 17.5%
   freightPerUnit  Decimal? @db.Decimal(12, 4)

@@ -1,0 +1,251 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { prisma } from "@/lib/db";
+import { assertRole } from "@/lib/session";
+import { logAudit } from "@/lib/audit";
+import { toDecimal } from "@/lib/money";
+import { parseSamplesWorkbook, parsePiLinesWorkbook } from "@/lib/import-excel";
+import { computeFobLine } from "@/lib/match";
+import type { Prisma } from "@prisma/client";
+
+export interface ImportSummary {
+  ok: boolean;
+  error?: string;
+  created: number;
+  updated: number;
+  variantsAdded: number;
+  skipped: { row: number; reason: string }[];
+  mappedColumns?: Record<string, string>;
+}
+
+const EMPTY: ImportSummary = { ok: false, created: 0, updated: 0, variantsAdded: 0, skipped: [] };
+
+async function readUpload(formData: FormData): Promise<Buffer | string> {
+  const file = formData.get("file");
+  if (!(file instanceof File) || file.size === 0) return "Choose an Excel file first.";
+  if (file.size > 10 * 1024 * 1024) return "File is too large (10 MB max).";
+  const name = file.name.toLowerCase();
+  if (!name.endsWith(".xlsx") && !name.endsWith(".xlsm")) {
+    return "Please upload an .xlsx file (in Excel: File → Save As → .xlsx).";
+  }
+  return Buffer.from(await file.arrayBuffer());
+}
+
+/**
+ * Bulk import samples (and their size/color/UPC variants) from Excel.
+ * Rows sharing a Sample # are grouped: the first row sets the sample's fields,
+ * and every row with size/color/UPC adds a SKU variant. Existing samples are
+ * updated with any non-empty values provided.
+ */
+export async function importSamplesExcel(formData: FormData): Promise<ImportSummary> {
+  const user = await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+
+  const parsed = await parseSamplesWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+  if (!parsed.mappedColumns.sampleNumber) {
+    return { ...EMPTY, error: "No Sample # column found — every row needs one." };
+  }
+
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  const factoryCache = new Map<string, string>();
+  let currentSampleId: string | null = null;
+  let currentSampleNumber = "";
+
+  for (const row of parsed.rows.slice(0, 2000)) {
+    const v = row.values;
+    const sampleNumber = (v.sampleNumber ?? "").trim();
+
+    try {
+      if (sampleNumber && sampleNumber !== currentSampleNumber) {
+        currentSampleNumber = sampleNumber;
+
+        let factoryId: string | undefined;
+        const factoryName = (v.factoryName ?? "").trim();
+        if (factoryName) {
+          if (!factoryCache.has(factoryName)) {
+            const f =
+              (await prisma.factory.findFirst({ where: { name: { equals: factoryName, mode: "insensitive" } } })) ??
+              (await prisma.factory.create({ data: { name: factoryName } }));
+            factoryCache.set(factoryName, f.id);
+          }
+          factoryId = factoryCache.get(factoryName);
+        }
+
+        const fields = {
+          brand: v.brand?.trim() || undefined,
+          category: v.category?.trim() || undefined,
+          styleNumber: v.styleNumber?.trim() || undefined,
+          styleName: v.styleName?.trim() || undefined,
+          description: v.description?.trim() || undefined,
+          targetCustomer: v.targetCustomer?.trim() || undefined,
+          fobCost: toDecimal(v.fobCost) ?? undefined,
+          customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
+          dutyRatePercent: toDecimal(v.dutyRatePercent) ?? undefined,
+          freightPerUnit: toDecimal(v.freightPerUnit) ?? undefined,
+          inlandPerUnit: toDecimal(v.inlandPerUnit) ?? undefined,
+          factoryId,
+        };
+
+        const existing = await prisma.sample.findUnique({ where: { sampleNumber } });
+        if (existing) {
+          await prisma.sample.update({ where: { id: existing.id }, data: fields });
+          currentSampleId = existing.id;
+          summary.updated += 1;
+        } else {
+          const created = await prisma.sample.create({
+            data: {
+              sampleNumber,
+              ...fields,
+              status: fields.fobCost ? "quoted" : "sample_requested",
+              requestedById: user.id,
+            },
+          });
+          currentSampleId = created.id;
+          summary.created += 1;
+        }
+      }
+
+      if (!currentSampleId) {
+        summary.skipped.push({ row: row.rowNumber, reason: "No Sample # on or above this row" });
+        continue;
+      }
+
+      // Variant on this row?
+      const upc = (v.upc ?? "").trim();
+      const size = (v.size ?? "").trim();
+      const color = (v.color ?? "").trim();
+      if (upc || (size && color)) {
+        if (!upc) {
+          summary.skipped.push({ row: row.rowNumber, reason: "Size/color without a UPC" });
+          continue;
+        }
+        const dup = await prisma.skuVariant.findUnique({ where: { upc } });
+        if (dup) {
+          if (dup.sampleId !== currentSampleId) {
+            summary.skipped.push({ row: row.rowNumber, reason: `UPC ${upc} already belongs to another sample` });
+          }
+          continue; // same sample: already imported, fine
+        }
+        await prisma.skuVariant.create({
+          data: {
+            sampleId: currentSampleId,
+            upc,
+            size: size || "OS",
+            color: color || "—",
+            skuCode: v.skuCode?.trim() || null,
+          },
+        });
+        summary.variantsAdded += 1;
+      }
+    } catch (err) {
+      summary.skipped.push({
+        row: row.rowNumber,
+        reason: err instanceof Error ? err.message.split("\n")[0].slice(0, 120) : "Unknown error",
+      });
+    }
+  }
+
+  await logAudit({
+    entityType: "sample",
+    entityId: "bulk_import",
+    action: "excel_import",
+    userId: user.id,
+    after: { created: summary.created, updated: summary.updated, variants: summary.variantsAdded },
+  });
+  revalidatePath("/samples");
+  return summary;
+}
+
+/**
+ * Import PI lines from a factory Excel. Each row needs a quantity + unit price
+ * plus something to match on: UPC (best), or Style # / Sample # (matched at
+ * the style level). FOB variance is computed exactly like manual entry.
+ */
+export async function importPiLinesExcel(piId: string, formData: FormData): Promise<ImportSummary> {
+  const user = await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+
+  const pi = await prisma.proformaInvoice.findUnique({ where: { id: piId }, select: { id: true } });
+  if (!pi) return { ...EMPTY, error: "PI not found." };
+
+  const parsed = await parsePiLinesWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+  if (!parsed.mappedColumns.quantity || !parsed.mappedColumns.unitPrice) {
+    return { ...EMPTY, error: "Need both a quantity column and a price column." };
+  }
+
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+
+  for (const row of parsed.rows.slice(0, 1000)) {
+    const v = row.values;
+    const quantity = parseInt(v.quantity ?? "", 10);
+    const unitPrice = toDecimal(v.unitPrice);
+    if (!Number.isFinite(quantity) || quantity <= 0 || !unitPrice) {
+      summary.skipped.push({ row: row.rowNumber, reason: "Missing or invalid quantity/price" });
+      continue;
+    }
+
+    // Resolve sample / SKU.
+    let sampleId: string | null = null;
+    let skuVariantId: string | null = null;
+    const upc = (v.upc ?? "").trim();
+    if (upc) {
+      const sku = await prisma.skuVariant.findUnique({ where: { upc }, select: { id: true, sampleId: true } });
+      if (sku) {
+        skuVariantId = sku.id;
+        sampleId = sku.sampleId;
+      }
+    }
+    if (!sampleId) {
+      const styleNo = (v.styleNumber ?? "").trim();
+      const sampleNo = (v.sampleNumber ?? "").trim();
+      const sample =
+        (sampleNo && (await prisma.sample.findUnique({ where: { sampleNumber: sampleNo }, select: { id: true } }))) ||
+        (styleNo &&
+          (await prisma.sample.findFirst({
+            where: { styleNumber: { equals: styleNo, mode: "insensitive" } },
+            select: { id: true },
+          }))) ||
+        null;
+      if (sample) sampleId = sample.id;
+    }
+    if (!sampleId) {
+      summary.skipped.push({ row: row.rowNumber, reason: `No matching style/UPC (${upc || v.styleNumber || v.sampleNumber || "blank"})` });
+      continue;
+    }
+
+    let fob: Prisma.Decimal | null = null;
+    const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { fobCost: true } });
+    fob = sample?.fobCost ?? null;
+    const match = computeFobLine(unitPrice, fob);
+
+    await prisma.pILine.create({
+      data: {
+        piId,
+        sampleId,
+        skuVariantId,
+        quantity,
+        unitPrice,
+        fobSnapshot: fob,
+        variance: match.variance,
+        variancePercent: match.variancePercent,
+        resolution: match.hasFob && match.matches ? "approved" : "pending",
+      },
+    });
+    summary.created += 1;
+  }
+
+  await logAudit({
+    entityType: "pi",
+    entityId: piId,
+    action: "excel_import_lines",
+    userId: user.id,
+    after: { created: summary.created, skipped: summary.skipped.length },
+  });
+  revalidatePath(`/pis/${piId}`);
+  return summary;
+}

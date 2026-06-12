@@ -4,6 +4,7 @@ import {
   Page,
   Text,
   View,
+  Image,
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
@@ -11,6 +12,7 @@ import { prisma } from "@/lib/db";
 import { formatMoney } from "@/lib/money";
 
 export interface LineSheetRow {
+  imageUrl: string | null;
   styleNumber: string;
   styleName: string;
   brand: string;
@@ -42,6 +44,7 @@ export async function getLineSheetData(sampleIds: string[]): Promise<LineSheetDa
       day: "numeric",
     }),
     rows: samples.map((s) => ({
+      imageUrl: s.imageUrl,
       styleNumber: s.styleNumber ?? s.sampleNumber,
       styleName: s.styleName ?? "—",
       brand: s.brand ?? "—",
@@ -63,7 +66,12 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     padding: 10,
     marginBottom: 8,
+    flexDirection: "row",
+    gap: 10,
   },
+  photo: { width: 64, height: 64, objectFit: "contain" },
+  photoBox: { width: 64 },
+  cardBody: { flex: 1 },
   styleRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 2 },
   styleName: { fontSize: 11, fontWeight: "bold" },
   price: { fontSize: 11, fontWeight: "bold" },
@@ -81,6 +89,12 @@ function LineSheetPdf({ data }: { data: LineSheetData }) {
         </Text>
         {data.rows.map((r, i) => (
           <View key={i} style={styles.card} wrap={false}>
+            {r.imageUrl ? (
+              <View style={styles.photoBox}>
+                <Image src={r.imageUrl} style={styles.photo} />
+              </View>
+            ) : null}
+            <View style={styles.cardBody}>
             <View style={styles.styleRow}>
               <Text style={styles.styleName}>
                 {r.styleNumber} — {r.styleName}
@@ -94,6 +108,7 @@ function LineSheetPdf({ data }: { data: LineSheetData }) {
               Sizes: {r.sizes} · Colors: {r.colors}
             </Text>
             {r.description ? <Text style={styles.desc}>{r.description}</Text> : null}
+            </View>
           </View>
         ))}
       </Page>

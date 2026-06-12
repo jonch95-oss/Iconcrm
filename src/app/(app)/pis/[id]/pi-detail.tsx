@@ -38,6 +38,7 @@ export interface PiLineView {
   id: string;
   sampleNumber: string;
   sampleId: string | null;
+  imageUrl: string | null;
   sku: string | null;
   quantity: number;
   unitPrice: string;
@@ -197,13 +198,19 @@ export function PiDetail({
                     lines.map((l) => (
                       <TableRow key={l.id}>
                         <TableCell>
-                          {l.sampleId ? (
-                            <Link href={`/samples/${l.sampleId}`} className="text-[var(--primary)] hover:underline">
-                              {l.sampleNumber}
-                            </Link>
-                          ) : (
-                            l.sampleNumber
-                          )}
+                          <span className="flex items-center gap-2">
+                            {l.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={l.imageUrl} alt="" className="h-8 w-8 shrink-0 rounded border border-[var(--border)] bg-white object-contain" />
+                            )}
+                            {l.sampleId ? (
+                              <Link href={`/samples/${l.sampleId}`} className="text-[var(--primary)] hover:underline">
+                                {l.sampleNumber}
+                              </Link>
+                            ) : (
+                              l.sampleNumber
+                            )}
+                          </span>
                         </TableCell>
                         <TableCell className="text-xs">{l.sku ?? "—"}</TableCell>
                         <TableCell className="tabular-nums">{l.quantity}</TableCell>

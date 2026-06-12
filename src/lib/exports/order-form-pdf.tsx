@@ -7,6 +7,7 @@ import {
   StyleSheet,
   renderToBuffer,
 } from "@react-pdf/renderer";
+import { Image } from "@react-pdf/renderer";
 import type { OrderFormExportData } from "./order-form";
 
 const styles = StyleSheet.create({
@@ -39,7 +40,8 @@ function OrderFormPdf({ data }: { data: OrderFormExportData }) {
 
         <View style={styles.table}>
           <View style={styles.headerRow}>
-            <View style={[styles.cell, { width: "14%" }]}><Text style={styles.headerText}>Style #</Text></View>
+            <View style={[styles.cell, { width: "8%" }]}><Text style={styles.headerText}>Image</Text></View>
+            <View style={[styles.cell, { width: "12%" }]}><Text style={styles.headerText}>Style #</Text></View>
             <View style={[styles.cell, { width: "22%" }]}><Text style={styles.headerText}>Style</Text></View>
             <View style={[styles.cell, { width: "12%" }]}><Text style={styles.headerText}>Color</Text></View>
             <View style={[styles.cell, { width: "10%" }]}><Text style={styles.headerText}>FOB</Text></View>

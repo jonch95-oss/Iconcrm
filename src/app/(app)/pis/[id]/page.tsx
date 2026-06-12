@@ -4,6 +4,7 @@ import { prisma } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { PiStatusBadge } from "@/components/status-badge";
+import { ImportPiLinesButton } from "./import-pi-lines-button";
 import { PiDetail, type PiLineView, type PiSampleOption } from "./pi-detail";
 import { summarizeFob } from "@/lib/match";
 import { formatMoney } from "@/lib/money";
@@ -26,7 +27,7 @@ export default async function PiDetailPage({
       orderForm: { select: { id: true, orderFormNumber: true } },
       purchaseOrders: { select: { id: true, poNumber: true } },
       lines: {
-        include: { sample: { select: { id: true, sampleNumber: true } }, skuVariant: true },
+        include: { sample: { select: { id: true, sampleNumber: true, imageUrl: true } }, skuVariant: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -47,6 +48,7 @@ export default async function PiDetailPage({
     id: l.id,
     sampleNumber: l.sample?.sampleNumber ?? "—",
     sampleId: l.sample?.id ?? null,
+    imageUrl: l.sample?.imageUrl ?? null,
     sku: l.skuVariant ? `${l.skuVariant.size}/${l.skuVariant.color}` : null,
     quantity: l.quantity,
     unitPrice: formatMoney(l.unitPrice, pi.currency),
@@ -72,6 +74,7 @@ export default async function PiDetailPage({
         title={`PI ${pi.piNumber}`}
         description={`${pi.factory.name} · ${formatDate(pi.piDate)}`}
       >
+        {canEdit && <ImportPiLinesButton piId={pi.id} />}
         <PiStatusBadge status={pi.status} />
       </PageHeader>
 

@@ -303,3 +303,69 @@ export async function createOrderFormFromSamples(
   revalidatePath("/order-forms");
   return { ok: true, id: of.id };
 }
+
+// ---------------------------------------------------------------------------
+// Sample image upload (primary product photo, carried into exports)
+// ---------------------------------------------------------------------------
+
+export async function uploadSampleImage(formData: FormData): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const sampleId = String(formData.get("sampleId") ?? "");
+  const file = formData.get("file");
+  if (!sampleId || !(file instanceof File) || file.size === 0) {
+    return { ok: false, error: "Choose an image first." };
+  }
+  if (!file.type.startsWith("image/")) {
+    return { ok: false, error: "That file isn't an image." };
+  }
+  if (file.size > 8 * 1024 * 1024) {
+    return { ok: false, error: "Image is too large (8 MB max)." };
+  }
+
+  const { uploadBlob } = await import("@/lib/blob");
+  let url: string;
+  try {
+    url = await uploadBlob(
+      `samples/${sampleId}/${file.name}`,
+      Buffer.from(await file.arrayBuffer()),
+      file.type,
+    );
+  } catch {
+    return {
+      ok: false,
+      error:
+        "Image storage isn't set up yet. In Vercel: Storage → Create → Blob, then redeploy.",
+    };
+  }
+
+  await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url } });
+  await prisma.attachment.create({
+    data: {
+      parentType: "sample",
+      parentId: sampleId,
+      blobUrl: url,
+      filename: file.name,
+      mimeType: file.type,
+      uploadedById: user.id,
+    },
+  });
+  await logAudit({
+    entityType: "sample",
+    entityId: sampleId,
+    action: "image_uploaded",
+    userId: user.id,
+    after: { filename: file.name },
+  });
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
+  return { ok: true };
+}
+
+export async function removeSampleImage(sampleId: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: null } });
+  await logAudit({ entityType: "sample", entityId: sampleId, action: "image_removed", userId: user.id });
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
+  return { ok: true };
+}

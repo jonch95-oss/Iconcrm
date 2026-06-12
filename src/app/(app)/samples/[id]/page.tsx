@@ -10,6 +10,7 @@ import { SampleStatusBadge } from "@/components/status-badge";
 import { PipelineChain, type ChainNode } from "@/components/pipeline-chain";
 import { formatMoney, formatPercent, marginPercent } from "@/lib/money";
 import { landedCost } from "@/lib/landed";
+import { SampleImage } from "./sample-image";
 import { formatDate, formatDateTime, isOverdue } from "@/lib/date";
 import { DROPPED_REASON_LABEL } from "@/lib/status";
 import { SampleActions } from "./sample-actions";
@@ -179,6 +180,7 @@ export default async function SampleDetailPage({
             <CardTitle>Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2 text-sm">
+            <SampleImage sampleId={sample.id} imageUrl={sample.imageUrl} canEdit={canEdit} />
             <Detail label="Factory" value={sample.factory ? <Link className="text-[var(--primary)] hover:underline" href={`/factories/${sample.factory.id}`}>{sample.factory.name}</Link> : "—"} />
             <Detail label="Style #" value={sample.styleNumber ?? "—"} />
             <Detail label="FOB cost" value={formatMoney(sample.fobCost, sample.currency)} />
