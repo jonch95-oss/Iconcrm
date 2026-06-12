@@ -181,3 +181,14 @@ import { computeContainerFill, CBM_40HQ } from "../src/lib/container";
   console.assert(two.verdict === "full_multiple", "two-container verdict, got " + two.verdict);
   console.log("container-fill: all assertions passed");
 }
+
+// --- Parcel carrier detection ---
+import { detectCarrier } from "../src/lib/parcel";
+{
+  console.assert(detectCarrier("1Z999AA10123456784") === "ups", "ups");
+  console.assert(detectCarrier("9405511899223197428490") === "usps", "usps");
+  console.assert(detectCarrier("123456789012") === "fedex", "fedex 12");
+  console.assert(detectCarrier("1234567890") === "dhl", "dhl 10");
+  console.assert(detectCarrier("ABC-XYZ-1") === "other", "other");
+  console.log("parcel-detect: all assertions passed");
+}

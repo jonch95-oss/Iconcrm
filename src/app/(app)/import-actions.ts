@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook } from "@/lib/import-excel";
 import { computeFobLine } from "@/lib/match";
+import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
 
 const VALID_STATUS = new Set([
@@ -102,6 +103,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           composition: v.composition?.trim() || undefined,
           cbmPerCarton: toDecimal(v.cbmPerCarton) ?? undefined,
           casePackDefault: v.casePackDefault ? parseInt(v.casePackDefault, 10) || undefined : undefined,
+          trackingNumber: v.trackingNumber?.trim() || undefined,
+          trackingCarrier: v.trackingNumber?.trim()
+            ? ((v.trackingCarrier?.trim().toLowerCase() as ParcelCarrier) || detectCarrier(v.trackingNumber.trim()))
+            : undefined,
           factoryId,
         };
 
@@ -174,6 +179,31 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         reason: err instanceof Error ? err.message.split("\n")[0].slice(0, 120) : "Unknown error",
       });
     }
+  }
+
+  // Live ETAs for any tracking numbers in the file (best-effort, parallel,
+  // capped so a big sheet can't stall the import).
+  {
+    const tracked = await prisma.sample.findMany({
+      where: {
+        trackingNumber: { not: null },
+        sampleReceivedDate: null,
+        id: { in: [...rowToSample.values()] },
+      },
+      select: { id: true, trackingNumber: true, trackingCarrier: true },
+      take: 50,
+    });
+    await Promise.allSettled(
+      tracked.map(async (t) => {
+        const live = await resolveParcel(t.trackingNumber!, (t.trackingCarrier ?? "other") as ParcelCarrier);
+        if (live) {
+          await prisma.sample.update({
+            where: { id: t.id },
+            data: { trackingEta: live.eta, trackingStatus: live.status ?? undefined },
+          });
+        }
+      }),
+    );
   }
 
   // Photos embedded in the spreadsheet: each image belongs to the sample

@@ -37,6 +37,8 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   composition: ["composition", "compositionwpercentages", "fabric", "material", "content", "fibercontent"],
   cbmPerCarton: ["cbm", "cbmpercarton", "cbmcarton", "cartoncbm"],
   casePackDefault: ["casepack", "caseqty", "unitspercarton", "casepk", "pack"],
+  trackingNumber: ["tracking", "trackingno", "trackingnumber", "trackingid", "awb", "airwaybill", "waybill"],
+  trackingCarrier: ["carrier", "courier", "shipvia", "shippedvia"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {

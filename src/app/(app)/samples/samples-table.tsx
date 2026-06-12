@@ -21,6 +21,7 @@ import {
   AlertTriangle,
   FileSpreadsheet,
   Save,
+  PackageCheck,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -53,7 +54,7 @@ import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
-import { updateSample, createOrderFormFromSamples } from "./actions";
+import { updateSample, createOrderFormFromSamples, bulkReceiveSamples } from "./actions";
 import { toast } from "sonner";
 
 export interface SampleRow {
@@ -529,6 +530,25 @@ export function SamplesTable({
           {canEdit && (
             <Button size="sm" onClick={createOrderForm} disabled={pending}>
               <FileSpreadsheet className="h-4 w-4" /> Create Order Form
+            </Button>
+          )}
+          {canEdit && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              onClick={() =>
+                startTransition(async () => {
+                  const res = await bulkReceiveSamples(selectedIds);
+                  if (res.ok) {
+                    toast.success(`${selectedIds.length} marked received`);
+                    setRowSelection({});
+                    router.refresh();
+                  } else toast.error(res.error);
+                })
+              }
+            >
+              <PackageCheck className="h-4 w-4" /> Mark received
             </Button>
           )}
           <Button

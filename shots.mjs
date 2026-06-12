@@ -1,17 +1,31 @@
 import { chromium } from "@playwright/test";
 const b = await chromium.launch();
-const page = await b.newPage({ viewport: { width: 1380, height: 900 } });
+const page = await b.newPage({ viewport: { width: 1380, height: 950 } });
 page.setDefaultTimeout(90000);
 await page.goto("http://localhost:3000/login", { timeout: 90000 });
 await page.locator('#email').fill("jonc@iconluxurygroup.com");
 await page.locator('#password').fill("Icon@1234");
 await page.getByRole("button", { name: "Sign in" }).click();
 await page.waitForURL("http://localhost:3000/", { timeout: 90000 });
-await page.goto("http://localhost:3000/order-forms");
-await page.waitForTimeout(2500);
-await page.locator('a[href^="/order-forms/"]').first().click();
-await page.waitForURL(/order-forms\/.+/, { timeout: 30000 });
+// import the tracking sheet
+await page.goto("http://localhost:3000/samples");
 await page.waitForTimeout(3500);
-await page.screenshot({ path: "/tmp/container-card2.png" });
-console.log("ON:", page.url());
+await page.getByRole("button", { name: "Import Excel" }).click();
+await page.waitForTimeout(700);
+await page.locator('input[type="file"]').setInputFiles("/tmp/test-tracking.xlsx");
+await page.waitForTimeout(7000);
+console.log("import:", await page.locator("text=Done —").textContent().catch(() => null));
+await page.keyboard.press("Escape");
+// receive page: incoming list with tracking + select all + bulk receive
+await page.goto("http://localhost:3000/receive");
+await page.waitForTimeout(3500);
+await page.screenshot({ path: "/tmp/receive-page.png" });
+const visible = await page.locator("text=1Z999AA10123456784").count();
+console.log("tracking visible on receive page:", visible > 0);
+await page.getByRole("button", { name: "Select all" }).click();
+await page.waitForTimeout(400);
+await page.getByRole("button", { name: /Receive \d+/ }).click();
+await page.waitForTimeout(4000);
+console.log("bulk received toast:", (await page.locator("text=received").count()) > 0);
+await page.screenshot({ path: "/tmp/receive-after.png" });
 await b.close();

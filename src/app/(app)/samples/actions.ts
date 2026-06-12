@@ -165,6 +165,21 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
             ? parseInt(d.casePackDefault, 10) || null
             : null
           : before.casePackDefault,
+      ...(d.trackingNumber !== undefined && d.trackingNumber.trim() !== (before.trackingNumber ?? "")
+        ? await (async () => {
+            const num = d.trackingNumber!.trim();
+            if (!num) return { trackingNumber: null, trackingCarrier: null, trackingEta: null, trackingStatus: null };
+            const { detectCarrier, resolveParcel } = await import("@/lib/parcel");
+            const carrier = detectCarrier(num);
+            const live = await resolveParcel(num, carrier);
+            return {
+              trackingNumber: num,
+              trackingCarrier: carrier,
+              trackingEta: live?.eta ?? null,
+              trackingStatus: live?.status ?? "in_transit",
+            };
+          })()
+        : {}),
       sampleReceivedDate: received,
       sampleEta: newEta,
       status,
@@ -381,5 +396,71 @@ export async function removeSampleImage(sampleId: string): Promise<ActionResult>
   await logAudit({ entityType: "sample", entityId: sampleId, action: "image_removed", userId: user.id });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Bulk receive + parcel tracking
+// ---------------------------------------------------------------------------
+
+export async function bulkReceiveSamples(sampleIds: string[]): Promise<ActionResult> {
+  const user = await assertRole("member");
+  if (!sampleIds.length) return { ok: false, error: "No samples selected." };
+  const now = new Date();
+  const samples = await prisma.sample.findMany({
+    where: { id: { in: sampleIds }, sampleReceivedDate: null },
+    select: { id: true, status: true },
+  });
+  for (const s of samples) {
+    await prisma.sample.update({
+      where: { id: s.id },
+      data: {
+        sampleReceivedDate: now,
+        trackingStatus: "delivered",
+        status: ["sample_requested", "eta_set"].includes(s.status) ? "sample_received" : undefined,
+      },
+    });
+  }
+  await logAudit({
+    entityType: "sample",
+    entityId: "bulk_receive",
+    action: "bulk_received",
+    userId: user.id,
+    after: { count: samples.length },
+  });
+  revalidatePath("/samples");
+  revalidatePath("/receive");
+  return { ok: true };
+}
+
+/** Set/refresh tracking on one sample (manual entry from the detail page). */
+export async function updateSampleTracking(formData: FormData): Promise<ActionResult> {
+  await assertRole("member");
+  const sampleId = String(formData.get("sampleId") ?? "");
+  const trackingNumber = String(formData.get("trackingNumber") ?? "").trim();
+  if (!sampleId) return { ok: false, error: "Missing sample." };
+
+  const { detectCarrier, resolveParcel } = await import("@/lib/parcel");
+  if (!trackingNumber) {
+    await prisma.sample.update({
+      where: { id: sampleId },
+      data: { trackingNumber: null, trackingCarrier: null, trackingEta: null, trackingStatus: null },
+    });
+  } else {
+    const carrier = detectCarrier(trackingNumber);
+    const live = await resolveParcel(trackingNumber, carrier);
+    await prisma.sample.update({
+      where: { id: sampleId },
+      data: {
+        trackingNumber,
+        trackingCarrier: carrier,
+        trackingEta: live?.eta ?? undefined,
+        trackingStatus: live?.status ?? "in_transit",
+      },
+    });
+  }
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
+  revalidatePath("/receive");
   return { ok: true };
 }

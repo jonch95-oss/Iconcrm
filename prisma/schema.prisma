@@ -245,6 +245,12 @@ model Sample {
   // line sheets, and PI views.
   imageUrl String?
 
+  // Inbound parcel tracking for the physical sample (courier from factory).
+  trackingNumber  String?
+  trackingCarrier String? // ups | fedex | dhl | usps | other
+  trackingEta     DateTime? // expected delivery, refreshed from the carrier
+  trackingStatus  String? // in_transit | out_for_delivery | delivered | exception
+
   // Customs + carton data — completes the Production Order Form and feeds
   // the 40' HQ container-fill calculator.
   htsCode         String?

@@ -66,6 +66,7 @@ export const sampleCreateSchema = z.object({
   composition: z.string().optional(),
   cbmPerCarton: decimalString,
   casePackDefault: z.string().optional(),
+  trackingNumber: z.string().optional(),
   sampleEta: optionalDate,
   sampleReceivedDate: optionalDate,
 });

@@ -7,7 +7,7 @@
  * shadcn/ui compatible variables, adapted for Tailwind v4 (@theme inline).
  */
 :root {
-  --radius: 0.625rem;
+  --radius: 0.375rem;
 
   /* Maison palette: ivory, ink, bronze. Quiet luxury — the chrome recedes,
      the product photography carries the color. */
@@ -149,6 +149,24 @@ h1, h2, h3, .font-display {
 .rule-bronze {
   border-bottom: 1px solid var(--bronze);
   opacity: 0.55;
+}
+
+/* Cards sit on the ivory like mounted prints: hairline, no heavy shadow. */
+[data-slot="card"], .card-surface {
+  box-shadow: 0 1px 2px hsl(30 8% 11% / 0.04);
+}
+
+/* Tables: airy rows, hairline dividers, hover wash. */
+tbody tr {
+  border-color: hsl(35 12% 88%);
+}
+tbody tr:hover {
+  background: hsl(38 22% 93% / 0.6);
+}
+
+/* Inputs: ivory wells with hairline borders. */
+input, select, textarea {
+  background-color: hsl(40 30% 99%);
 }
 
 /* Generous, visible keyboard focus for accessibility. */
