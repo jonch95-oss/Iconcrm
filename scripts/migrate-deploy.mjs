@@ -46,7 +46,7 @@ const runCapture = (cmd) => {
 const MAX_ATTEMPTS = 3;
 let lastStderr = "";
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-  const res = runCapture("prisma migrate deploy");
+  const res = runCapture("npx prisma migrate deploy");
   if (res.ok) {
     console.log("[migrate] migrations applied.");
     process.exit(0);
@@ -57,8 +57,8 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     console.warn("[migrate] schema exists without history (P3005) — baselining…");
     try {
       const migrations = readdirSync("prisma/migrations").filter((d) => /^\d{14}_/.test(d));
-      for (const m of migrations) run(`prisma migrate resolve --applied ${m}`);
-      run("prisma migrate deploy");
+      for (const m of migrations) run(`npx prisma migrate resolve --applied ${m}`);
+      run("npx prisma migrate deploy");
       console.warn("[migrate] baselined and deployed.");
       process.exit(0);
     } catch (err) {
