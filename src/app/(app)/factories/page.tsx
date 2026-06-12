@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/page-header";
+import { NewFactoryDialog } from "./new-factory-dialog";
 import { EmptyState } from "@/components/empty-state";
 import {
   Table,
@@ -22,7 +23,9 @@ export default async function FactoriesPage() {
 
   return (
     <div>
-      <PageHeader title="Factories" description={`${factories.length} factories.`} />
+      <PageHeader title="Factories" description={`${factories.length} factories.`} >
+        <NewFactoryDialog />
+      </PageHeader>
       {factories.length === 0 ? (
         <EmptyState icon={Factory} title="No factories" />
       ) : (

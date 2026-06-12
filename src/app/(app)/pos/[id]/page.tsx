@@ -95,7 +95,7 @@ export default async function PoDetailPage({
           <CardHeader><CardTitle>Details</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <Row label="PI" value={<Link href={`/pis/${po.pi.id}`} className="text-[var(--primary)] hover:underline">{po.pi.piNumber}</Link>} />
-            <Row label="Factory" value={<Link href={`/factories/${po.pi.factory.id}`} className="text-[var(--primary)] hover:underline">{po.pi.factory.name}</Link>} />
+            <Row label="Factory" value={po.pi.factory ? <Link href={`/factories/${po.pi.factory.id}`} className="text-[var(--primary)] hover:underline">{po.pi.factory.name}</Link> : "—"} />
             <Row label="Payment terms" value={po.pi.paymentTerms ?? "—"} />
             <Row label="Factory ETA" value={formatDate(po.factoryEta)} />
             <Row label="Inspection" value={formatDate(po.inspectionDate)} />

@@ -57,7 +57,7 @@ export default async function OrderFormsPage() {
                       {of.orderFormNumber}
                     </Link>
                   </TableCell>
-                  <TableCell>{of.factory.name}</TableCell>
+                  <TableCell>{of.factory?.name ?? "—"}</TableCell>
                   <TableCell>
                     <Badge variant={STATUS_TONE[of.status]} className="capitalize">
                       {of.status}

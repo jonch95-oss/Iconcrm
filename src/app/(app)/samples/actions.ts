@@ -244,10 +244,14 @@ export async function createOrderFormFromSamples(
     where: { id: { in: sampleIds } },
     include: { skuVariants: true },
   });
+  // Factory is optional. Group by the first factory present; samples without a
+  // factory are included when no factory exists in the selection, or alongside
+  // the chosen factory's samples when they share none.
   const factoryIds = [...new Set(samples.map((s) => s.factoryId).filter(Boolean))] as string[];
-  if (factoryIds.length === 0) return { ok: false, error: "Selected samples have no factory." };
-  const factoryId = factoryIds[0];
-  const factorySamples = samples.filter((s) => s.factoryId === factoryId);
+  const factoryId = factoryIds[0] ?? null;
+  const factorySamples = factoryId
+    ? samples.filter((s) => s.factoryId === factoryId || s.factoryId === null)
+    : samples;
 
   const { nextOrderFormNumber } = await import("@/lib/sequence");
 

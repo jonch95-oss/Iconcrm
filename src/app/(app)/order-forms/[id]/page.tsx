@@ -53,7 +53,7 @@ export default async function OrderFormDetailPage({
     <div>
       <PageHeader
         title={of.orderFormNumber}
-        description={`${of.factory.name} · created by ${of.createdBy?.name ?? "—"} · ${formatDate(of.createdAt)}`}
+        description={`${of.factory?.name ?? "No factory"} · created by ${of.createdBy?.name ?? "—"} · ${formatDate(of.createdAt)}`}
       >
         <Badge variant={STATUS_TONE[of.status]} className="capitalize">{of.status}</Badge>
       </PageHeader>

@@ -20,7 +20,7 @@ type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
 const piCreateSchema = z.object({
   piNumber: z.string().trim().min(1, "PI # required"),
-  factoryId: z.string().min(1, "Factory required"),
+  factoryId: z.string().optional(),
   orderFormId: z.string().optional(),
   currency: z.enum(["USD", "RMB", "EUR"]).default("USD"),
   paymentTerms: z.string().optional(),
@@ -37,7 +37,7 @@ export async function createPI(formData: FormData): Promise<ActionResult> {
   const pi = await prisma.proformaInvoice.create({
     data: {
       piNumber: d.piNumber,
-      factoryId: d.factoryId,
+      factoryId: d.factoryId || null,
       orderFormId: d.orderFormId || null,
       currency: d.currency,
       paymentTerms: d.paymentTerms,
@@ -195,7 +195,7 @@ async function afterLinesChanged(piId: string) {
         subject: `FOB variance on PI ${pi.piNumber} (${varianceLines.length} line${varianceLines.length > 1 ? "s" : ""})`,
         react: VarianceAlertEmail({
           piNumber: pi.piNumber,
-          factoryName: pi.factory.name,
+          factoryName: pi.factory?.name ?? null,
           piUrl: `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/pis/${pi.id}`,
           rows: varianceLines.map((l) => ({
             label: `${l.sample?.sampleNumber ?? "—"} ${l.skuVariant ? `${l.skuVariant.size}/${l.skuVariant.color}` : ""}`.trim(),
@@ -339,7 +339,7 @@ export async function issuePO(piId: string, factoryEta?: string): Promise<Action
       react: PoNotificationEmail({
         poNumber: po.poNumber,
         piNumber: pi.piNumber,
-        factoryName: pi.factory.name,
+        factoryName: pi.factory?.name ?? null,
         paymentTerms: pi.paymentTerms,
         poUrl: `${process.env.APP_BASE_URL ?? "http://localhost:3000"}/pos/${po.id}`,
       }),

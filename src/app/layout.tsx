@@ -1,11 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Bricolage_Grotesque } from "next/font/google";
+import { Geist, Geist_Mono, Cormorant_Garamond } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "@/components/ui/sonner";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const display = Bricolage_Grotesque({ variable: "--font-display", subsets: ["latin"] });
+const display = Cormorant_Garamond({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["500", "600", "700"],
+});
 
 export const metadata: Metadata = {
   title: "Icon CRM",
@@ -22,7 +26,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#184d6e",
+  themeColor: "#1b1916",
 };
 
 export default function RootLayout({

@@ -14,10 +14,11 @@ export default async function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-[var(--muted)] p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <div className="mb-2 flex h-9 w-9 items-center justify-center rounded bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-bold">
-            IC
+          <div className="mb-3">
+            <div className="font-display text-3xl tracking-wide">ICON</div>
+            <div className="label-luxe mt-1 text-[var(--bronze)]">Luxury Group · Production</div>
           </div>
-          <CardTitle className="font-display text-2xl">Icon CRM</CardTitle>
+          <CardTitle className="sr-only">Icon CRM</CardTitle>
           <CardDescription>
             Wholesale production tracker.{" "}
             {passwordEnabled

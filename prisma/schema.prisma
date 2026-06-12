@@ -328,8 +328,8 @@ model EtaRevision {
 model OrderForm {
   id              String          @id @default(cuid())
   orderFormNumber String          @unique // OF-YYYY-####
-  factoryId       String
-  factory         Factory         @relation(fields: [factoryId], references: [id])
+  factoryId       String?
+  factory         Factory?        @relation(fields: [factoryId], references: [id])
   status          OrderFormStatus @default(draft)
   createdById     String?
   createdBy       User?           @relation("CreatedOrderForms", fields: [createdById], references: [id])
@@ -365,8 +365,8 @@ model OrderFormLine {
 model ProformaInvoice {
   id          String   @id @default(cuid())
   piNumber    String // factory's number (not globally unique across factories)
-  factoryId   String
-  factory     Factory  @relation(fields: [factoryId], references: [id])
+  factoryId   String?
+  factory     Factory? @relation(fields: [factoryId], references: [id])
   orderFormId String?
   orderForm   OrderForm? @relation(fields: [orderFormId], references: [id])
 

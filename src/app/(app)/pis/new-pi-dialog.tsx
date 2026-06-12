@@ -29,7 +29,7 @@ export function NewPiDialog({
   orderForms,
 }: {
   factories: { id: string; name: string }[];
-  orderForms: { id: string; orderFormNumber: string; factoryId: string }[];
+  orderForms: { id: string; orderFormNumber: string; factoryId: string | null }[];
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -54,7 +54,7 @@ export function NewPiDialog({
     });
   };
 
-  const relevantOFs = orderForms.filter((o) => !factoryId || o.factoryId === factoryId);
+  const relevantOFs = orderForms.filter((o) => !factoryId || !o.factoryId || o.factoryId === factoryId);
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
@@ -69,7 +69,7 @@ export function NewPiDialog({
             <Input id="piNumber" name="piNumber" required />
           </div>
           <div className="space-y-1.5">
-            <Label>Factory *</Label>
+            <Label>Factory (optional) *</Label>
             <Select value={factoryId} onValueChange={setFactoryId}>
               <SelectTrigger><SelectValue placeholder="Select factory" /></SelectTrigger>
               <SelectContent>

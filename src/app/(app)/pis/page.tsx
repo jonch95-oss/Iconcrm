@@ -79,7 +79,7 @@ export default async function PisPage({
                       {pi.piNumber}
                     </Link>
                   </TableCell>
-                  <TableCell>{pi.factory.name}</TableCell>
+                  <TableCell>{pi.factory?.name ?? "—"}</TableCell>
                   <TableCell><PiStatusBadge status={pi.status} /></TableCell>
                   <TableCell className="tabular-nums">{pi._count.lines}</TableCell>
                   <TableCell>

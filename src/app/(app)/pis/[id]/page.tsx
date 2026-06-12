@@ -37,7 +37,7 @@ export default async function PiDetailPage({
   // Samples available to add as lines: prefer those on the linked order form,
   // else all samples for this factory.
   const factorySamples = await prisma.sample.findMany({
-    where: { factoryId: pi.factoryId },
+    where: pi.factoryId ? { factoryId: pi.factoryId } : {},
     include: { skuVariants: true },
     orderBy: { sampleNumber: "asc" },
   });
@@ -72,7 +72,7 @@ export default async function PiDetailPage({
     <div>
       <PageHeader
         title={`PI ${pi.piNumber}`}
-        description={`${pi.factory.name} · ${formatDate(pi.piDate)}`}
+        description={`${pi.factory?.name ?? "No factory"} · ${formatDate(pi.piDate)}`}
       >
         {canEdit && <ImportPiLinesButton piId={pi.id} />}
         <PiStatusBadge status={pi.status} />

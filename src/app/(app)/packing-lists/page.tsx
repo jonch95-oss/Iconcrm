@@ -36,7 +36,7 @@ export default async function PackingListsPage() {
 
   const piOptions = pis.map((p) => ({
     id: p.id,
-    label: `${p.piNumber} · ${p.factory.name}`,
+    label: `${p.piNumber}${p.factory ? ` · ${p.factory.name}` : ""}`,
     pos: p.purchaseOrders,
   }));
 
@@ -74,7 +74,7 @@ export default async function PackingListsPage() {
                       {pl.pi.piNumber}
                     </Link>
                   </TableCell>
-                  <TableCell>{pl.pi.factory.name}</TableCell>
+                  <TableCell>{pl.pi.factory?.name ?? "—"}</TableCell>
                   <TableCell className="text-xs">{pl.vesselOrAwb ?? "—"}</TableCell>
                   <TableCell className="tabular-nums">{pl._count.lines}</TableCell>
                   <TableCell>{formatDate(pl.eta)}</TableCell>

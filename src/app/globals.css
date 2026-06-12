@@ -9,40 +9,44 @@
 :root {
   --radius: 0.625rem;
 
-  /* "Port chart" palette: paper, ink, harbor blue. */
-  --background: hsl(40 20% 98%);          /* paper — warm packing-slip white */
-  --foreground: hsl(210 18% 16%);         /* ink */
+  /* Maison palette: ivory, ink, bronze. Quiet luxury — the chrome recedes,
+     the product photography carries the color. */
+  --background: hsl(40 27% 96%);          /* ivory — gallery wall */
+  --foreground: hsl(30 8% 11%);           /* ink black, warm */
 
-  --card: hsl(0 0% 100%);
-  --card-foreground: hsl(210 18% 16%);
+  --card: hsl(40 30% 99%);
+  --card-foreground: hsl(30 8% 11%);
 
-  --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(210 18% 16%);
+  --popover: hsl(40 30% 99%);
+  --popover-foreground: hsl(30 8% 11%);
 
-  --primary: hsl(202 64% 27%);            /* harbor — deep chart blue */
-  --primary-foreground: hsl(40 30% 98%);
+  --primary: hsl(30 8% 12%);              /* ink — buttons read like labels */
+  --primary-foreground: hsl(40 30% 97%);
 
-  --secondary: hsl(204 24% 94%);
-  --secondary-foreground: hsl(202 50% 22%);
+  --secondary: hsl(40 18% 91%);
+  --secondary-foreground: hsl(30 8% 14%);
 
-  --muted: hsl(40 12% 94%);
-  --muted-foreground: hsl(210 12% 44%);
+  --muted: hsl(40 16% 92%);
+  --muted-foreground: hsl(30 6% 42%);
 
-  --accent: hsl(202 48% 94%);             /* harbor tint for hovers/selection */
-  --accent-foreground: hsl(202 64% 22%);
+  --accent: hsl(38 24% 90%);              /* warm hover wash */
+  --accent-foreground: hsl(30 8% 12%);
 
-  --destructive: hsl(4 72% 46%);
+  --bronze: hsl(33 38% 47%);              /* single metallic accent, used sparingly */
+  --bronze-foreground: hsl(40 30% 97%);
+
+  --destructive: hsl(4 64% 42%);
   --destructive-foreground: hsl(40 30% 98%);
 
-  --success: hsl(152 55% 32%);
+  --success: hsl(152 40% 30%);
   --success-foreground: hsl(150 60% 97%);
 
-  --warning: hsl(36 92% 40%);
+  --warning: hsl(36 80% 38%);
   --warning-foreground: hsl(0 0% 100%);
 
-  --border: hsl(210 16% 88%);
-  --input: hsl(210 16% 86%);
-  --ring: hsl(202 64% 38%);
+  --border: hsl(35 12% 84%);              /* hairline, warm gray */
+  --input: hsl(35 12% 82%);
+  --ring: hsl(33 38% 47%);
 }
 
 .dark {
@@ -128,8 +132,23 @@ body {
 }
 
 h1, h2, h3, .font-display {
-  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
-  letter-spacing: -0.015em;
+  font-family: var(--font-display), Georgia, "Times New Roman", serif;
+  letter-spacing: 0.005em;
+  font-weight: 600;
+}
+
+/* Atelier label: small caps tracking, the typographic signature of the house. */
+.label-luxe {
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+/* Bronze hairline used under section titles. */
+.rule-bronze {
+  border-bottom: 1px solid var(--bronze);
+  opacity: 0.55;
 }
 
 /* Generous, visible keyboard focus for accessibility. */

@@ -55,7 +55,7 @@ export default async function CustomerPoDetailPage({
     poId: l.purchaseOrderId,
     poNumber: l.purchaseOrder.poNumber,
     piNumber: l.purchaseOrder.pi.piNumber,
-    factoryName: l.purchaseOrder.pi.factory.name,
+    factoryName: l.purchaseOrder.pi.factory?.name ?? "—",
     note: l.note,
   }));
 
@@ -63,7 +63,7 @@ export default async function CustomerPoDetailPage({
     id: p.id,
     poNumber: p.poNumber,
     piNumber: p.pi.piNumber,
-    factoryName: p.pi.factory.name,
+    factoryName: p.pi.factory?.name ?? "—",
   }));
 
   // Originating samples across all linked POs.

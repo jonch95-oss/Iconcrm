@@ -105,7 +105,7 @@ export default async function PosPage() {
                         {po.pi.piNumber}
                       </Link>
                     </TableCell>
-                    <TableCell>{po.pi.factory.name}</TableCell>
+                    <TableCell>{po.pi.factory?.name ?? "—"}</TableCell>
                     <TableCell>
                       <span className="flex items-center gap-1">
                         {formatDate(po.factoryEta)}

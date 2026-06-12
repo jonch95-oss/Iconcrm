@@ -80,7 +80,7 @@ export default async function PackingListDetailPage({
     <div>
       <PageHeader
         title={pl.shipmentRef ?? `Packing list ${pl.id.slice(-6)}`}
-        description={`PI ${pl.pi.piNumber} · ${pl.pi.factory.name}${pl.vesselOrAwb ? ` · ${pl.vesselOrAwb}` : ""}`}
+        description={`PI ${pl.pi.piNumber} · ${pl.pi.factory?.name ?? "No factory"}${pl.vesselOrAwb ? ` · ${pl.vesselOrAwb}` : ""}`}
       />
 
       {/* PI-level progress */}
