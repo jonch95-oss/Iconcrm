@@ -42,7 +42,7 @@ export function EmailLayout({
           <Section>{children}</Section>
           <Hr />
           <Text style={footer}>
-            Sample-to-PO CRM · Wholesale Production Tracker. This is an automated
+            Icon CRM · Wholesale Production Tracker. This is an automated
             message.
           </Text>
         </Container>

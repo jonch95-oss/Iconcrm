@@ -38,10 +38,10 @@ export function AppSidebar() {
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col border-r border-[var(--border)] bg-[var(--card)]">
       <div className="flex h-14 items-center gap-2 border-b border-[var(--border)] px-4">
-        <div className="flex h-7 w-7 items-center justify-center rounded bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold">
-          S2P
+        <div className="flex h-7 w-7 items-center justify-center rounded-md bg-[var(--primary)] text-[var(--primary-foreground)] text-xs font-bold">
+          IC
         </div>
-        <span className="font-semibold text-sm">Sample-to-PO CRM</span>
+        <span className="font-display text-sm font-semibold tracking-tight">Icon CRM</span>
       </div>
       <nav className="flex-1 space-y-0.5 overflow-y-auto p-2">
         {NAV.map((item) => {

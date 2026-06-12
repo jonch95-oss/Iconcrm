@@ -14,9 +14,9 @@ export default async function LoginPage() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <div className="mb-2 flex h-9 w-9 items-center justify-center rounded bg-[var(--primary)] text-[var(--primary-foreground)] text-sm font-bold">
-            S2P
+            IC
           </div>
-          <CardTitle>Sample-to-PO CRM</CardTitle>
+          <CardTitle className="font-display text-2xl">Icon CRM</CardTitle>
           <CardDescription>
             Wholesale production tracker. Sign in with your Microsoft 365 account.
           </CardDescription>

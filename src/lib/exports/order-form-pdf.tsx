@@ -27,7 +27,7 @@ function OrderFormPdf({ data }: { data: OrderFormExportData }) {
   return (
     <Document>
       <Page size="A4" orientation="landscape" style={styles.page}>
-        <Text style={styles.company}>Wholesale Co. — Sample-to-PO</Text>
+        <Text style={styles.company}>ICON LUXURY GROUP</Text>
         <Text style={styles.sub}>Order Form {data.orderFormNumber}</Text>
         <Text style={styles.meta}>
           Factory: {data.factory.name}

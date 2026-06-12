@@ -23,11 +23,11 @@ export function StatCard({
   }[tone];
   return (
     <Link href={href}>
-      <Card className="p-4 transition-colors hover:bg-[var(--accent)]">
+      <Card className="h-full p-4 transition-all hover:-translate-y-0.5 hover:border-[var(--ring)] hover:shadow-sm">
         <div className="text-xs font-medium uppercase tracking-wide text-[var(--muted-foreground)]">
           {label}
         </div>
-        <div className={cn("mt-1 text-3xl font-semibold tabular-nums", toneClass)}>{value}</div>
+        <div className={cn("font-display mt-1 text-3xl font-semibold tabular-nums", toneClass)}>{value}</div>
         {hint && <div className="mt-1 text-xs text-[var(--muted-foreground)]">{hint}</div>}
       </Card>
     </Link>

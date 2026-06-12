@@ -7,41 +7,42 @@
  * shadcn/ui compatible variables, adapted for Tailwind v4 (@theme inline).
  */
 :root {
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222.2 47.4% 11.2%);
+  /* "Port chart" palette: paper, ink, harbor blue. */
+  --background: hsl(40 20% 98%);          /* paper — warm packing-slip white */
+  --foreground: hsl(210 18% 16%);         /* ink */
 
   --card: hsl(0 0% 100%);
-  --card-foreground: hsl(222.2 47.4% 11.2%);
+  --card-foreground: hsl(210 18% 16%);
 
   --popover: hsl(0 0% 100%);
-  --popover-foreground: hsl(222.2 47.4% 11.2%);
+  --popover-foreground: hsl(210 18% 16%);
 
-  --primary: hsl(222.2 47.4% 11.2%);
-  --primary-foreground: hsl(210 40% 98%);
+  --primary: hsl(202 64% 27%);            /* harbor — deep chart blue */
+  --primary-foreground: hsl(40 30% 98%);
 
-  --secondary: hsl(210 40% 96.1%);
-  --secondary-foreground: hsl(222.2 47.4% 11.2%);
+  --secondary: hsl(204 24% 94%);
+  --secondary-foreground: hsl(202 50% 22%);
 
-  --muted: hsl(210 40% 96.1%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
+  --muted: hsl(40 12% 94%);
+  --muted-foreground: hsl(210 12% 44%);
 
-  --accent: hsl(210 40% 96.1%);
-  --accent-foreground: hsl(222.2 47.4% 11.2%);
+  --accent: hsl(202 48% 94%);             /* harbor tint for hovers/selection */
+  --accent-foreground: hsl(202 64% 22%);
 
-  --destructive: hsl(0 72.2% 50.6%);
-  --destructive-foreground: hsl(210 40% 98%);
+  --destructive: hsl(4 72% 46%);
+  --destructive-foreground: hsl(40 30% 98%);
 
-  --success: hsl(142.1 76.2% 36.3%);
-  --success-foreground: hsl(355.7 100% 97.3%);
+  --success: hsl(152 55% 32%);
+  --success-foreground: hsl(150 60% 97%);
 
-  --warning: hsl(32.1 94.6% 43.7%);
+  --warning: hsl(36 92% 40%);
   --warning-foreground: hsl(0 0% 100%);
 
-  --border: hsl(214.3 31.8% 91.4%);
-  --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(222.2 47.4% 11.2%);
+  --border: hsl(210 16% 88%);
+  --input: hsl(210 16% 86%);
+  --ring: hsl(202 64% 38%);
 }
 
 .dark {
@@ -113,4 +114,33 @@
 /* Dense table styling helpers */
 .tabular-nums {
   font-variant-numeric: tabular-nums;
+}
+
+
+/* ------------------------------------------------------------------------- */
+/* App-wide refinements                                                       */
+/* ------------------------------------------------------------------------- */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-feature-settings: "tnum" 1; /* numbers line up in tables everywhere */
+}
+
+h1, h2, h3, .font-display {
+  font-family: var(--font-display), var(--font-geist-sans), system-ui, sans-serif;
+  letter-spacing: -0.015em;
+}
+
+/* Generous, visible keyboard focus for accessibility. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }

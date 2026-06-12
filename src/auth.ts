@@ -48,6 +48,9 @@ if (process.env.DEV_AUTH_ENABLED === "true" && process.env.NODE_ENV !== "product
 
 export const authConfig: NextAuthConfig = {
   adapter: PrismaAdapter(prisma),
+  // Trust the Host header (required behind proxies like Vercel; safe for an
+  // internal app where the platform sets the header).
+  trustHost: true,
   // JWT strategy required to support the credentials provider.
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
