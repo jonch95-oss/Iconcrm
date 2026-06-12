@@ -62,6 +62,10 @@ export const sampleCreateSchema = z.object({
   dutyRatePercent: decimalString,
   freightPerUnit: decimalString,
   inlandPerUnit: decimalString,
+  htsCode: z.string().optional(),
+  composition: z.string().optional(),
+  cbmPerCarton: decimalString,
+  casePackDefault: z.string().optional(),
   sampleEta: optionalDate,
   sampleReceivedDate: optionalDate,
 });

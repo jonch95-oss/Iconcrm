@@ -159,6 +159,10 @@ export default async function SampleDetailPage({
             dutyRatePercent: sample.dutyRatePercent?.toString() ?? "",
             freightPerUnit: sample.freightPerUnit?.toString() ?? "",
             inlandPerUnit: sample.inlandPerUnit?.toString() ?? "",
+    htsCode: sample.htsCode ?? "",
+    composition: sample.composition ?? "",
+    cbmPerCarton: sample.cbmPerCarton?.toString() ?? "",
+    casePackDefault: sample.casePackDefault?.toString() ?? "",
             factoryId: sample.factoryId ?? "",
             status: sample.status,
           }}

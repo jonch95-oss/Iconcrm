@@ -245,6 +245,13 @@ model Sample {
   // line sheets, and PI views.
   imageUrl String?
 
+  // Customs + carton data — completes the Production Order Form and feeds
+  // the 40' HQ container-fill calculator.
+  htsCode         String?
+  composition     String? // e.g. "100% Cotton" / leather type
+  cbmPerCarton    Decimal? @db.Decimal(10, 4)
+  casePackDefault Int? // units per carton when the variant doesn't specify
+
   // Landed cost inputs (per unit). Landed = FOB + duty% of FOB + freight + inland.
   dutyRatePercent Decimal? @db.Decimal(6, 3)  // e.g. 17.500 = 17.5%
   freightPerUnit  Decimal? @db.Decimal(12, 4)

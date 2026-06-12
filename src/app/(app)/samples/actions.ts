@@ -155,6 +155,16 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
         d.freightPerUnit !== undefined ? toDecimal(d.freightPerUnit) : before.freightPerUnit,
       inlandPerUnit:
         d.inlandPerUnit !== undefined ? toDecimal(d.inlandPerUnit) : before.inlandPerUnit,
+      htsCode: d.htsCode !== undefined ? d.htsCode || null : before.htsCode,
+      composition: d.composition !== undefined ? d.composition || null : before.composition,
+      cbmPerCarton:
+        d.cbmPerCarton !== undefined ? toDecimal(d.cbmPerCarton) : before.cbmPerCarton,
+      casePackDefault:
+        d.casePackDefault !== undefined
+          ? d.casePackDefault
+            ? parseInt(d.casePackDefault, 10) || null
+            : null
+          : before.casePackDefault,
       sampleReceivedDate: received,
       sampleEta: newEta,
       status,

@@ -98,6 +98,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           dutyRatePercent: toDecimal(v.dutyRatePercent) ?? undefined,
           freightPerUnit: toDecimal(v.freightPerUnit) ?? undefined,
           inlandPerUnit: toDecimal(v.inlandPerUnit) ?? undefined,
+          htsCode: v.htsCode?.trim() || undefined,
+          composition: v.composition?.trim() || undefined,
+          cbmPerCarton: toDecimal(v.cbmPerCarton) ?? undefined,
+          casePackDefault: v.casePackDefault ? parseInt(v.casePackDefault, 10) || undefined : undefined,
           factoryId,
         };
 
@@ -159,6 +163,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             size: size || "OS",
             color: color || "—",
             skuCode: v.skuCode?.trim() || null,
+            unitsPerCarton: v.casePackDefault ? parseInt(v.casePackDefault, 10) || null : null,
           },
         });
         summary.variantsAdded += 1;

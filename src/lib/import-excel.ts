@@ -33,6 +33,10 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   upc: ["upc", "barcode", "ean", "gtin", "upccode"],
   skuCode: ["sku", "skucode", "itemcode"],
   status: ["status", "stage"],
+  htsCode: ["hts", "htscode", "htsno", "tariff", "tariffcode"],
+  composition: ["composition", "compositionwpercentages", "fabric", "material", "content", "fibercontent"],
+  cbmPerCarton: ["cbm", "cbmpercarton", "cbmcarton", "cartoncbm"],
+  casePackDefault: ["casepack", "caseqty", "unitspercarton", "casepk", "pack"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {
@@ -175,6 +179,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   ws.addRow([
     "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
+    "HTS Code", "Composition", "CBM/Carton", "Case Pack",
     "Factory", "Target Customer", "Status", "Size", "Color", "UPC",
   ]);
   ws.getRow(1).font = { bold: true };

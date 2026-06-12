@@ -142,3 +142,42 @@ const sample = (over: Record<string, unknown> = {}) => ({
 }
 
 console.log("po-pnl: all assertions passed");
+
+// --- Container fill ---
+import { computeContainerFill, CBM_40HQ } from "../src/lib/container";
+
+{
+  // partial: 30 CBM of a 68 CBM box
+  const partial = computeContainerFill([
+    { quantity: 600, unitsPerCarton: 20, casePackDefault: null, cbmPerCarton: 1.0 }, // 30 cartons, 30 CBM
+  ]);
+  console.assert(partial.totalCartons === 30 && partial.totalCbm === 30, "partial cartons/cbm");
+  console.assert(partial.verdict === "partial", "partial verdict, got " + partial.verdict);
+
+  // near full: 65 CBM
+  const full = computeContainerFill([
+    { quantity: 650, unitsPerCarton: 10, casePackDefault: null, cbmPerCarton: 1.0 },
+  ]);
+  console.assert(full.verdict === "near_full", "near_full verdict, got " + full.verdict);
+
+  // overflow: 1 full + 40% partial
+  const over = computeContainerFill([
+    { quantity: 950, unitsPerCarton: 10, casePackDefault: null, cbmPerCarton: 1.0 }, // 95 CBM
+  ]);
+  console.assert(over.verdict === "overflow_partial", "overflow verdict, got " + over.verdict);
+  console.assert(over.message.includes("1 full"), "overflow message mentions whole containers");
+
+  // case pack fallback to sample default + missing-data line
+  const mixed = computeContainerFill([
+    { quantity: 100, unitsPerCarton: null, casePackDefault: 25, cbmPerCarton: 0.5 }, // 4 cartons, 2 CBM
+    { quantity: 100, unitsPerCarton: null, casePackDefault: null, cbmPerCarton: 0.5 }, // missing
+  ]);
+  console.assert(mixed.totalCartons === 4 && mixed.missingDataLines === 1, "fallback + missing");
+
+  // exact multiples: 2 × 68
+  const two = computeContainerFill([
+    { quantity: 136, unitsPerCarton: 1, casePackDefault: null, cbmPerCarton: 1.0 },
+  ]);
+  console.assert(two.verdict === "full_multiple", "two-container verdict, got " + two.verdict);
+  console.log("container-fill: all assertions passed");
+}

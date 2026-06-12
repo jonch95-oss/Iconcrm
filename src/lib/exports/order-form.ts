@@ -25,6 +25,8 @@ export interface OrderFormExportData {
     quantity: number;
     composition: string;
     upc: string;
+    htsCode: string;
+    cbmPerCarton: number | null;
     fob: number | null;
     freight: number | null;
     dutyRatePercent: number | null;
@@ -63,10 +65,12 @@ export async function getOrderFormExportData(
       styleNumber: l.sample.sampleNumber,
       color: l.skuVariant?.color ?? "",
       size: l.skuVariant?.size ?? "",
-      casePack: l.skuVariant?.unitsPerCarton ?? null,
+      casePack: l.skuVariant?.unitsPerCarton ?? l.sample.casePackDefault ?? null,
       quantity: l.quantity,
-      composition: "",
+      composition: l.sample.composition ?? "",
       upc: l.skuVariant?.upc ?? "",
+      htsCode: l.sample.htsCode ?? "",
+      cbmPerCarton: l.sample.cbmPerCarton ? Number(l.sample.cbmPerCarton) : null,
       fob: l.fobCostSnapshot ? Number(l.fobCostSnapshot) : l.sample.fobCost ? Number(l.sample.fobCost) : null,
       freight: l.sample.freightPerUnit ? Number(l.sample.freightPerUnit) : null,
       dutyRatePercent: l.sample.dutyRatePercent ? Number(l.sample.dutyRatePercent) : null,
@@ -211,7 +215,8 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
     ws.getCell(rowNum, 5).value = r.styleNumber;
     ws.getCell(rowNum, 6).value = r.color;
     ws.getCell(rowNum, 7).value = r.size;
-    // CBM (H) is a manual fill-in; CBM TOTAL (I) = CBM × TTL CASES.
+    if (r.cbmPerCarton !== null) ws.getCell(rowNum, 8).value = r.cbmPerCarton;
+    // CBM TOTAL (I) = CBM × TTL CASES.
     ws.getCell(rowNum, 9).value = { formula: `H${rowNum}*K${rowNum}` };
     if (r.casePack) {
       ws.getCell(rowNum, 10).value = r.casePack;
@@ -220,7 +225,7 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
     }
     ws.getCell(rowNum, 12).value = r.quantity;
     ws.getCell(rowNum, 13).value = r.composition;
-    // HTS (N) manual fill-in.
+    if (r.htsCode) ws.getCell(rowNum, 14).value = r.htsCode;
     ws.getCell(rowNum, 15).value = r.upc;
     if (r.fob !== null) {
       ws.getCell(rowNum, 16).value = r.fob;

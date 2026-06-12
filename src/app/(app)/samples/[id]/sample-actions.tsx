@@ -42,6 +42,10 @@ export interface SampleEditData {
   dutyRatePercent: string;
   freightPerUnit: string;
   inlandPerUnit: string;
+  htsCode: string;
+  composition: string;
+  cbmPerCarton: string;
+  casePackDefault: string;
   factoryId: string;
   status: string;
 }
@@ -125,6 +129,10 @@ export function SampleActions({
             <F label="Duty rate %" name="dutyRatePercent" defaultValue={data.dutyRatePercent} type="number" step="0.001" />
             <F label="Freight / unit" name="freightPerUnit" defaultValue={data.freightPerUnit} type="number" step="0.01" />
             <F label="Inland / unit" name="inlandPerUnit" defaultValue={data.inlandPerUnit} type="number" step="0.01" />
+            <F label="HTS code" name="htsCode" defaultValue={data.htsCode} />
+            <F label="Composition (100% Cotton…)" name="composition" defaultValue={data.composition} />
+            <F label="CBM / carton" name="cbmPerCarton" defaultValue={data.cbmPerCarton} type="number" step="0.0001" />
+            <F label="Case pack (units/carton)" name="casePackDefault" defaultValue={data.casePackDefault} type="number" step="1" />
             <div className="col-span-2 space-y-1.5">
               <Label>Factory</Label>
               <Select value={factoryId} onValueChange={setFactoryId}>

@@ -3,6 +3,8 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
+import { ContainerFillCard } from "@/components/container-fill-card";
+import { computeContainerFill } from "@/lib/container";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { OrderFormBuilder, type BuilderLine } from "./builder";
@@ -33,6 +35,15 @@ export default async function OrderFormDetailPage({
   });
   if (!of) notFound();
 
+  const containerFill = computeContainerFill(
+    of.lines.map((l) => ({
+      quantity: l.quantity,
+      unitsPerCarton: l.skuVariant?.unitsPerCarton ?? null,
+      casePackDefault: l.sample.casePackDefault,
+      cbmPerCarton: l.sample.cbmPerCarton,
+    })),
+  );
+
   const blockers = await getOrderFormBlockers(id);
   const canEdit = hasRole(user.role, "member");
 
@@ -57,6 +68,8 @@ export default async function OrderFormDetailPage({
       >
         <Badge variant={STATUS_TONE[of.status]} className="capitalize">{of.status}</Badge>
       </PageHeader>
+
+      <ContainerFillCard fill={containerFill} />
 
       {of.proformaInvoices.length > 0 && (
         <Card className="mb-4">
