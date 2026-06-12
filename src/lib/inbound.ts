@@ -140,11 +140,14 @@ export async function processInboundEmail(payload: InboundPayload): Promise<Inbo
 }
 
 async function saveAttachments(payload: InboundPayload, sampleId: string) {
+  let firstImageUrl: string | null = null;
   for (const att of payload.attachments ?? []) {
     let url = `local://uploads/${att.name}`;
+    let uploaded = false;
     if (att.contentBase64) {
       try {
         url = await uploadBlob(att.name, Buffer.from(att.contentBase64, "base64"), att.contentType);
+        uploaded = true;
       } catch {
         // Fall back to placeholder url on upload error.
       }
@@ -157,6 +160,18 @@ async function saveAttachments(payload: InboundPayload, sampleId: string) {
         filename: att.name,
         mimeType: att.contentType,
       },
+    });
+    // First real image in the email becomes the product photo candidate.
+    if (!firstImageUrl && uploaded && (att.contentType ?? "").startsWith("image/")) {
+      firstImageUrl = url;
+    }
+  }
+  // Set as the sample's product photo only when none exists yet — a later
+  // email shouldn't silently replace a photo someone chose on purpose.
+  if (firstImageUrl) {
+    await prisma.sample.updateMany({
+      where: { id: sampleId, imageUrl: null },
+      data: { imageUrl: firstImageUrl },
     });
   }
 }

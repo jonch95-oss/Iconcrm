@@ -90,6 +90,7 @@ export function ExcelImportDialog({
                   Done — {result.created} created
                   {result.updated > 0 && `, ${result.updated} updated`}
                   {result.variantsAdded > 0 && `, ${result.variantsAdded} sizes/UPCs added`}
+                  {result.photosAdded > 0 && `, ${result.photosAdded} photos imported`}
                   {result.skipped.length > 0 && `, ${result.skipped.length} skipped`}.
                 </p>
                 {result.mappedColumns && (

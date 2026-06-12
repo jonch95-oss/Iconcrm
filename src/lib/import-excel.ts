@@ -49,11 +49,18 @@ export interface ParsedRow {
   values: Record<string, string>;
 }
 
+export interface ParsedImage {
+  rowNumber: number; // 1-based worksheet row the image is anchored to
+  buffer: Buffer;
+  extension: string; // jpeg | png | gif
+}
+
 export interface ParseResult {
   headerRow: number;
   mappedColumns: Record<string, string>; // field -> original header text
   unmappedHeaders: string[];
   rows: ParsedRow[];
+  images: ParsedImage[];
   error?: string;
 }
 
@@ -70,10 +77,10 @@ export async function parseWorkbook(
   try {
     await wb.xlsx.load(buffer as unknown as ArrayBuffer);
   } catch {
-    return { headerRow: 0, mappedColumns: {}, unmappedHeaders: [], rows: [], error: "Couldn't read that file. Save it as .xlsx and try again." };
+    return { headerRow: 0, mappedColumns: {}, unmappedHeaders: [], rows: [], images: [], error: "Couldn't read that file. Save it as .xlsx and try again." };
   }
   const ws = wb.worksheets[0];
-  if (!ws) return { headerRow: 0, mappedColumns: {}, unmappedHeaders: [], rows: [], error: "The file has no sheets." };
+  if (!ws) return { headerRow: 0, mappedColumns: {}, unmappedHeaders: [], rows: [], images: [], error: "The file has no sheets." };
 
   const aliasToField = new Map<string, string>();
   for (const [field, names] of Object.entries(aliases)) {
@@ -117,6 +124,7 @@ export async function parseWorkbook(
       mappedColumns: {},
       unmappedHeaders: [],
       rows: [],
+      images: [],
       error:
         "Couldn't find a header row. The first sheet needs column titles like Sample #, Brand, Size, UPC…",
     };
@@ -135,7 +143,25 @@ export async function parseWorkbook(
     }
     if (hasAny) rows.push({ rowNumber: r, values });
   }
-  return { headerRow, mappedColumns, unmappedHeaders, rows };
+  // Embedded pictures: exceljs anchors are zero-based, worksheet rows are
+  // one-based — an image whose top-left sits in native row r belongs to
+  // spreadsheet row r + 1.
+  const images: ParsedImage[] = [];
+  try {
+    for (const img of ws.getImages()) {
+      const media = wb.getImage(Number(img.imageId));
+      if (!media?.buffer) continue;
+      images.push({
+        rowNumber: Math.floor(img.range.tl.nativeRow) + 1,
+        buffer: Buffer.from(media.buffer as unknown as ArrayBuffer),
+        extension: media.extension ?? "png",
+      });
+    }
+  } catch {
+    // Image extraction is best-effort; never fail the whole import over it.
+  }
+
+  return { headerRow, mappedColumns, unmappedHeaders, rows, images };
 }
 
 export const parseSamplesWorkbook = (b: Buffer) => parseWorkbook(b, SAMPLE_ALIASES);

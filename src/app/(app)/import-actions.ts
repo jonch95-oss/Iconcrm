@@ -15,11 +15,12 @@ export interface ImportSummary {
   created: number;
   updated: number;
   variantsAdded: number;
+  photosAdded: number;
   skipped: { row: number; reason: string }[];
   mappedColumns?: Record<string, string>;
 }
 
-const EMPTY: ImportSummary = { ok: false, created: 0, updated: 0, variantsAdded: 0, skipped: [] };
+const EMPTY: ImportSummary = { ok: false, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [] };
 
 async function readUpload(formData: FormData): Promise<Buffer | string> {
   const file = formData.get("file");
@@ -49,8 +50,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     return { ...EMPTY, error: "No Sample # column found — every row needs one." };
   }
 
-  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
   const factoryCache = new Map<string, string>();
+  // Embedded pictures, keyed by the worksheet row they're anchored to.
+  const imageByRow = new Map(parsed.images.map((img) => [img.rowNumber, img]));
+  const rowToSample = new Map<number, string>(); // worksheet row -> sampleId
   let currentSampleId: string | null = null;
   let currentSampleNumber = "";
 
@@ -112,6 +116,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         summary.skipped.push({ row: row.rowNumber, reason: "No Sample # on or above this row" });
         continue;
       }
+      rowToSample.set(row.rowNumber, currentSampleId);
 
       // Variant on this row?
       const upc = (v.upc ?? "").trim();
@@ -148,12 +153,44 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     }
   }
 
+  // Photos embedded in the spreadsheet: each image belongs to the sample
+  // owning the row it's anchored to. The last image per sample wins.
+  if (imageByRow.size > 0) {
+    const { uploadBlob } = await import("@/lib/blob");
+    let storageDown = false;
+    for (const [rowNumber, img] of imageByRow) {
+      const sampleId =
+        rowToSample.get(rowNumber) ??
+        // Images sometimes anchor a row above/below their data row.
+        rowToSample.get(rowNumber + 1) ??
+        rowToSample.get(rowNumber - 1);
+      if (!sampleId) continue;
+      try {
+        const url = await uploadBlob(
+          `samples/${sampleId}/import-row-${rowNumber}.${img.extension}`,
+          img.buffer,
+          `image/${img.extension}`,
+        );
+        await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url } });
+        summary.photosAdded += 1;
+      } catch {
+        storageDown = true;
+      }
+    }
+    if (storageDown) {
+      summary.skipped.push({
+        row: 0,
+        reason: "Photos found in the file but image storage isn't set up (Vercel → Storage → Blob).",
+      });
+    }
+  }
+
   await logAudit({
     entityType: "sample",
     entityId: "bulk_import",
     action: "excel_import",
     userId: user.id,
-    after: { created: summary.created, updated: summary.updated, variants: summary.variantsAdded },
+    after: { created: summary.created, updated: summary.updated, variants: summary.variantsAdded, photos: summary.photosAdded },
   });
   revalidatePath("/samples");
   return summary;
@@ -178,7 +215,7 @@ export async function importPiLinesExcel(piId: string, formData: FormData): Prom
     return { ...EMPTY, error: "Need both a quantity column and a price column." };
   }
 
-  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
 
   for (const row of parsed.rows.slice(0, 1000)) {
     const v = row.values;
