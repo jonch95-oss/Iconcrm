@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/page-header";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import { LayoutGrid } from "lucide-react";
 import { SamplesTable, type SampleRow } from "./samples-table";
 import { NewSampleDialog } from "./new-sample-dialog";
 import { requireUser, hasRole } from "@/lib/session";
@@ -68,6 +71,9 @@ export default async function SamplesPage({
         title="Samples"
         description={`${rows.length} samples across the pipeline.`}
       >
+        <Button asChild variant="outline">
+          <Link href="/samples/board"><LayoutGrid className="h-4 w-4" /> Board</Link>
+        </Button>
         {canEdit && <NewSampleDialog factories={factories} />}
       </PageHeader>
       <SamplesTable
