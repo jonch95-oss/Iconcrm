@@ -3,6 +3,7 @@ import type { NextAuthConfig } from "next-auth";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Credentials from "next-auth/providers/credentials";
 import { PrismaAdapter } from "@auth/prisma-adapter";
+import { timingSafeEqual } from "crypto";
 import { prisma } from "@/lib/db";
 import type { Role } from "@prisma/client";
 
@@ -17,6 +18,56 @@ if (process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET) {
       issuer: process.env.AZURE_AD_TENANT_ID
         ? `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`
         : undefined,
+    }),
+  );
+}
+
+// Shared-password login. Enabled when APP_PASSWORD is set (e.g. in Vercel env
+// vars). Everyone signs in with their own email + the shared team password:
+// the email keeps roles and audit attribution per person. Bootstrap rule: when
+// the user table is completely empty, the first successful sign-in becomes an
+// admin; after that, sign-in is invite-only (admins add emails in Settings).
+if (process.env.APP_PASSWORD) {
+  providers.push(
+    Credentials({
+      id: "password",
+      name: "Team password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" },
+      },
+      authorize: async (credentials) => {
+        const email = String(credentials?.email ?? "").toLowerCase().trim();
+        const password = String(credentials?.password ?? "");
+        const expected = process.env.APP_PASSWORD ?? "";
+        if (!email || !email.includes("@") || !password) return null;
+
+        // Constant-time comparison (lengths must match first).
+        const a = Buffer.from(password);
+        const b = Buffer.from(expected);
+        if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+
+        let user = await prisma.user.findUnique({ where: { email } });
+        if (!user) {
+          // First-ever sign-in on an empty database becomes the admin.
+          const total = await prisma.user.count();
+          if (total === 0) {
+            user = await prisma.user.create({
+              data: { email, role: "admin", name: email.split("@")[0] },
+            });
+          } else {
+            return null; // invite-only after bootstrap
+          }
+        }
+        if (!user.isActive) return null;
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          role: user.role,
+        };
+      },
     }),
   );
 }

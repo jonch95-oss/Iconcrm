@@ -1,6 +1,10 @@
 import crypto from "crypto";
 
-const SECRET = process.env.TOKEN_SIGNING_SECRET ?? "insecure-dev-secret";
+const SECRET =
+  process.env.TOKEN_SIGNING_SECRET ??
+  process.env.NEXTAUTH_SECRET ??
+  process.env.AUTH_SECRET ??
+  "insecure-dev-secret";
 
 export type TokenPurpose =
   | "missing_info"

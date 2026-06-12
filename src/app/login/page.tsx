@@ -8,6 +8,7 @@ export default async function LoginPage() {
   if (user) redirect("/");
   const devEnabled = process.env.DEV_AUTH_ENABLED === "true";
   const azureEnabled = Boolean(process.env.AZURE_AD_CLIENT_ID);
+  const passwordEnabled = Boolean(process.env.APP_PASSWORD);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-[var(--muted)] p-4">
@@ -18,11 +19,16 @@ export default async function LoginPage() {
           </div>
           <CardTitle className="font-display text-2xl">Icon CRM</CardTitle>
           <CardDescription>
-            Wholesale production tracker. Sign in with your Microsoft 365 account.
+            Wholesale production tracker.{" "}
+            {passwordEnabled
+              ? "Sign in with your email and the team password."
+              : azureEnabled
+                ? "Sign in with your Microsoft 365 account."
+                : "Sign in below."}
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <LoginForm devEnabled={devEnabled} azureEnabled={azureEnabled} />
+          <LoginForm devEnabled={devEnabled} azureEnabled={azureEnabled} passwordEnabled={passwordEnabled} />
         </CardContent>
       </Card>
     </div>
