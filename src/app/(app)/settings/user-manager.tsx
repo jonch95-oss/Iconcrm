@@ -79,9 +79,9 @@ export function UserManager({ users }: { users: UserRow[] }) {
                     disabled={pending}
                     className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-sm"
                   >
-                    <option value="admin">admin</option>
-                    <option value="member">member</option>
-                    <option value="viewer">viewer</option>
+                    <option value="admin">Admin — full control</option>
+                    <option value="member">Can edit</option>
+                    <option value="viewer">View only</option>
                   </select>
                 </TableCell>
                 <TableCell>
@@ -109,10 +109,10 @@ export function UserManager({ users }: { users: UserRow[] }) {
         </div>
         <div className="space-y-1">
           <label className="text-xs">Role</label>
-          <select name="role" defaultValue="member" className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-xs">
-            <option value="admin">admin</option>
-            <option value="member">member</option>
-            <option value="viewer">viewer</option>
+          <select name="role" defaultValue="viewer" className="h-8 rounded-md border border-[var(--input)] bg-[var(--background)] px-2 text-xs">
+            <option value="admin">Admin — full control</option>
+            <option value="member">Can edit</option>
+            <option value="viewer">View only</option>
           </select>
         </div>
         <Button size="sm" type="submit" disabled={pending}>Add user</Button>

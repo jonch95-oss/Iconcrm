@@ -7,7 +7,13 @@ import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook } from "@/lib/import-excel";
 import { computeFobLine } from "@/lib/match";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, SampleStatus } from "@prisma/client";
+
+const VALID_STATUS = new Set([
+  "sample_requested", "eta_set", "sample_received", "quoted", "on_order_form",
+  "pi_received", "pi_matched", "po_issued", "in_production", "shipped",
+  "packing_list_matched", "closed",
+]);
 
 export interface ImportSummary {
   ok: boolean;
@@ -78,7 +84,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           factoryId = factoryCache.get(factoryName);
         }
 
+        const statusRaw = (v.status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
         const fields = {
+          status: VALID_STATUS.has(statusRaw) ? (statusRaw as SampleStatus) : undefined,
           brand: v.brand?.trim() || undefined,
           category: v.category?.trim() || undefined,
           styleNumber: v.styleNumber?.trim() || undefined,
@@ -131,8 +139,18 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         if (dup) {
           if (dup.sampleId !== currentSampleId) {
             summary.skipped.push({ row: row.rowNumber, reason: `UPC ${upc} already belongs to another sample` });
+            continue;
           }
-          continue; // same sample: already imported, fine
+          // Same sample: bulk-update the variant's details from the sheet.
+          await prisma.skuVariant.update({
+            where: { id: dup.id },
+            data: {
+              size: size || dup.size,
+              color: color || dup.color,
+              skuCode: v.skuCode?.trim() || dup.skuCode,
+            },
+          });
+          continue;
         }
         await prisma.skuVariant.create({
           data: {

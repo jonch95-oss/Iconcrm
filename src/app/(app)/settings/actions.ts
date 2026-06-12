@@ -73,7 +73,7 @@ export async function inviteUser(formData: FormData): Promise<ActionResult> {
   const admin = await assertRole("admin");
   const email = String(formData.get("email") ?? "").toLowerCase().trim();
   const name = String(formData.get("name") ?? "").trim();
-  const role = String(formData.get("role") ?? "member") as Role;
+  const role = String(formData.get("role") ?? "viewer") as Role;
   if (!email) return { ok: false, error: "Email required" };
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return { ok: false, error: "User already exists" };

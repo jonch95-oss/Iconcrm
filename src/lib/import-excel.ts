@@ -32,6 +32,7 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   color: ["color", "colour", "colorway", "clr"],
   upc: ["upc", "barcode", "ean", "gtin", "upccode"],
   skuCode: ["sku", "skucode", "itemcode"],
+  status: ["status", "stage"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {
@@ -174,12 +175,12 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   ws.addRow([
     "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
-    "Factory", "Target Customer", "Size", "Color", "UPC",
+    "Factory", "Target Customer", "Status", "Size", "Color", "UPC",
   ]);
   ws.getRow(1).font = { bold: true };
-  ws.addRow(["S-1001", "Aurora", "Outerwear", "AUR-PF-01", "Quilted Puffer", "Recycled fill", 18.5, 42, 17.5, 1.1, 0.4, "Saigon Garment", "Nordstrom", "S", "Black", "812345678001"]);
-  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "M", "Black", "812345678002"]);
-  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "L", "Black", "812345678003"]);
+  ws.addRow(["S-1001", "Aurora", "Outerwear", "AUR-PF-01", "Quilted Puffer", "Recycled fill", 18.5, 42, 17.5, 1.1, 0.4, "Saigon Garment", "Nordstrom", "quoted", "S", "Black", "812345678001"]);
+  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "", "M", "Black", "812345678002"]);
+  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "", "L", "Black", "812345678003"]);
   ws.columns.forEach((c) => (c.width = 16));
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);

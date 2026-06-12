@@ -1,5 +1,4 @@
 import { chromium } from "@playwright/test";
-import { writeFileSync } from "node:fs";
 const b = await chromium.launch();
 const page = await b.newPage({ viewport: { width: 1380, height: 950 } });
 page.setDefaultTimeout(90000);
@@ -8,8 +7,12 @@ await page.locator('#email').fill("admin@ourdomain.com");
 await page.locator('#password').fill("Icon@1234");
 await page.getByRole("button", { name: "Sign in" }).click();
 await page.waitForURL("http://localhost:3000/", { timeout: 90000 });
-// download the mass export
-const resp = await page.request.get("http://localhost:3000/api/samples/export");
-writeFileSync("/tmp/mass-export.xlsx", Buffer.from(await resp.body()));
-console.log("EXPORT DOWNLOADED:", resp.status());
+await page.goto("http://localhost:3000/samples");
+await page.waitForTimeout(4000);
+await page.getByRole("button", { name: "Import Excel" }).click();
+await page.waitForTimeout(800);
+await page.locator('input[type="file"]').setInputFiles("/tmp/mass-edited.xlsx");
+await page.waitForTimeout(12000);
+const text = await page.locator("text=Done —").textContent().catch(() => null);
+console.log("ROUND-TRIP IMPORT:", text);
 await b.close();
