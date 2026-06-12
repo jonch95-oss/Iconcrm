@@ -23,7 +23,7 @@ if (process.env.AZURE_AD_CLIENT_ID && process.env.AZURE_AD_CLIENT_SECRET) {
 
 // Dev-only credentials login so the tool can be exercised without a tenant.
 // Looks up an existing (seeded) user by email; password is ignored in dev.
-if (process.env.DEV_AUTH_ENABLED === "true") {
+if (process.env.DEV_AUTH_ENABLED === "true" && process.env.NODE_ENV !== "production") {
   providers.push(
     Credentials({
       id: "dev",
@@ -78,17 +78,16 @@ export const authConfig: NextAuthConfig = {
       return session;
     },
     async signIn({ user, account }) {
-      // For Azure AD: auto-provision a User row (default member role) if new.
-      if (account?.provider === "microsoft-entra-id" && user.email) {
-        await prisma.user.upsert({
-          where: { email: user.email },
-          update: { name: user.name ?? undefined, image: user.image ?? undefined },
-          create: {
-            email: user.email,
-            name: user.name,
-            image: user.image,
-            role: "member",
-          },
+      // Invite-only: sign-in is allowed only for emails an admin has already
+      // added in Settings (and that are active). No auto-provisioning.
+      if (account?.provider === "microsoft-entra-id") {
+        const email = user.email?.toLowerCase().trim();
+        if (!email) return false;
+        const existing = await prisma.user.findUnique({ where: { email } });
+        if (!existing || !existing.isActive) return false;
+        await prisma.user.update({
+          where: { email },
+          data: { name: user.name ?? undefined, image: user.image ?? undefined },
         });
       }
       return true;

@@ -11,6 +11,11 @@ export async function uploadBlob(
 ): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "File storage is not configured (BLOB_READ_WRITE_TOKEN missing). The file was not saved.",
+      );
+    }
     return `local://uploads/${Date.now()}-${filename}`;
   }
   const blob = await put(filename, data, {

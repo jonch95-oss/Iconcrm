@@ -9,10 +9,22 @@ import { processInboundEmail, type InboundPayload } from "@/lib/inbound";
  */
 export async function POST(req: NextRequest) {
   const expected = process.env.POSTMARK_INBOUND_TOKEN;
-  const provided =
-    req.nextUrl.searchParams.get("token") ?? req.headers.get("x-postmark-token");
-  if (expected && provided !== expected) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const isProd = process.env.NODE_ENV === "production";
+
+  // Fail closed: in production this endpoint must never run unauthenticated.
+  if (!expected) {
+    if (isProd) {
+      console.error("POSTMARK_INBOUND_TOKEN is not set; rejecting inbound email webhook.");
+      return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
+    }
+  } else {
+    // Header only in production — query strings leak into request logs.
+    const provided = isProd
+      ? req.headers.get("x-postmark-token")
+      : (req.headers.get("x-postmark-token") ?? req.nextUrl.searchParams.get("token"));
+    if (provided !== expected) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
   }
 
   let body: unknown;
