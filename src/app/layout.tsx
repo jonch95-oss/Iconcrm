@@ -9,7 +9,20 @@ const display = Bricolage_Grotesque({ variable: "--font-display", subsets: ["lat
 
 export const metadata: Metadata = {
   title: "Icon CRM",
+  applicationName: "Icon CRM",
+  appleWebApp: {
+    capable: true,
+    title: "Icon CRM",
+    statusBarStyle: "default",
+  },
+  icons: {
+    apple: "/apple-icon.png",
+  },
   description: "Wholesale production tracker: sample request → PO → packing list match",
+};
+
+export const viewport = {
+  themeColor: "#184d6e",
 };
 
 export default function RootLayout({
