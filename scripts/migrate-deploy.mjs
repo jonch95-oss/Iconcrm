@@ -30,7 +30,15 @@ if (!directUrl) {
   process.exit(0);
 }
 
-const env = { ...process.env, DATABASE_URL: directUrl };
+const env = {
+  ...process.env,
+  DATABASE_URL: directUrl,
+  // Connection poolers (Neon's pgbouncer endpoint) can't hold Prisma's
+  // advisory lock, which surfaces as a P1002 timeout. Vercel runs one
+  // production build at a time, so skipping the lock is safe here.
+  // Ref: https://pris.ly/d/migrate-advisory-locking
+  PRISMA_SCHEMA_DISABLE_ADVISORY_LOCK: "1",
+};
 const run = (cmd) => execSync(cmd, { stdio: "inherit", env });
 const runCapture = (cmd) => {
   try {
