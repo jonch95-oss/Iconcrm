@@ -1,0 +1,646 @@
+// Sample-to-PO CRM — Prisma schema
+// Postgres (Neon/Supabase compatible). All money is Decimal; all dates are UTC.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+enum Role {
+  admin
+  member
+  viewer
+}
+
+enum Currency {
+  USD
+  RMB
+  EUR
+}
+
+enum SampleStatus {
+  sample_requested
+  eta_set
+  sample_received
+  quoted
+  on_order_form
+  pi_received
+  pi_matched
+  po_issued
+  in_production
+  shipped
+  packing_list_matched
+  closed
+  dropped
+}
+
+enum DroppedReason {
+  customer_passed
+  price_too_high
+  quality_fail
+  factory_issue
+  other
+}
+
+enum OrderFormStatus {
+  draft
+  sent
+  superseded
+}
+
+enum PIStatus {
+  received
+  under_review
+  approved
+  disputed
+}
+
+enum LineResolution {
+  pending
+  approved
+  disputed
+}
+
+enum POStatus {
+  issued
+  deposit_paid
+  in_production
+  inspection
+  ready_to_ship
+  shipped
+  delivered
+}
+
+enum PackingMatchStatus {
+  matched
+  short
+  over
+}
+
+enum ParseStatus {
+  parsed
+  needs_review
+  ignored
+}
+
+enum EtaParentType {
+  sample
+  po
+  shipment
+}
+
+
+enum ShipmentStatus {
+  booked
+  in_transit
+  arrived_port
+  inland
+  delivered
+  cancelled
+}
+
+enum RiskStatus {
+  on_track
+  at_risk
+  late_for_window
+  early_for_window
+  no_window
+}
+
+enum ProductionStage {
+  pp  // pre-production sample
+  top // top-of-production sample
+}
+
+enum ProductionApproval {
+  pending
+  approved
+  rejected
+}
+
+// ---------------------------------------------------------------------------
+// Auth + Users (NextAuth/Auth.js compatible)
+// ---------------------------------------------------------------------------
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  image         String?
+  emailVerified DateTime?
+  role          Role      @default(member)
+  isActive      Boolean   @default(true)
+  // Which alert types this user receives (morning digest, variance, follow-ups, etc.)
+  notificationPrefs Json  @default("{}")
+
+  accounts Account[]
+  sessions Session[]
+
+  requestedSamples Sample[]        @relation("RequestedSamples")
+  comments         Comment[]
+  createdOrderForms OrderForm[]    @relation("CreatedOrderForms")
+  issuedPOs        PurchaseOrder[] @relation("IssuedPOs")
+  auditLogs        AuditLog[]
+  etaRevisions     EtaRevision[]
+  productionReviews ProductionSample[] @relation("ProductionReviews")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------------------
+// Core domain
+// ---------------------------------------------------------------------------
+
+model Factory {
+  id                  String   @id @default(cuid())
+  name                String
+  contactName         String?
+  contactEmail        String?
+  country             String?
+  paymentTermsDefault String?
+  notes               String?  @db.Text
+
+  samples         Sample[]
+  orderForms      OrderForm[]
+  proformaInvoices ProformaInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Sample {
+  id           String       @id @default(cuid())
+  sampleNumber String       @unique // globally unique — enforced at DB level
+  brand        String?
+  category     String?
+  styleName    String?
+  styleNumber  String?
+  description  String?      @db.Text
+  status       SampleStatus @default(sample_requested)
+
+  requestedById String?
+  requestedBy   User?   @relation("RequestedSamples", fields: [requestedById], references: [id])
+  // Free-text sender when the requester is not a known User (e.g. external email).
+  requestedByExternal String?
+  requestedAt   DateTime @default(now())
+
+  sourceEmailId String?       @unique
+  sourceEmail   InboundEmail? @relation(fields: [sourceEmailId], references: [id])
+
+  sampleEta          DateTime?
+  sampleReceivedDate DateTime?
+
+  fobCost  Decimal?  @db.Decimal(12, 4)
+  currency Currency  @default(USD)
+  fobPort  String?
+
+  // Customer sell price per style (for margin %). Stored alongside currency above.
+  customerSellPrice Decimal? @db.Decimal(12, 4)
+
+  // Landed cost inputs (per unit). Landed = FOB + duty% of FOB + freight + inland.
+  dutyRatePercent Decimal? @db.Decimal(6, 3)  // e.g. 17.500 = 17.5%
+  freightPerUnit  Decimal? @db.Decimal(12, 4)
+  inlandPerUnit   Decimal? @db.Decimal(12, 4)
+
+  factoryId String?
+  factory   Factory? @relation(fields: [factoryId], references: [id])
+
+  targetCustomer String?
+
+  droppedReason DroppedReason?
+
+  // follow-up automation tracking
+  lastFollowUpAt   DateTime?
+  followUpStopped  Boolean   @default(false)
+  followUpCadenceDays Int    @default(7)
+  snoozeUntil      DateTime?
+
+  skuVariants    SkuVariant[]
+  comments       Comment[]
+  orderFormLines OrderFormLine[]
+  piLines        PILine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([factoryId])
+  @@index([brand])
+}
+
+model SkuVariant {
+  id              String  @id @default(cuid())
+  sampleId        String
+  sample          Sample  @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  size            String
+  color           String
+  upc             String  @unique // UPC lives at size/color level
+  skuCode         String?
+  unitsPerCarton  Int?
+
+  orderFormLines   OrderFormLine[]
+  piLines          PILine[]
+  packingListLines PackingListLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sampleId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  sampleId  String
+  sample    Sample   @relation(fields: [sampleId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id])
+  authorLabel String? // for inbound email comments where author is not a User
+  body      String   @db.Text
+  tags      String[] @default([]) // e.g. "duplicate-email"
+  createdAt DateTime @default(now())
+
+  @@index([sampleId])
+}
+
+// Never overwrite ETAs — log every change.
+model EtaRevision {
+  id         String        @id @default(cuid())
+  parentType EtaParentType
+  parentId   String
+  oldEta     DateTime?
+  newEta     DateTime?
+  reason     String?
+  changedById String?
+  changedBy  User?         @relation(fields: [changedById], references: [id])
+  createdAt  DateTime      @default(now())
+
+  @@index([parentType, parentId])
+}
+
+model OrderForm {
+  id              String          @id @default(cuid())
+  orderFormNumber String          @unique // OF-YYYY-####
+  factoryId       String
+  factory         Factory         @relation(fields: [factoryId], references: [id])
+  status          OrderFormStatus @default(draft)
+  createdById     String?
+  createdBy       User?           @relation("CreatedOrderForms", fields: [createdById], references: [id])
+  sentAt          DateTime?
+  notes           String?         @db.Text
+
+  lines             OrderFormLine[]
+  proformaInvoices  ProformaInvoice[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model OrderFormLine {
+  id           String      @id @default(cuid())
+  orderFormId  String
+  orderForm    OrderForm   @relation(fields: [orderFormId], references: [id], onDelete: Cascade)
+  sampleId     String
+  sample       Sample      @relation(fields: [sampleId], references: [id])
+  skuVariantId String?
+  skuVariant   SkuVariant? @relation(fields: [skuVariantId], references: [id])
+  quantity     Int         @default(0)
+  // FOB snapshot at the time the line was added.
+  fobCostSnapshot Decimal? @db.Decimal(12, 4)
+  currency     Currency    @default(USD)
+
+  createdAt DateTime @default(now())
+
+  @@index([orderFormId])
+  @@index([sampleId])
+}
+
+model ProformaInvoice {
+  id          String   @id @default(cuid())
+  piNumber    String // factory's number (not globally unique across factories)
+  factoryId   String
+  factory     Factory  @relation(fields: [factoryId], references: [id])
+  orderFormId String?
+  orderForm   OrderForm? @relation(fields: [orderFormId], references: [id])
+
+  currency       Currency @default(USD)
+  paymentTerms   String?
+  depositPercent Decimal? @db.Decimal(5, 2)
+  depositPaidDate DateTime?
+  balancePaidDate DateTime?
+  piDate         DateTime?
+  status         PIStatus @default(received)
+
+  lines          PILine[]
+  purchaseOrders PurchaseOrder[]
+  packingLists   PackingList[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([factoryId])
+}
+
+model PILine {
+  id           String      @id @default(cuid())
+  piId         String
+  pi           ProformaInvoice @relation(fields: [piId], references: [id], onDelete: Cascade)
+  sampleId     String?
+  sample       Sample?     @relation(fields: [sampleId], references: [id])
+  skuVariantId String?
+  skuVariant   SkuVariant? @relation(fields: [skuVariantId], references: [id])
+  quantity     Int         @default(0)
+  unitPrice    Decimal     @db.Decimal(12, 4)
+
+  // FOB match engine results (computed on entry, persisted for digests).
+  fobSnapshot      Decimal?       @db.Decimal(12, 4)
+  variance         Decimal?       @db.Decimal(12, 4) // unitPrice - fob
+  variancePercent  Decimal?       @db.Decimal(8, 4)
+  resolution       LineResolution @default(pending)
+  resolvedById     String?
+  resolvedAt       DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@index([piId])
+}
+
+model PurchaseOrder {
+  id        String   @id @default(cuid())
+  poNumber  String   @unique // PO-YYYY-####
+  piId      String
+  pi        ProformaInvoice @relation(fields: [piId], references: [id])
+  issuedById String?
+  issuedBy   User?   @relation("IssuedPOs", fields: [issuedById], references: [id])
+  issuedAt   DateTime @default(now())
+  factoryEta DateTime?
+  status     POStatus @default(issued)
+  productionNotes String? @db.Text
+  inspectionDate DateTime?
+  shipDate       DateTime?
+
+  customerPoLinks CustomerPoLink[]
+  packingLists    PackingList[]
+  shipments       Shipment[] @relation("ShipmentPOs")
+  productionSamples ProductionSample[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model CustomerPO {
+  id              String   @id @default(cuid())
+  customerPoNumber String  @unique
+  customerName    String
+  receivedDate    DateTime?
+  totalValue      Decimal? @db.Decimal(14, 2)
+  currency        Currency @default(USD)
+
+  // Delivery window: goods must arrive at the customer DC between these dates.
+  startShipDate    DateTime? // earliest acceptable delivery
+  cancelDate       DateTime? // hard deadline — PO can be cancelled after this
+  deliveryLocation String?   // customer DC name/city
+
+  links CustomerPoLink[]
+  shipmentRisks ShipmentRisk[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Many-to-many between CustomerPO and PurchaseOrder.
+model CustomerPoLink {
+  id            String        @id @default(cuid())
+  customerPoId  String
+  customerPo    CustomerPO    @relation(fields: [customerPoId], references: [id], onDelete: Cascade)
+  purchaseOrderId String
+  purchaseOrder PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  note          String?
+  createdAt     DateTime      @default(now())
+
+  @@unique([customerPoId, purchaseOrderId])
+}
+
+model PackingList {
+  id          String   @id @default(cuid())
+  piId        String
+  pi          ProformaInvoice @relation(fields: [piId], references: [id], onDelete: Cascade)
+  poId        String?
+  po          PurchaseOrder?  @relation(fields: [poId], references: [id])
+  shipmentRef String?
+  vesselOrAwb String?
+  shipmentId  String?
+  shipment    Shipment? @relation(fields: [shipmentId], references: [id])
+  etd         DateTime?
+  eta         DateTime?
+  receivedAt  DateTime?
+
+  lines PackingListLine[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([piId])
+}
+
+model PackingListLine {
+  id           String      @id @default(cuid())
+  packingListId String
+  packingList  PackingList @relation(fields: [packingListId], references: [id], onDelete: Cascade)
+  skuVariantId String
+  skuVariant   SkuVariant  @relation(fields: [skuVariantId], references: [id])
+  cartons      Int         @default(0)
+  unitsShipped Int         @default(0)
+
+  createdAt DateTime @default(now())
+
+  @@index([packingListId])
+}
+
+model InboundEmail {
+  id          String      @id @default(cuid())
+  fromEmail   String
+  toEmail     String?
+  cc          String?
+  subject     String?
+  bodyText    String?     @db.Text
+  bodyHtml    String?     @db.Text
+  attachments Json        @default("[]")
+  receivedAt  DateTime    @default(now())
+  parsedSampleId String?
+  parseStatus ParseStatus @default(needs_review)
+  parseNotes  String?     @db.Text
+  rawPayload  Json?
+
+  sample Sample?
+
+  @@index([parseStatus])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  actorLabel String?  // for system/automation actions
+  entityType String
+  entityId   String
+  action     String
+  before     Json?
+  after      Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+}
+
+model Attachment {
+  id         String   @id @default(cuid())
+  parentType String   // polymorphic: "sample" | "pi" | "packing_list" | "customer_po" | ...
+  parentId   String
+  blobUrl    String
+  filename   String
+  mimeType   String?
+  uploadedById String?
+  createdAt  DateTime @default(now())
+
+  @@index([parentType, parentId])
+}
+
+
+// ---------------------------------------------------------------------------
+// Container / shipment tracking
+// ---------------------------------------------------------------------------
+
+model Shipment {
+  id          String  @id @default(cuid())
+  shipmentRef String  @unique // SHP-YYYY-####
+
+  // Tracking identifiers — at least one should be present.
+  containerNumber String?
+  mblNumber       String?
+  bookingNumber   String?
+
+  carrierScac      String?
+  vesselName       String?
+  voyage           String?
+  pol              String? // port of lading
+  pod              String? // port of discharge
+  finalDestination String?
+
+  // Original = set once when tracking starts, never overwritten.
+  originalEtd DateTime?
+  originalEta DateTime?
+  currentEtd  DateTime?
+  currentEta  DateTime?
+  atd         DateTime? // actual departure
+  ata         DateTime? // actual arrival at POD
+
+  // Days from port arrival to delivered at the customer DC.
+  inlandBufferDays Int @default(5)
+
+  status ShipmentStatus @default(booked)
+
+  trackingProvider       String? // "terminal49" | "manual"
+  trackingSubscriptionId String?
+  lastTrackingSyncAt     DateTime?
+  milestones             Json    @default("[]") // raw provider event history
+
+  notes String? @db.Text
+
+  packingLists   PackingList[]
+  purchaseOrders PurchaseOrder[] @relation("ShipmentPOs")
+  risks          ShipmentRisk[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([containerNumber])
+}
+
+// Computed risk of a shipment vs one customer PO's delivery window.
+model ShipmentRisk {
+  id           String     @id @default(cuid())
+  shipmentId   String
+  shipment     Shipment   @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  customerPoId String
+  customerPo   CustomerPO @relation(fields: [customerPoId], references: [id], onDelete: Cascade)
+
+  status                RiskStatus
+  projectedDeliveryDate DateTime?
+  slipDays              Int? // currentEta - originalEta, in days
+  computedAt            DateTime @default(now())
+
+  @@unique([shipmentId, customerPoId])
+  @@index([status])
+}
+
+// PP / TOP production sample approvals per purchase order.
+model ProductionSample {
+  id    String          @id @default(cuid())
+  poId  String
+  po    PurchaseOrder   @relation(fields: [poId], references: [id], onDelete: Cascade)
+  stage ProductionStage
+
+  status     ProductionApproval @default(pending)
+  notes      String?            @db.Text
+  dueDate    DateTime?
+  reviewedById String?
+  reviewedBy   User?            @relation("ProductionReviews", fields: [reviewedById], references: [id])
+  reviewedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([poId])
+}
+
+// Singleton-ish key/value app settings (parsing regexes, recipient lists,
+// PO number format, follow-up cadence, brand/category option lists, etc.)
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
