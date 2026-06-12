@@ -13,6 +13,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatDate, isOverdue } from "@/lib/date";
+import { formatPercent } from "@/lib/money";
+import { computePoPnl } from "@/lib/pnl";
 import { ClipboardList, AlertTriangle } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +24,32 @@ export default async function PosPage() {
     prisma.purchaseOrder.findMany({
       orderBy: { issuedAt: "desc" },
       include: {
-        pi: { select: { id: true, piNumber: true, factory: { select: { name: true } } } },
+        pi: {
+          select: {
+            id: true,
+            piNumber: true,
+            factory: { select: { name: true } },
+            lines: {
+              select: {
+                quantity: true,
+                unitPrice: true,
+                sample: {
+                  select: {
+                    id: true,
+                    styleNumber: true,
+                    styleName: true,
+                    sampleNumber: true,
+                    currency: true,
+                    dutyRatePercent: true,
+                    freightPerUnit: true,
+                    inlandPerUnit: true,
+                    customerSellPrice: true,
+                  },
+                },
+              },
+            },
+          },
+        },
         customerPoLinks: { include: { customerPo: { select: { id: true, customerPoNumber: true } } } },
       },
     }),
@@ -33,6 +60,13 @@ export default async function PosPage() {
     }),
   ]);
   const etaCountMap = new Map(etaCounts.map((e) => [e.parentId, e._count._all]));
+  const marginMap = new Map(
+    pos.map((po) => {
+      if (po.pi.lines.length === 0) return [po.id, null] as const;
+      const pnl = computePoPnl(po.pi.lines);
+      return [po.id, pnl.marginPct] as const;
+    }),
+  );
 
   return (
     <div>
@@ -40,7 +74,7 @@ export default async function PosPage() {
       {pos.length === 0 ? (
         <EmptyState icon={ClipboardList} title="No purchase orders" description="Issue a PO from a PI detail page." />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>
@@ -50,6 +84,7 @@ export default async function PosPage() {
                 <TableHead>Factory</TableHead>
                 <TableHead>Factory ETA</TableHead>
                 <TableHead>Customer POs</TableHead>
+                <TableHead className="text-right">Margin</TableHead>
                 <TableHead>Issued</TableHead>
               </TableRow>
             </TableHeader>
@@ -91,6 +126,18 @@ export default async function PosPage() {
                         ))}
                         {po.customerPoLinks.length === 0 && <span className="text-xs text-[var(--muted-foreground)]">—</span>}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right tabular-nums">
+                      {(() => {
+                        const m = marginMap.get(po.id);
+                        if (!m) return <span className="text-[var(--muted-foreground)]">—</span>;
+                        const bad = Number(m) < 0;
+                        return (
+                          <span className={bad ? "font-medium text-[var(--destructive)]" : "font-medium text-[var(--success)]"}>
+                            {formatPercent(m)}
+                          </span>
+                        );
+                      })()}
                     </TableCell>
                     <TableCell>{formatDate(po.issuedAt)}</TableCell>
                   </TableRow>

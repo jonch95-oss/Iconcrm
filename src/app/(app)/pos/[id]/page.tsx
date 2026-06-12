@@ -10,6 +10,8 @@ import { PO_PIPELINE, PO_STATUS_LABEL, poRank } from "@/lib/status";
 import { PoControls } from "./po-controls";
 import { formatDate, toDateInputValue } from "@/lib/date";
 import { ProductionSamples, type ProductionRow } from "./production-samples";
+import { PoPnlCard } from "@/components/po-pnl-card";
+import { getPoPnl } from "@/lib/pnl";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -38,6 +40,7 @@ export default async function PoDetailPage({
   });
   if (!po) notFound();
 
+  const pnl = await getPoPnl(id);
   const etaRevisions = await prisma.etaRevision.findMany({
     where: { parentType: "po", parentId: id },
     orderBy: { createdAt: "desc" },
@@ -154,6 +157,8 @@ export default async function PoDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {pnl && <PoPnlCard pnl={pnl} currency={pnl.currency} />}
 
       <Card className="mt-4">
         <CardHeader><CardTitle>Production sample approvals (PP / TOP)</CardTitle></CardHeader>

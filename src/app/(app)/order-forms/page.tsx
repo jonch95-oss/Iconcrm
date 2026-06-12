@@ -37,7 +37,7 @@ export default async function OrderFormsPage() {
           description="Select samples on the Samples page and use 'Create Order Form' to start one."
         />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>

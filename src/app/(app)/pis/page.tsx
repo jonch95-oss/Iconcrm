@@ -58,7 +58,7 @@ export default async function PisPage({
       {rows.length === 0 ? (
         <EmptyState icon={ReceiptText} title="No proforma invoices" description="Create a PI to enter factory lines and run the FOB match engine." />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>

@@ -48,7 +48,7 @@ export default async function PackingListsPage() {
       {lists.length === 0 ? (
         <EmptyState icon={Boxes} title="No packing lists" description="Create a packing list against a PI and enter shipped lines to run the 3-way match." />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>

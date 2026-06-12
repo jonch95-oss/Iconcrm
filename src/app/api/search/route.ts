@@ -13,7 +13,7 @@ export async function GET(req: NextRequest) {
   const q = (req.nextUrl.searchParams.get("q") ?? "").trim();
   if (q.length < 2) return NextResponse.json({ results: [] });
 
-  const [samples, skus, pis, pos, customerPos] = await Promise.all([
+  const [samples, skus, pis, pos, customerPos, shipments] = await Promise.all([
     prisma.sample.findMany({
       where: {
         OR: [
@@ -50,6 +50,18 @@ export async function GET(req: NextRequest) {
       select: { id: true, customerPoNumber: true, customerName: true },
       take: 6,
     }),
+    prisma.shipment.findMany({
+      where: {
+        OR: [
+          { shipmentRef: { contains: q, mode: "insensitive" } },
+          { containerNumber: { contains: q, mode: "insensitive" } },
+          { mblNumber: { contains: q, mode: "insensitive" } },
+          { bookingNumber: { contains: q, mode: "insensitive" } },
+        ],
+      },
+      select: { id: true, shipmentRef: true, containerNumber: true, status: true },
+      take: 6,
+    }),
   ]);
 
   const results = [
@@ -82,6 +94,12 @@ export async function GET(req: NextRequest) {
       label: c.customerPoNumber,
       sub: c.customerName,
       href: `/customer-pos/${c.id}`,
+    })),
+    ...shipments.map((sh) => ({
+      type: "Shipment",
+      label: sh.shipmentRef,
+      sub: sh.containerNumber ?? sh.status,
+      href: `/shipments/${sh.id}`,
     })),
   ];
 

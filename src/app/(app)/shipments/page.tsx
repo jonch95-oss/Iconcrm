@@ -77,7 +77,12 @@ export default async function ShipmentsPage() {
             <TableBody>
               {shipments.map((s) => {
                 const worst = worstRisk(s.risks.map((r) => r.status));
-                const slip = s.risks[0]?.slipDays ?? null;
+                const slip =
+                  s.originalEta && s.currentEta
+                    ? Math.round(
+                        (s.currentEta.getTime() - s.originalEta.getTime()) / 86400000,
+                      )
+                    : null;
                 const revised =
                   s.originalEta &&
                   s.currentEta &&

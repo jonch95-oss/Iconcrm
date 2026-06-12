@@ -34,7 +34,7 @@ export default async function CustomerPosPage() {
       {cpos.length === 0 ? (
         <EmptyState icon={Building2} title="No customer POs" description="Add a customer PO and link it to one or more internal POs." />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>

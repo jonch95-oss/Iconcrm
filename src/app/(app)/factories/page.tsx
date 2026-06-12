@@ -26,7 +26,7 @@ export default async function FactoriesPage() {
       {factories.length === 0 ? (
         <EmptyState icon={Factory} title="No factories" />
       ) : (
-        <div className="rounded-md border border-[var(--border)]">
+        <div className="overflow-x-auto rounded-md border border-[var(--border)]">
           <Table>
             <TableHeader>
               <TableRow>

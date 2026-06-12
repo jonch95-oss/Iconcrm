@@ -22,6 +22,9 @@ export default async function SamplesPage({
   const [samples, factories, etaCounts] = await Promise.all([
     prisma.sample.findMany({
       orderBy: { requestedAt: "desc" },
+      // Newest 2,000 keeps the page fast at high volume; older records remain
+      // reachable through global search and direct links.
+      take: 2000,
       include: {
         factory: { select: { id: true, name: true } },
         requestedBy: { select: { name: true, email: true } },
