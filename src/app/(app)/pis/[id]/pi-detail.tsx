@@ -57,8 +57,6 @@ export interface PiSampleOption {
 
 export function PiDetail({
   piId,
-  currency,
-  status,
   hasPO,
   lines,
   summary,
@@ -67,8 +65,6 @@ export function PiDetail({
   canEdit,
 }: {
   piId: string;
-  currency: string;
-  status: string;
   hasPO: boolean;
   lines: PiLineView[];
   summary: { total: number; matched: number; varianceCount: number; varianceTotal: string };

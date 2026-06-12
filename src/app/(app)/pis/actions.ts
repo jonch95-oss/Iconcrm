@@ -93,7 +93,7 @@ const lineSchema = z.object({
 });
 
 export async function addPILine(formData: FormData): Promise<ActionResult> {
-  const user = await assertRole("member");
+  await assertRole("member");
   const parsed = lineSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
   const up = toDecimal(parsed.data.unitPrice);
@@ -107,7 +107,7 @@ export async function addPILine(formData: FormData): Promise<ActionResult> {
     up,
   );
   await prisma.pILine.create({ data });
-  await afterLinesChanged(parsed.data.piId, user.id);
+  await afterLinesChanged(parsed.data.piId);
   revalidatePath(`/pis/${parsed.data.piId}`);
   return { ok: true };
 }
@@ -121,7 +121,7 @@ export async function bulkPastePILines(
   piId: string,
   text: string,
 ): Promise<ActionResult> {
-  const user = await assertRole("member");
+  await assertRole("member");
   const rows = text
     .split(/\r?\n/)
     .map((r) => r.trim())
@@ -161,13 +161,13 @@ export async function bulkPastePILines(
   }
 
   if (created === 0) return { ok: false, error: "No rows matched a known sample #." };
-  await afterLinesChanged(piId, user.id);
+  await afterLinesChanged(piId);
   revalidatePath(`/pis/${piId}`);
   return { ok: true, id: String(created) };
 }
 
 /** Recompute sample statuses, send variance alerts after lines change. */
-async function afterLinesChanged(piId: string, userId: string) {
+async function afterLinesChanged(piId: string) {
   const pi = await prisma.proformaInvoice.findUnique({
     where: { id: piId },
     include: { lines: { include: { sample: true, skuVariant: true } }, factory: true },

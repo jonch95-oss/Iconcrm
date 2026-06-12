@@ -56,8 +56,7 @@ export const authConfig: NextAuthConfig = {
     async jwt({ token, user }) {
       if (user) {
         token.uid = user.id;
-        // @ts-expect-error role added on authorize
-        token.role = user.role;
+        token.role = (user as { role?: Role }).role;
       }
       // Hydrate role/id from DB on every call when missing (Azure AD path).
       if (token.email && (!token.role || !token.uid)) {

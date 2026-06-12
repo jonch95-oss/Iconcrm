@@ -49,7 +49,7 @@ export async function createSampleFromEmail(formData: FormData): Promise<ActionR
 
 /** Merge a needs-review email into an existing sample (append as comment). */
 export async function mergeEmailToSample(emailId: string, sampleId: string): Promise<ActionResult> {
-  const user = await assertRole("member");
+  await assertRole("member");
   const email = await prisma.inboundEmail.findUnique({ where: { id: emailId } });
   if (!email) return { ok: false, error: "Email not found" };
   const sample = await prisma.sample.findUnique({ where: { id: sampleId } });

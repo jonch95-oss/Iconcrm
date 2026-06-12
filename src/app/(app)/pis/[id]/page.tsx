@@ -6,7 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { PiStatusBadge } from "@/components/status-badge";
 import { PiDetail, type PiLineView, type PiSampleOption } from "./pi-detail";
 import { summarizeFob } from "@/lib/match";
-import { formatMoney, formatPercent } from "@/lib/money";
+import { formatMoney } from "@/lib/money";
 import { formatDate, toDateInputValue } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -96,8 +96,6 @@ export default async function PiDetailPage({
 
       <PiDetail
         piId={pi.id}
-        currency={pi.currency}
-        status={pi.status}
         hasPO={pi.purchaseOrders.length > 0}
         lines={lines}
         summary={{

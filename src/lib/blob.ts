@@ -6,7 +6,7 @@ import { put } from "@vercel/blob";
  */
 export async function uploadBlob(
   filename: string,
-  data: Buffer | Uint8Array | string,
+  data: Buffer | string,
   contentType?: string,
 ): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;

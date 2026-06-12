@@ -4,7 +4,6 @@ import { prisma } from "@/lib/db";
 import { z } from "zod";
 import { verifyToken } from "@/lib/tokens";
 import { logAudit } from "@/lib/audit";
-import { advanceSampleStatus } from "@/lib/status";
 
 type ActionResult = { ok: true } | { ok: false; error: string };
 

@@ -47,13 +47,12 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
 import { formatMoney } from "@/lib/money";
-import { formatDate, toDateInputValue } from "@/lib/date";
+import { toDateInputValue } from "@/lib/date";
 import { updateSample, createOrderFormFromSamples } from "./actions";
 import { toast } from "sonner";
 
