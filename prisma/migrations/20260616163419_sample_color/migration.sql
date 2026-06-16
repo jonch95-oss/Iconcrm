@@ -1,2 +1,1 @@
--- AlterTable
-ALTER TABLE "Sample" ADD COLUMN     "color" TEXT;
+ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "color" TEXT;

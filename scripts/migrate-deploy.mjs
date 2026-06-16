@@ -53,10 +53,23 @@ const runCapture = (cmd) => {
 
 const MAX_ATTEMPTS = 3;
 let lastStderr = "";
+
+// Idempotent safeguard: ensure columns the running app reads always exist,
+// even if a prior P3005 baseline marked migrations "applied" without running
+// their SQL. Delegates to scripts/ensure-columns.mjs (safe to run repeatedly).
+function ensureColumns() {
+  try {
+    run("node scripts/ensure-columns.mjs");
+  } catch (err) {
+    console.warn("[migrate] column safeguard warning:", err?.message?.slice(0, 200) ?? err);
+  }
+}
+
 for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
   const res = runCapture("npx prisma migrate deploy");
   if (res.ok) {
     console.log("[migrate] migrations applied.");
+    ensureColumns();
     process.exit(0);
   }
   lastStderr = res.stderr;
@@ -67,6 +80,7 @@ for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const migrations = readdirSync("prisma/migrations").filter((d) => /^\d{14}_/.test(d));
       for (const m of migrations) run(`npx prisma migrate resolve --applied ${m}`);
       run("npx prisma migrate deploy");
+      ensureColumns();
       console.warn("[migrate] baselined and deployed.");
       process.exit(0);
     } catch (err) {

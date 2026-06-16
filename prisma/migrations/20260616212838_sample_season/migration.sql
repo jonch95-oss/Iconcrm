@@ -1,1 +1,1 @@
-ALTER TABLE "Sample" ADD COLUMN "season" TEXT;
+ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "season" TEXT;
