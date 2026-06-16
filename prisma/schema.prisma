@@ -533,6 +533,8 @@ model InboundEmail {
   parseNotes  String?     @db.Text
   rawPayload  Json?
 
+  mailgunMessageKey String? @unique
+
   sample Sample?
 
   @@index([parseStatus])

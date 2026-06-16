@@ -18,6 +18,7 @@ const JOBS: { name: string; load: () => Promise<any> }[] = [
   { name: "morning-digest", load: () => import("../morning-digest/route") },
   { name: "tracking-sync", load: () => import("../tracking-sync/route") },
   { name: "parcel-sync", load: () => import("../parcel-sync/route") },
+  { name: "mailgun-sweep", load: () => import("../mailgun-sweep/route") },
 ];
 
 export async function GET(req: Request) {
