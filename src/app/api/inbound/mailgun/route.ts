@@ -52,6 +52,45 @@ export async function POST(req: NextRequest) {
   };
 
   const attachments: { name: string; contentBase64?: string; contentType?: string }[] = [];
+
+  // --- Store-and-notify path (no size limit) ---
+  // When the route uses store(), Mailgun keeps the attachments and sends an
+  // "attachments" field: a JSON array of { url, name, content-type, size }.
+  // We fetch each from Mailgun's API (server-to-server, bypassing the webhook
+  // body cap entirely — this is how large sample sheets get through).
+  const attachmentsJson = str("attachments");
+  if (attachmentsJson) {
+    try {
+      const list = JSON.parse(attachmentsJson) as {
+        url: string;
+        name?: string;
+        "content-type"?: string;
+      }[];
+      const apiKey = process.env.MAILGUN_API_KEY;
+      for (const a of list) {
+        if (!a.url) continue;
+        const headers: Record<string, string> = {};
+        if (apiKey) {
+          headers["Authorization"] = "Basic " + Buffer.from(`api:${apiKey}`).toString("base64");
+        }
+        const res = await fetch(a.url, { headers });
+        if (!res.ok) continue;
+        const buf = Buffer.from(await res.arrayBuffer());
+        attachments.push({
+          name: a.name || "attachment",
+          contentBase64: buf.toString("base64"),
+          contentType: a["content-type"] || "application/octet-stream",
+        });
+      }
+    } catch {
+      // fall through to inline parsing below
+    }
+  }
+
+  // --- Inline forward path (small attachments) ---
+  // Mailgun field names (parsed/forwarded format):
+  //   sender, from, subject, recipient, "body-plain", "body-html",
+  //   "attachment-count", "attachment-1", "attachment-2", ...
   const count = parseInt(str("attachment-count") ?? "0", 10) || 0;
   // Gather attachment-1..N, plus any File parts as a fallback.
   const seen = new Set<string>();
