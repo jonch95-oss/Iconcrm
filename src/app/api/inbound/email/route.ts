@@ -18,10 +18,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Webhook not configured" }, { status: 503 });
     }
   } else {
-    // Header only in production — query strings leak into request logs.
-    const provided = isProd
-      ? req.headers.get("x-postmark-token")
-      : (req.headers.get("x-postmark-token") ?? req.nextUrl.searchParams.get("token"));
+    // Accept the shared secret from either the x-postmark-token header or the
+    // ?token= query param. Postmark's inbound webhook can only carry the secret
+    // in the URL, so the query param is the primary path; the secret is random
+    // and the request is HTTPS.
+    const provided =
+      req.headers.get("x-postmark-token") ?? req.nextUrl.searchParams.get("token");
     if (provided !== expected) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
