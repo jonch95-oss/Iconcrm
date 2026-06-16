@@ -53,8 +53,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
 
   const parsed = await parseSamplesWorkbook(buf);
   if (parsed.error) return { ...EMPTY, error: parsed.error };
-  if (!parsed.mappedColumns.sampleNumber) {
-    return { ...EMPTY, error: "No Sample # column found — every row needs one." };
+  // Accept either a Sample # column or a STYLE # column as the row key.
+  // Sample-request sheets (IMAGE/Brand/STYLE #/DESCRIPTION/COLOR/Season) use
+  // STYLE #; SKU-style sheets use Sample #.
+  if (!parsed.mappedColumns.sampleNumber && !parsed.mappedColumns.styleNumber) {
+    return { ...EMPTY, error: "No Sample # or STYLE # column found — every row needs one." };
   }
 
   const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
