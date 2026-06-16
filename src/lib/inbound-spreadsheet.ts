@@ -23,7 +23,7 @@ export interface SpreadsheetImportResult {
  */
 export async function importSampleRequestAttachment(
   attachments: { name: string; contentBase64?: string; contentType?: string; downloadUrl?: string }[],
-  opts: { sentAt: Date; requestedByExternal: string | null; requestedById: string | null; sourceEmailId: string },
+  opts: { sentAt: Date; requestedByExternal: string | null; requestedById: string | null; sourceEmailId: string; defaultBrand?: string },
 ): Promise<SpreadsheetImportResult | null> {
   const sheet = attachments.find((a) => SHEET_EXT.test(a.name) && (a.contentBase64 || a.downloadUrl));
   if (!sheet) return null;
@@ -80,8 +80,9 @@ export async function importSampleRequestAttachment(
       styleNumber: styleNo,
       styleName: v.styleName?.trim() || v.description?.trim() || undefined,
       description: v.description?.trim() || undefined,
-      brand: v.brand?.trim() || undefined,
+      brand: v.brand?.trim() || opts.defaultBrand || undefined,
       category: v.category?.trim() || undefined,
+      color: v.color?.trim() || undefined,
       customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
       fobCost: toDecimal(v.fobCost) ?? undefined,
     };
@@ -107,18 +108,6 @@ export async function importSampleRequestAttachment(
       });
       sampleId = created.id;
       result.created += 1;
-    }
-
-    const color = (v.color ?? "").trim();
-    if (color) {
-      const dupVariant = await prisma.skuVariant.findFirst({ where: { sampleId, color } });
-      if (!dupVariant) {
-        await prisma.skuVariant
-          .create({
-            data: { sampleId, upc: `REQ-${styleNo}-${color}`.slice(0, 64), size: "OS", color },
-          })
-          .catch(() => {});
-      }
     }
 
     rowToSample.set(row.rowNumber, sampleId);

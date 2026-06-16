@@ -34,6 +34,21 @@ export function NewSampleDialog({
   const [open, setOpen] = React.useState(false);
   const [currency, setCurrency] = React.useState("USD");
   const [factoryId, setFactoryId] = React.useState("");
+  const [dupWarning, setDupWarning] = React.useState<string | null>(null);
+
+  const checkDuplicate = React.useCallback(async (value: string) => {
+    const v = value.trim();
+    if (!v) { setDupWarning(null); return; }
+    try {
+      const res = await fetch(`/api/samples/check-duplicate?sampleNumber=${encodeURIComponent(v)}`);
+      const data = await res.json();
+      setDupWarning(
+        data.exists
+          ? `Heads up: sample # "${v}" already exists${data.styleName ? ` (${data.styleName})` : ""}. Saving will be blocked — edit the existing one instead.`
+          : null,
+      );
+    } catch { setDupWarning(null); }
+  }, []);
   const [pending, startTransition] = React.useTransition();
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -66,8 +81,12 @@ export function NewSampleDialog({
         </DialogHeader>
         <form onSubmit={onSubmit} className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Sample # *" name="sampleNumber" required />
+            <div className="space-y-1.5">
+              <Label>Sample # *</Label>
+              <Input name="sampleNumber" required onBlur={(e) => checkDuplicate(e.target.value)} />
+            </div>
             <Field label="Brand" name="brand" />
+            <Field label="Color" name="color" />
             <Field label="Category" name="category" />
             <Field label="Style name" name="styleName" />
             <Field label="Style #" name="styleNumber" />
@@ -109,6 +128,11 @@ export function NewSampleDialog({
               {pending ? "Creating…" : "Create sample"}
             </Button>
           </DialogFooter>
+          {dupWarning && (
+            <p className="rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-2 text-xs text-[var(--warning)]">
+              {dupWarning}
+            </p>
+          )}
         </form>
       </DialogContent>
     </Dialog>

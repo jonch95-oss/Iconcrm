@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,13 +23,14 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL, DROPPED_REASON_LABEL } from "@/lib/status";
-import { updateSample } from "../actions";
+import { updateSample, deleteSample } from "../actions";
 import { toast } from "sonner";
 
 export interface SampleEditData {
   id: string;
   sampleNumber: string;
   brand: string;
+  color: string;
   category: string;
   styleName: string;
   styleNumber: string;
@@ -94,7 +95,21 @@ export function SampleActions({
     });
   };
 
+  const onDelete = () => {
+    if (!confirm(`Delete sample ${data.sampleNumber}? This can't be undone.`)) return;
+    startTransition(async () => {
+      const res = await deleteSample(data.id);
+      if (res.ok) {
+        toast.success("Sample deleted");
+        router.push("/samples");
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
+
   return (
+    <div className="flex gap-2">
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
@@ -109,6 +124,7 @@ export function SampleActions({
           <div className="grid grid-cols-2 gap-3">
             <F label="Sample #" name="sampleNumber" defaultValue={data.sampleNumber} />
             <F label="Brand" name="brand" defaultValue={data.brand} />
+            <F label="Color" name="color" defaultValue={data.color} />
             <F label="Category" name="category" defaultValue={data.category} />
             <F label="Style name" name="styleName" defaultValue={data.styleName} />
             <F label="Style #" name="styleNumber" defaultValue={data.styleNumber} />
@@ -190,6 +206,12 @@ export function SampleActions({
         </form>
       </DialogContent>
     </Dialog>
+    {isAdmin && (
+      <Button variant="outline" onClick={onDelete} disabled={pending} className="text-[var(--destructive)] hover:bg-[var(--destructive)]/10">
+        <Trash2 className="h-4 w-4" /> Delete
+      </Button>
+    )}
+    </div>
   );
 }
 

@@ -49,6 +49,7 @@ const decimalString = z
 export const sampleCreateSchema = z.object({
   sampleNumber: z.string().trim().min(1, "Sample # is required"),
   brand: optionalString,
+  color: optionalString,
   category: optionalString,
   styleName: optionalString,
   styleNumber: optionalString,

@@ -22,6 +22,7 @@ import {
   FileSpreadsheet,
   Save,
   PackageCheck,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -54,7 +55,7 @@ import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
-import { updateSample, createOrderFormFromSamples, bulkReceiveSamples } from "./actions";
+import { updateSample, createOrderFormFromSamples, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
 import { toast } from "sonner";
 
 export interface SampleRow {
@@ -159,6 +160,7 @@ export function SamplesTable({
   rows,
   factories,
   canEdit,
+  isAdmin,
   initialOverdue,
   initialStatus,
   initialFactory,
@@ -166,6 +168,7 @@ export function SamplesTable({
   rows: SampleRow[];
   factories: { id: string; name: string }[];
   canEdit: boolean;
+  isAdmin?: boolean;
   initialOverdue: boolean;
   initialStatus: string;
   initialFactory: string;
@@ -549,6 +552,27 @@ export function SamplesTable({
               }
             >
               <PackageCheck className="h-4 w-4" /> Mark received
+            </Button>
+          )}
+          {isAdmin && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pending}
+              className="text-[var(--destructive)] hover:bg-[var(--destructive)]/10"
+              onClick={() => {
+                if (!confirm(`Delete ${selectedIds.length} sample(s)? This can't be undone. Samples used on order forms/PIs will be skipped.`)) return;
+                startTransition(async () => {
+                  const res = await bulkDeleteSamples(selectedIds);
+                  if (res.ok) {
+                    toast.success(res.id ?? `${selectedIds.length} deleted`);
+                    setRowSelection({});
+                    router.refresh();
+                  } else toast.error(res.error);
+                });
+              }}
+            >
+              <Trash2 className="h-4 w-4" /> Delete
             </Button>
           )}
           <Button

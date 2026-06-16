@@ -70,6 +70,7 @@ export default async function SamplesPage({
   });
 
   const canEdit = hasRole(user.role, "member");
+  const isAdmin = hasRole(user.role, "admin");
 
   return (
     <div>
@@ -90,6 +91,7 @@ export default async function SamplesPage({
         rows={rows}
         factories={factories}
         canEdit={canEdit}
+        isAdmin={isAdmin}
         initialOverdue={sp.overdue === "1"}
         initialStatus={sp.status ?? ""}
         initialFactory={sp.factory ?? ""}

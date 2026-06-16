@@ -219,6 +219,7 @@ model Sample {
   category     String?
   styleName    String?
   styleNumber  String?
+  color        String?
   description  String?      @db.Text
   status       SampleStatus @default(sample_requested)
 

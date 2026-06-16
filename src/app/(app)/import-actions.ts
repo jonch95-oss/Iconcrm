@@ -210,6 +210,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   // owning the row it's anchored to. The last image per sample wins.
   if (imageByRow.size > 0) {
     const { uploadBlob } = await import("@/lib/blob");
+    // Compress embedded photos before storing: they render as ~130px
+    // thumbnails, so full-resolution images just waste storage/bandwidth.
+    const sharp = (await import("sharp")).default;
     let storageDown = false;
     for (const [rowNumber, img] of imageByRow) {
       const sampleId =
@@ -219,10 +222,21 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         rowToSample.get(rowNumber - 1);
       if (!sampleId) continue;
       try {
+        let buffer: Buffer = img.buffer;
+        let ext = img.extension;
+        try {
+          buffer = await sharp(img.buffer)
+            .resize({ width: 700, height: 700, fit: "inside", withoutEnlargement: true })
+            .jpeg({ quality: 72 })
+            .toBuffer();
+          ext = "jpeg";
+        } catch {
+          // If sharp can't read it, fall back to the original bytes.
+        }
         const url = await uploadBlob(
-          `samples/${sampleId}/import-row-${rowNumber}.${img.extension}`,
-          img.buffer,
-          `image/${img.extension}`,
+          `samples/${sampleId}/import-row-${rowNumber}.${ext}`,
+          buffer,
+          `image/${ext}`,
         );
         await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url } });
         summary.photosAdded += 1;

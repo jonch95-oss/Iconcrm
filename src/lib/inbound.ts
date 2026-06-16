@@ -57,11 +57,18 @@ export async function processInboundEmail(payload: InboundPayload): Promise<Inbo
   // 2a) Sample-request spreadsheet attached? Import every row as its own
   // sample (style #, description, color, photo), dated to the email and with
   // a default 6-week ETA. This takes precedence over single-sample parsing.
+  // Best-effort brand: a "BRAND:" hint in the subject, else the sender's domain
+  // label (e.g. design@lab.com -> "Lab"). Falls back to blank; user can edit.
+  const subjBrand = (payload.subject ?? "").match(/brand\s*[:=]\s*([A-Za-z0-9 &.-]{2,30})/i)?.[1]?.trim();
+  const domainBrand = payload.from.split("@")[1]?.split(".")[0];
+  const defaultBrand = subjBrand || (domainBrand ? domainBrand.toUpperCase() : undefined);
+
   const sheetResult = await importSampleRequestAttachment(payload.attachments ?? [], {
     sentAt: new Date(),
     requestedByExternal: senderUser ? null : payload.from,
     requestedById: senderUser?.id ?? null,
     sourceEmailId: email.id,
+    defaultBrand,
   });
   if (sheetResult?.isSampleRequest && (sheetResult.created > 0 || sheetResult.updated > 0)) {
     await prisma.inboundEmail.update({

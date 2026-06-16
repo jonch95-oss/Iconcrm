@@ -138,6 +138,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
     data: {
       sampleNumber: d.sampleNumber ?? before.sampleNumber,
       brand: d.brand ?? before.brand,
+      color: d.color ?? before.color,
       category: d.category ?? before.category,
       styleName: d.styleName ?? before.styleName,
       styleNumber: d.styleNumber ?? before.styleNumber,
@@ -462,5 +463,75 @@ export async function updateSampleTracking(formData: FormData): Promise<ActionRe
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
   revalidatePath("/receive");
+  return { ok: true };
+}
+
+// ---------------------------------------------------------------------------
+// Delete (admin-guarded; blocks when downstream records exist)
+// ---------------------------------------------------------------------------
+
+export async function deleteSample(sampleId: string): Promise<ActionResult> {
+  const user = await assertRole("admin");
+  const sample = await prisma.sample.findUnique({
+    where: { id: sampleId },
+    include: {
+      _count: { select: { orderFormLines: true, piLines: true } },
+    },
+  });
+  if (!sample) return { ok: false, error: "Sample not found." };
+
+  const links = sample._count.orderFormLines + sample._count.piLines;
+  if (links > 0) {
+    return {
+      ok: false,
+      error: `Can't delete — this sample is used on ${links} order form / PI / packing-list line${links > 1 ? "s" : ""}. Remove it from those first.`,
+    };
+  }
+
+  await prisma.sample.delete({ where: { id: sampleId } }); // cascades SKUs, comments, attachments
+  await logAudit({
+    entityType: "sample",
+    entityId: sampleId,
+    action: "deleted",
+    userId: user.id,
+    before: { sampleNumber: sample.sampleNumber },
+  });
+  revalidatePath("/samples");
+  return { ok: true };
+}
+
+export async function bulkDeleteSamples(sampleIds: string[]): Promise<ActionResult> {
+  const user = await assertRole("admin");
+  if (!sampleIds.length) return { ok: false, error: "No samples selected." };
+
+  // Skip any that are referenced downstream; report how many were protected.
+  const linked = await prisma.sample.findMany({
+    where: {
+      id: { in: sampleIds },
+      OR: [{ orderFormLines: { some: {} } }, { piLines: { some: {} } }],
+    },
+    select: { id: true },
+  });
+  const linkedIds = new Set(linked.map((s) => s.id));
+  const deletable = sampleIds.filter((id) => !linkedIds.has(id));
+
+  if (deletable.length) {
+    await prisma.sample.deleteMany({ where: { id: { in: deletable } } });
+    await logAudit({
+      entityType: "sample",
+      entityId: "bulk_delete",
+      action: "bulk_deleted",
+      userId: user.id,
+      after: { count: deletable.length },
+    });
+  }
+  revalidatePath("/samples");
+  if (linkedIds.size > 0) {
+    // Partial success — report via the id slot (caller shows it as a toast).
+    return {
+      ok: true,
+      id: `Deleted ${deletable.length}. Skipped ${linkedIds.size} still used on order forms/PIs.`,
+    };
+  }
   return { ok: true };
 }
