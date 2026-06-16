@@ -15,7 +15,7 @@ export interface InboundPayload {
   subject?: string;
   textBody?: string;
   htmlBody?: string;
-  attachments?: { name: string; contentBase64?: string; contentType?: string }[];
+  attachments?: { name: string; contentBase64?: string; contentType?: string; downloadUrl?: string }[];
   raw?: unknown;
 }
 

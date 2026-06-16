@@ -119,6 +119,7 @@ export const postmarkInboundSchema = z.object({
       z.object({
         Name: z.string(),
         Content: z.string().optional(),
+        DownloadUrl: z.string().optional(),
         ContentType: z.string().optional(),
         ContentLength: z.number().optional(),
       }),

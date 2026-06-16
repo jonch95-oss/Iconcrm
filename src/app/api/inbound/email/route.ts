@@ -53,8 +53,9 @@ export async function POST(req: NextRequest) {
       name: a.Name,
       contentBase64: a.Content,
       contentType: a.ContentType,
+      downloadUrl: a.DownloadUrl,
     })),
-    raw: body,
+    raw: undefined, // don't retain a second full copy of a large payload
   };
 
   const result = await processInboundEmail(payload);
