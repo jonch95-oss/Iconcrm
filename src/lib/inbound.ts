@@ -6,6 +6,7 @@ import { sendEmail } from "@/lib/email";
 import { MissingInfoEmail } from "@/emails/missing-info";
 import { magicLink } from "@/lib/tokens";
 import { logAudit } from "@/lib/audit";
+import { importSampleRequestAttachment } from "@/lib/inbound-spreadsheet";
 
 export interface InboundPayload {
   from: string;
@@ -50,11 +51,31 @@ export async function processInboundEmail(payload: InboundPayload): Promise<Inbo
     },
   });
 
-  // 2) Parse subject first, then body.
-  const parsed = parseInboundEmail(payload.subject ?? "", payload.textBody ?? "", settings);
-
   // Resolve the sender to a known user if possible.
   const senderUser = await prisma.user.findUnique({ where: { email: payload.from.toLowerCase() } });
+
+  // 2a) Sample-request spreadsheet attached? Import every row as its own
+  // sample (style #, description, color, photo), dated to the email and with
+  // a default 6-week ETA. This takes precedence over single-sample parsing.
+  const sheetResult = await importSampleRequestAttachment(payload.attachments ?? [], {
+    sentAt: new Date(),
+    requestedByExternal: senderUser ? null : payload.from,
+    requestedById: senderUser?.id ?? null,
+    sourceEmailId: email.id,
+  });
+  if (sheetResult?.isSampleRequest && (sheetResult.created > 0 || sheetResult.updated > 0)) {
+    await prisma.inboundEmail.update({
+      where: { id: email.id },
+      data: {
+        parseStatus: "parsed",
+        parseNotes: `Imported ${sheetResult.created} new + ${sheetResult.updated} updated styles from attachment (${sheetResult.photos} photos).`,
+      },
+    });
+    return { emailId: email.id, outcome: "created_sample" };
+  }
+
+  // 2b) Otherwise parse subject first, then body (single-sample workflow).
+  const parsed = parseInboundEmail(payload.subject ?? "", payload.textBody ?? "", settings);
 
   // No sample # → goes to Needs Review.
   if (!parsed.sampleNumber) {
