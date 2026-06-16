@@ -30,6 +30,7 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   factoryName: ["factory", "factoryname", "supplier", "mill"],
   size: ["size", "sz"],
   color: ["color", "colour", "colorway", "clr"],
+  season: ["season", "seasoncode", "deliveryseason"],
   upc: ["upc", "barcode", "ean", "gtin", "upccode"],
   skuCode: ["sku", "skucode", "itemcode"],
   status: ["status", "stage"],
@@ -174,21 +175,35 @@ export async function parseWorkbook(
 export const parseSamplesWorkbook = (b: Buffer) => parseWorkbook(b, SAMPLE_ALIASES);
 export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIASES);
 
-/** Build the downloadable import template. */
+/** Build the downloadable import template (matches the sample-request sheet
+ *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,
+ *  STYLE #, DESCRIPTION, COLOR, Season). Each data row is tall enough to hold a
+ *  thumbnail; the importer reads the embedded picture anchored to that row. */
 export async function buildSamplesTemplate(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet("Samples");
-  ws.addRow([
-    "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
-    "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
-    "HTS Code", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Size", "Color", "UPC",
-  ]);
+  const ws = wb.addWorksheet("Sample Request");
+  ws.addRow(["IMAGE", "Brand", "STYLE #", "DESCRIPTION", "COLOR", "Season"]);
   ws.getRow(1).font = { bold: true };
-  ws.addRow(["S-1001", "Aurora", "Outerwear", "AUR-PF-01", "Quilted Puffer", "Recycled fill", 18.5, 42, 17.5, 1.1, 0.4, "Saigon Garment", "Nordstrom", "quoted", "S", "Black", "812345678001"]);
-  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "", "M", "Black", "812345678002"]);
-  ws.addRow(["S-1001", "", "", "", "", "", "", "", "", "", "", "", "", "", "L", "Black", "812345678003"]);
-  ws.columns.forEach((c) => (c.width = 16));
+  const examples = [
+    ["", "Off White L/AB", "LAB-HB-10002", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27"],
+    ["", "Off White L/AB", "LAB-HB-10004", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27"],
+    ["", "Off White L/AB", "LAB-HB-10005", "EAST WEST SATCHEL", "GRAFFITTI", "ss27"],
+  ];
+  for (const r of examples) ws.addRow(r);
+  // Column widths: wide IMAGE column, comfortable text columns.
+  ws.getColumn(1).width = 28;
+  ws.getColumn(2).width = 18;
+  ws.getColumn(3).width = 16;
+  ws.getColumn(4).width = 26;
+  ws.getColumn(5).width = 22;
+  ws.getColumn(6).width = 10;
+  // Tall rows so a pasted/embedded photo fits in the IMAGE column.
+  for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
+  // A small note so users know images go in column A, anchored to each row.
+  const note = ws.addRow([]);
+  ws.getCell(`A${note.number + 1}`).value =
+    "Paste a product photo into column A on each style's row. Headers are matched loosely; extra columns are ignored.";
+  ws.getCell(`A${note.number + 1}`).font = { italic: true, size: 9, color: { argb: "FF888888" } };
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);
 }

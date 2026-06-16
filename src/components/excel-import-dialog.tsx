@@ -32,11 +32,15 @@ export function ExcelImportDialog({
   const [open, setOpen] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
   const [result, setResult] = React.useState<ImportSummary | null>(null);
+  const [dragging, setDragging] = React.useState(false);
   const inputRef = React.useRef<HTMLInputElement>(null);
 
-  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const runFile = (file: File | undefined | null) => {
     if (!file) return;
+    if (!/\.(xlsx|xlsm)$/i.test(file.name)) {
+      setResult({ error: "Please use an .xlsx file." } as ImportSummary);
+      return;
+    }
     const fd = new FormData();
     fd.set("file", file);
     setResult(null);
@@ -45,6 +49,16 @@ export function ExcelImportDialog({
       setResult(res);
       if (inputRef.current) inputRef.current.value = "";
     });
+  };
+
+  const onPick = (e: React.ChangeEvent<HTMLInputElement>) => {
+    runFile(e.target.files?.[0]);
+  };
+
+  const onDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragging(false);
+    runFile(e.dataTransfer.files?.[0]);
   };
 
   return (
@@ -67,18 +81,45 @@ export function ExcelImportDialog({
         <p className="text-sm text-[var(--muted-foreground)]">{description}</p>
 
         <input ref={inputRef} type="file" accept=".xlsx,.xlsm" className="hidden" onChange={onPick} />
-        <div className="flex flex-wrap gap-2">
-          <Button disabled={pending} onClick={() => inputRef.current?.click()} className="h-11">
-            <FileUp className="h-4 w-4" /> {pending ? "Importing…" : "Choose Excel file"}
-          </Button>
-          {templateHref && (
-            <Button variant="outline" className="h-11" asChild>
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={() => !pending && inputRef.current?.click()}
+          onKeyDown={(e) => {
+            if ((e.key === "Enter" || e.key === " ") && !pending) inputRef.current?.click();
+          }}
+          onDragOver={(e) => {
+            e.preventDefault();
+            if (!dragging) setDragging(true);
+          }}
+          onDragLeave={(e) => {
+            e.preventDefault();
+            setDragging(false);
+          }}
+          onDrop={onDrop}
+          className={`flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed p-8 text-center transition-colors cursor-pointer ${
+            dragging
+              ? "border-[var(--primary)] bg-[var(--accent)]"
+              : "border-[var(--border)] hover:border-[var(--primary)]"
+          } ${pending ? "pointer-events-none opacity-60" : ""}`}
+        >
+          <FileUp className="h-7 w-7 text-[var(--muted-foreground)]" />
+          <p className="text-sm font-medium">
+            {pending ? "Importing…" : dragging ? "Drop the file to import" : "Drag & drop an Excel file here"}
+          </p>
+          {!pending && (
+            <p className="text-xs text-[var(--muted-foreground)]">or click to choose · .xlsx with embedded photos supported</p>
+          )}
+        </div>
+        {templateHref && (
+          <div className="flex justify-center">
+            <Button variant="outline" className="h-9" asChild>
               <a href={templateHref}>
                 <Download className="h-4 w-4" /> Download template
               </a>
             </Button>
-          )}
-        </div>
+          </div>
+        )}
 
         {result && (
           <div className="space-y-2 rounded-md border border-[var(--border)] p-3 text-sm">

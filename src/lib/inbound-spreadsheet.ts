@@ -83,6 +83,7 @@ export async function importSampleRequestAttachment(
       brand: v.brand?.trim() || opts.defaultBrand || undefined,
       category: v.category?.trim() || undefined,
       color: v.color?.trim() || undefined,
+      season: v.season?.trim() || undefined,
       customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
       fobCost: toDecimal(v.fobCost) ?? undefined,
     };

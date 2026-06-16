@@ -67,7 +67,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
 
   for (const row of parsed.rows.slice(0, 2000)) {
     const v = row.values;
-    const sampleNumber = (v.sampleNumber ?? "").trim();
+    // Key on Sample # when present; otherwise fall back to STYLE # so
+    // sample-request sheets (IMAGE / Brand / STYLE # / DESCRIPTION / COLOR /
+    // Season) import one sample per style row, same as the emailed sheets.
+    const sampleNumber = ((v.sampleNumber ?? v.styleNumber) ?? "").trim();
 
     try {
       if (sampleNumber && sampleNumber !== currentSampleNumber) {
@@ -91,8 +94,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           brand: v.brand?.trim() || undefined,
           category: v.category?.trim() || undefined,
           styleNumber: v.styleNumber?.trim() || undefined,
-          styleName: v.styleName?.trim() || undefined,
+          styleName: v.styleName?.trim() || v.description?.trim() || undefined,
           description: v.description?.trim() || undefined,
+          color: v.color?.trim() || undefined,
+          season: v.season?.trim() || undefined,
           targetCustomer: v.targetCustomer?.trim() || undefined,
           fobCost: toDecimal(v.fobCost) ?? undefined,
           customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
