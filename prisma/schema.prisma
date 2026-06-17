@@ -682,3 +682,16 @@ model CustomerPoLine {
 
   @@index([customerPoId])
 }
+
+model InventoryMovement {
+  id           String   @id @default(cuid())
+  skuVariantId String
+  delta        Int // + receipts / counts up, - shipments / counts down
+  reason       String? // count | receipt | adjustment | correction
+  source       String? // excel | manual | packing_list
+  refId        String? // e.g. packingListLineId, for de-duping auto receipts
+  createdById  String?
+  createdAt    DateTime @default(now())
+
+  @@index([skuVariantId])
+}

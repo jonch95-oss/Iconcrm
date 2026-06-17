@@ -26,6 +26,18 @@ const STATEMENTS = [
     CONSTRAINT "CustomerPoLine_customerPoId_fkey" FOREIGN KEY ("customerPoId") REFERENCES "CustomerPO"("id") ON DELETE CASCADE ON UPDATE CASCADE
   )`,
   `CREATE INDEX IF NOT EXISTS "CustomerPoLine_customerPoId_idx" ON "CustomerPoLine"("customerPoId")`,
+  `CREATE TABLE IF NOT EXISTS "InventoryMovement" (
+    "id" TEXT NOT NULL,
+    "skuVariantId" TEXT NOT NULL,
+    "delta" INTEGER NOT NULL,
+    "reason" TEXT,
+    "source" TEXT,
+    "refId" TEXT,
+    "createdById" TEXT,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "InventoryMovement_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE INDEX IF NOT EXISTS "InventoryMovement_skuVariantId_idx" ON "InventoryMovement"("skuVariantId")`,
 ];
 
 const url =

@@ -13,6 +13,7 @@ import {
   Inbox,
   Factory,
   Settings,
+  Warehouse,
   Ship,
   PackageCheck,
 } from "lucide-react";
@@ -26,6 +27,7 @@ const NAV = [
   { href: "/pos", label: "Purchase Orders", icon: ClipboardList },
   { href: "/customer-pos", label: "Customer POs", icon: Building2 },
   { href: "/allocation", label: "Allocation", icon: Boxes },
+  { href: "/inventory", label: "Inventory", icon: Warehouse },
   { href: "/packing-lists", label: "Packing Lists", icon: Boxes },
   { href: "/shipments", label: "Shipments", icon: Ship },
   { href: "/receive", label: "Receive Samples", icon: PackageCheck },

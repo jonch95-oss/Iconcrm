@@ -182,9 +182,19 @@ const CUSTOMER_PO_LINE_ALIASES: Record<string, string[]> = {
   upc: ["upc", "barcode", "ean", "gtin"],
 };
 
+const INVENTORY_ALIASES: Record<string, string[]> = {
+  upc: ["upc", "barcode", "ean", "gtin", "upccode"],
+  styleNumber: ["style", "styleno", "stylenumber", "styleref", "itemnumber"],
+  size: ["size", "sz"],
+  color: ["color", "colour", "clr"],
+  skuCode: ["sku", "skucode", "itemcode"],
+  quantity: ["qty", "quantity", "onhand", "onhandqty", "stock", "units", "count", "available", "oh"],
+};
+
 export const parseSamplesWorkbook = (b: Buffer) => parseWorkbook(b, SAMPLE_ALIASES);
 export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIASES);
 export const parseCustomerPoWorkbook = (b: Buffer) => parseWorkbook(b, CUSTOMER_PO_LINE_ALIASES);
+export const parseInventoryWorkbook = (b: Buffer) => parseWorkbook(b, INVENTORY_ALIASES);
 
 /** Build the downloadable import template (matches the sample-request sheet
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,

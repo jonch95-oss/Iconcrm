@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
-import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook } from "@/lib/import-excel";
+import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook } from "@/lib/import-excel";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
@@ -479,5 +479,71 @@ export async function importCustomerPoLines(customerPoId: string, formData: Form
     after: { created: summary.created, skipped: summary.skipped.length },
   });
   revalidatePath(`/customer-pos/${customerPoId}`);
+  return summary;
+}
+
+
+/**
+ * Import on-hand stock counts from Excel. Each row needs a quantity (on-hand)
+ * plus a UPC (best) or Style # (+ optional size/color) to resolve the SKU.
+ * Recorded as a reconciling ledger movement so on-hand becomes the counted
+ * number. Re-uploading a fresh count just books the difference.
+ */
+export async function importInventoryCounts(formData: FormData): Promise<ImportSummary> {
+  const user = await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+
+  const parsed = await parseInventoryWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+  if (!parsed.mappedColumns.quantity) return { ...EMPTY, error: "No quantity / on-hand column found." };
+  if (!parsed.mappedColumns.upc && !parsed.mappedColumns.styleNumber) {
+    return { ...EMPTY, error: "Need a UPC or Style # column to match SKUs." };
+  }
+
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+
+  for (const row of parsed.rows.slice(0, 5000)) {
+    const v = row.values;
+    const qty = parseInt(v.quantity ?? "", 10);
+    if (!Number.isFinite(qty) || qty < 0) {
+      summary.skipped.push({ row: row.rowNumber, reason: "Missing or invalid quantity" });
+      continue;
+    }
+    let sku: { id: string } | null = null;
+    const upc = (v.upc ?? "").trim();
+    if (upc) sku = await prisma.skuVariant.findUnique({ where: { upc }, select: { id: true } });
+    if (!sku) {
+      const style = (v.styleNumber ?? "").trim();
+      const size = (v.size ?? "").trim();
+      const color = (v.color ?? "").trim();
+      if (style) {
+        sku = await prisma.skuVariant.findFirst({
+          where: {
+            sample: { styleNumber: { equals: style, mode: "insensitive" } },
+            ...(size ? { size: { equals: size, mode: "insensitive" } } : {}),
+            ...(color ? { color: { equals: color, mode: "insensitive" } } : {}),
+          },
+          select: { id: true },
+        });
+      }
+    }
+    if (!sku) {
+      summary.skipped.push({ row: row.rowNumber, reason: `No SKU match (${upc || v.styleNumber || "blank"})` });
+      continue;
+    }
+    const agg = await prisma.inventoryMovement.aggregate({ where: { skuVariantId: sku.id }, _sum: { delta: true } });
+    const current = agg._sum.delta ?? 0;
+    const delta = qty - current;
+    if (delta !== 0) {
+      await prisma.inventoryMovement.create({
+        data: { skuVariantId: sku.id, delta, reason: "count", source: "excel", createdById: user.id },
+      });
+    }
+    summary.created += 1;
+  }
+
+  await logAudit({ entityType: "inventory", entityId: "bulk_count", action: "import_counts", userId: user.id, after: { rows: summary.created, skipped: summary.skipped.length } });
+  revalidatePath("/inventory");
   return summary;
 }
