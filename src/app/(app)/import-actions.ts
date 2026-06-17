@@ -236,7 +236,15 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     const { uploadBlob } = await import("@/lib/blob");
     // Compress embedded photos before storing: they render as ~130px
     // thumbnails, so full-resolution images just waste storage/bandwidth.
-    const sharp = (await import("sharp")).default;
+    // Load sharp lazily and tolerate its absence: if it can't be resolved or
+    // initialized at runtime, fall back to storing the original bytes rather
+    // than failing the whole import after samples were already created.
+    let sharp: typeof import("sharp").default | null = null;
+    try {
+      sharp = (await import("sharp")).default;
+    } catch {
+      // sharp unavailable — photos will be stored uncompressed.
+    }
     let storageDown = false;
     for (const [rowNumber, img] of imageByRow) {
       const sampleId =
@@ -248,14 +256,16 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       try {
         let buffer: Buffer = img.buffer;
         let ext = img.extension;
-        try {
-          buffer = await sharp(img.buffer)
-            .resize({ width: 700, height: 700, fit: "inside", withoutEnlargement: true })
-            .jpeg({ quality: 72 })
-            .toBuffer();
-          ext = "jpeg";
-        } catch {
-          // If sharp can't read it, fall back to the original bytes.
+        if (sharp) {
+          try {
+            buffer = await sharp(img.buffer)
+              .resize({ width: 700, height: 700, fit: "inside", withoutEnlargement: true })
+              .jpeg({ quality: 72 })
+              .toBuffer();
+            ext = "jpeg";
+          } catch {
+            // If sharp can't read it, fall back to the original bytes.
+          }
         }
         const url = await uploadBlob(
           `samples/${sampleId}/import-row-${rowNumber}.${ext}`,
