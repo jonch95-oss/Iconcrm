@@ -239,12 +239,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     // Load sharp lazily and tolerate its absence: if it can't be resolved or
     // initialized at runtime, fall back to storing the original bytes rather
     // than failing the whole import after samples were already created.
-    let sharp: typeof import("sharp").default | null = null;
-    try {
-      sharp = (await import("sharp")).default;
-    } catch {
-      // sharp unavailable — photos will be stored uncompressed.
-    }
+    // (Inferred type avoids sharp's `export =` typing quirks.)
+    const sharp = await import("sharp")
+      .then((m) => m.default)
+      .catch(() => null);
     let storageDown = false;
     for (const [rowNumber, img] of imageByRow) {
       const sampleId =
