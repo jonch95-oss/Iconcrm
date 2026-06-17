@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
-import { parseSamplesWorkbook, parsePiLinesWorkbook } from "@/lib/import-excel";
+import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook } from "@/lib/import-excel";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
@@ -418,5 +418,66 @@ export async function importPiLinesExcel(piId: string, formData: FormData): Prom
     after: { created: summary.created, skipped: summary.skipped.length },
   });
   revalidatePath(`/pis/${piId}`);
+  return summary;
+}
+
+
+/**
+ * Import customer PO line items (style # + quantity) from an Excel sheet.
+ * Replaces any existing lines so a re-upload is idempotent. These lines are
+ * matched against our internal PO(s) by style number on the customer PO page.
+ */
+export async function importCustomerPoLines(customerPoId: string, formData: FormData): Promise<ImportSummary> {
+  const user = await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+
+  const cpo = await prisma.customerPO.findUnique({ where: { id: customerPoId }, select: { id: true } });
+  if (!cpo) return { ...EMPTY, error: "Customer PO not found." };
+
+  const parsed = await parseCustomerPoWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+  if (!parsed.mappedColumns.styleNumber) return { ...EMPTY, error: "No Style # column found." };
+  if (!parsed.mappedColumns.quantity) return { ...EMPTY, error: "No Quantity column found." };
+
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+
+  // Replace existing lines so re-uploading the corrected sheet just works.
+  await prisma.customerPoLine.deleteMany({ where: { customerPoId } });
+
+  for (const row of parsed.rows.slice(0, 5000)) {
+    const v = row.values;
+    const styleNumber = (v.styleNumber ?? "").trim();
+    const quantity = parseInt(v.quantity ?? "", 10);
+    if (!styleNumber) {
+      summary.skipped.push({ row: row.rowNumber, reason: "No style #" });
+      continue;
+    }
+    if (!Number.isFinite(quantity) || quantity <= 0) {
+      summary.skipped.push({ row: row.rowNumber, reason: "Missing or invalid quantity" });
+      continue;
+    }
+    await prisma.customerPoLine.create({
+      data: {
+        customerPoId,
+        styleNumber,
+        description: v.description?.trim() || null,
+        color: v.color?.trim() || null,
+        size: v.size?.trim() || null,
+        quantity,
+        unitPrice: toDecimal(v.unitPrice) ?? null,
+      },
+    });
+    summary.created += 1;
+  }
+
+  await logAudit({
+    entityType: "customer_po",
+    entityId: customerPoId,
+    action: "import_lines",
+    userId: user.id,
+    after: { created: summary.created, skipped: summary.skipped.length },
+  });
+  revalidatePath(`/customer-pos/${customerPoId}`);
   return summary;
 }

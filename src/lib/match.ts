@@ -211,3 +211,71 @@ export function compareToOrderForm(ofLines: OFMatchLine[], piLines: OFMatchLine[
   rows.sort((a, b) => a.sampleNumber.localeCompare(b.sampleNumber));
   return { rows, matchedCount, issueCount, ok: issueCount === 0 && rows.length > 0 };
 }
+
+
+// ---------------------------------------------------------------------------
+// Customer PO vs internal PO reconciliation (by style number + quantity)
+// ---------------------------------------------------------------------------
+
+export type StyleMatchStatus = "matched" | "short" | "over" | "missing_on_po" | "extra_on_po";
+
+export interface StyleMatchRow {
+  styleNumber: string;
+  customerQty: number;
+  poQty: number;
+  diff: number; // poQty - customerQty
+  status: StyleMatchStatus;
+}
+
+export interface StyleMatchResult {
+  rows: StyleMatchRow[];
+  matchedCount: number;
+  issueCount: number;
+  ok: boolean;
+}
+
+const normStyle = (s: string) => s.trim().toUpperCase();
+
+/**
+ * Compare a customer PO's lines (their demand) to what our internal PO(s)
+ * actually ordered, grouped by style number. Flags styles we're short/over on,
+ * styles the customer wants that aren't on our PO, and styles on our PO that
+ * aren't on the customer PO.
+ */
+export function compareCustomerPoToPo(
+  customerLines: { styleNumber: string; quantity: number }[],
+  poLines: { styleNumber: string; quantity: number }[],
+): StyleMatchResult {
+  const cust = new Map<string, number>();
+  const po = new Map<string, number>();
+  const display = new Map<string, string>();
+  const tally = (lines: { styleNumber: string; quantity: number }[], target: Map<string, number>) => {
+    for (const l of lines) {
+      const key = normStyle(l.styleNumber);
+      if (!key) continue;
+      target.set(key, (target.get(key) ?? 0) + (l.quantity || 0));
+      if (!display.has(key)) display.set(key, l.styleNumber.trim());
+    }
+  };
+  tally(customerLines, cust);
+  tally(poLines, po);
+
+  const rows: StyleMatchRow[] = [];
+  let matchedCount = 0;
+  let issueCount = 0;
+  for (const key of new Set([...cust.keys(), ...po.keys()])) {
+    const c = cust.get(key) ?? 0;
+    const p = po.get(key) ?? 0;
+    let status: StyleMatchStatus;
+    if (c > 0 && p === 0) status = "missing_on_po";
+    else if (c === 0 && p > 0) status = "extra_on_po";
+    else if (p === c) status = "matched";
+    else if (p < c) status = "short";
+    else status = "over";
+    if (status === "matched") matchedCount += 1;
+    else issueCount += 1;
+    rows.push({ styleNumber: display.get(key) ?? key, customerQty: c, poQty: p, diff: p - c, status });
+  }
+  rows.sort((a, b) => a.styleNumber.localeCompare(b.styleNumber));
+  return { rows, matchedCount, issueCount, ok: issueCount === 0 && rows.length > 0 };
+}

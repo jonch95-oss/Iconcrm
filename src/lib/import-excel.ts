@@ -172,8 +172,19 @@ export async function parseWorkbook(
   return { headerRow, mappedColumns, unmappedHeaders, rows, images };
 }
 
+const CUSTOMER_PO_LINE_ALIASES: Record<string, string[]> = {
+  styleNumber: ["style", "styleno", "stylenumber", "stylenum", "styleref", "itemnumber", "model", "sku"],
+  description: ["description", "desc", "productname", "details", "name"],
+  color: ["color", "colour", "clr"],
+  size: ["size", "sz"],
+  quantity: ["qty", "quantity", "units", "pcs", "pieces", "orderqty", "unitsordered"],
+  unitPrice: ["unitprice", "price", "cost", "wholesale", "wholesaleprice", "retail"],
+  upc: ["upc", "barcode", "ean", "gtin"],
+};
+
 export const parseSamplesWorkbook = (b: Buffer) => parseWorkbook(b, SAMPLE_ALIASES);
 export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIASES);
+export const parseCustomerPoWorkbook = (b: Buffer) => parseWorkbook(b, CUSTOMER_PO_LINE_ALIASES);
 
 /** Build the downloadable import template (matches the sample-request sheet
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,

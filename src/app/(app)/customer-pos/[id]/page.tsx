@@ -9,8 +9,19 @@ import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/date";
 import { RiskBadge } from "@/components/status-badge";
 import { WindowEditor } from "./window-editor";
+import { ImportCustomerPoLinesButton } from "./import-cpo-lines-button";
+import { Badge } from "@/components/ui/badge";
+import { compareCustomerPoToPo, type StyleMatchStatus } from "@/lib/match";
 
 export const dynamic = "force-dynamic";
+
+const STYLE_TONE: Record<StyleMatchStatus, { label: string; variant: "success" | "destructive" | "secondary" | "outline" }> = {
+  matched: { label: "Match", variant: "success" },
+  short: { label: "Short", variant: "destructive" },
+  over: { label: "Over", variant: "destructive" },
+  missing_on_po: { label: "Not in our PO", variant: "destructive" },
+  extra_on_po: { label: "Extra in our PO", variant: "outline" },
+};
 
 export default async function CustomerPoDetailPage({
   params,
@@ -32,7 +43,7 @@ export default async function CustomerPoDetailPage({
                 select: {
                   piNumber: true,
                   factory: { select: { name: true } },
-                  lines: { select: { sample: { select: { id: true, sampleNumber: true } } } },
+                  lines: { select: { quantity: true, sample: { select: { id: true, sampleNumber: true, styleNumber: true } } } },
                 },
               },
             },
@@ -42,6 +53,24 @@ export default async function CustomerPoDetailPage({
     },
   });
   if (!cpo) notFound();
+
+  // Customer PO line items (style # + qty). Defensive: the table is created by
+  // the schema self-heal on deploy; tolerate its brief absence.
+  const cpoLines = await prisma.customerPoLine
+    .findMany({ where: { customerPoId: id }, orderBy: { styleNumber: "asc" } })
+    .catch(() => [] as { id: string; styleNumber: string; description: string | null; color: string | null; size: string | null; quantity: number; unitPrice: import("@prisma/client").Prisma.Decimal | null }[]);
+
+  // What our linked internal PO(s) actually ordered, by style number.
+  const ourPoStyleLines: { styleNumber: string; quantity: number }[] = [];
+  for (const l of cpo.links) {
+    for (const line of l.purchaseOrder.pi.lines) {
+      if (line.sample?.styleNumber) ourPoStyleLines.push({ styleNumber: line.sample.styleNumber, quantity: line.quantity });
+    }
+  }
+  const styleMatch = compareCustomerPoToPo(
+    cpoLines.map((l) => ({ styleNumber: l.styleNumber, quantity: l.quantity })),
+    ourPoStyleLines,
+  );
 
   const allPos = await prisma.purchaseOrder.findMany({
     include: { pi: { select: { piNumber: true, factory: { select: { name: true } } } } },
@@ -76,7 +105,9 @@ export default async function CustomerPoDetailPage({
 
   return (
     <div>
-      <PageHeader title={cpo.customerPoNumber} description={cpo.customerName} />
+      <PageHeader title={cpo.customerPoNumber} description={cpo.customerName}>
+        {canEdit && <ImportCustomerPoLinesButton customerPoId={cpo.id} />}
+      </PageHeader>
 
       <div className="grid gap-4 lg:grid-cols-3">
         <Card>
@@ -135,6 +166,53 @@ export default async function CustomerPoDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {cpoLines.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">
+            <CardTitle>Customer PO vs our PO ({styleMatch.rows.length} styles)</CardTitle>
+            <Badge variant={cpo.links.length === 0 ? "secondary" : styleMatch.ok ? "success" : "destructive"}>
+              {cpo.links.length === 0 ? "Link a PO to compare" : styleMatch.ok ? "All styles match" : `${styleMatch.issueCount} to review`}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-[var(--muted-foreground)]">
+                  <th className="pb-2 font-medium">Style</th>
+                  <th className="pb-2 text-right font-medium">Customer</th>
+                  <th className="pb-2 text-right font-medium">Our PO</th>
+                  <th className="pb-2 text-right font-medium">Diff</th>
+                  <th className="pb-2 text-right font-medium">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {styleMatch.rows.map((r) => {
+                  const t = STYLE_TONE[r.status];
+                  return (
+                    <tr key={r.styleNumber} className="border-t border-[var(--border)]">
+                      <td className="py-1.5">{r.styleNumber}</td>
+                      <td className="py-1.5 text-right tabular-nums">{r.customerQty || "—"}</td>
+                      <td className="py-1.5 text-right tabular-nums">{r.poQty || "—"}</td>
+                      <td className="py-1.5 text-right tabular-nums">
+                        {r.diff > 0 ? `+${r.diff}` : r.diff < 0 ? r.diff : "—"}
+                      </td>
+                      <td className="py-1.5 text-right"><Badge variant={t.variant}>{t.label}</Badge></td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </CardContent>
+        </Card>
+      )}
+      {cpoLines.length === 0 && canEdit && (
+        <Card className="mt-4">
+          <CardContent className="pt-6 text-sm text-[var(--muted-foreground)]">
+            No customer PO lines yet. Use “Import customer PO” above to upload the style/quantity sheet, then link your internal PO to match.
+          </CardContent>
+        </Card>
+      )}
 
       <Card className="mt-4">
         <CardHeader><CardTitle>Originating samples ({sampleMap.size})</CardTitle></CardHeader>

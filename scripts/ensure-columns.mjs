@@ -12,6 +12,20 @@ const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "size" TEXT`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "InboundEmail_mailgunMessageKey_key" ON "InboundEmail"("mailgunMessageKey")`,
+  `CREATE TABLE IF NOT EXISTS "CustomerPoLine" (
+    "id" TEXT NOT NULL,
+    "customerPoId" TEXT NOT NULL,
+    "styleNumber" TEXT NOT NULL,
+    "description" TEXT,
+    "color" TEXT,
+    "size" TEXT,
+    "quantity" INTEGER NOT NULL DEFAULT 0,
+    "unitPrice" DECIMAL(12,4),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "CustomerPoLine_pkey" PRIMARY KEY ("id"),
+    CONSTRAINT "CustomerPoLine_customerPoId_fkey" FOREIGN KEY ("customerPoId") REFERENCES "CustomerPO"("id") ON DELETE CASCADE ON UPDATE CASCADE
+  )`,
+  `CREATE INDEX IF NOT EXISTS "CustomerPoLine_customerPoId_idx" ON "CustomerPoLine"("customerPoId")`,
 ];
 
 const url =

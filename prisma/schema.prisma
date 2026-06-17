@@ -465,6 +465,7 @@ model CustomerPO {
   deliveryLocation String?   // customer DC name/city
 
   links CustomerPoLink[]
+  poLines CustomerPoLine[]
   shipmentRisks ShipmentRisk[]
 
   createdAt DateTime @default(now())
@@ -665,4 +666,19 @@ model AppSetting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+model CustomerPoLine {
+  id           String     @id @default(cuid())
+  customerPoId String
+  customerPo   CustomerPO @relation(fields: [customerPoId], references: [id], onDelete: Cascade)
+  styleNumber  String
+  description  String?
+  color        String?
+  size         String?
+  quantity     Int        @default(0)
+  unitPrice    Decimal?   @db.Decimal(12, 4)
+  createdAt    DateTime   @default(now())
+
+  @@index([customerPoId])
 }
