@@ -35,6 +35,8 @@ export interface BuilderLine {
   upc: string | null;
   quantity: number;
   fob: string;
+  cbm: string | null;
+  casePack: number | null;
 }
 
 export function OrderFormBuilder({
@@ -145,6 +147,8 @@ export function OrderFormBuilder({
               <TableHead>Color</TableHead>
               <TableHead>UPC</TableHead>
               <TableHead>FOB</TableHead>
+              <TableHead>CBM</TableHead>
+              <TableHead>Case pack</TableHead>
               <TableHead>Qty</TableHead>
               {canEdit && !isSent && <TableHead></TableHead>}
             </TableRow>
@@ -167,6 +171,8 @@ export function OrderFormBuilder({
                   {l.upc ?? <Badge variant="warning">missing</Badge>}
                 </TableCell>
                 <TableCell className="tabular-nums">{l.fob}</TableCell>
+                <TableCell className="tabular-nums">{l.cbm ?? "—"}</TableCell>
+                <TableCell className="tabular-nums">{l.casePack ?? "—"}</TableCell>
                 <TableCell>
                   {canEdit && !isSent ? (
                     <Input

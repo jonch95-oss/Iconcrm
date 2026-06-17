@@ -156,3 +156,24 @@ export async function requestMissingInfo(orderFormId: string): Promise<ActionRes
   });
   return { ok: true };
 }
+
+
+/** Delete an order form (and its lines). Blocked if any PI references it. */
+export async function deleteOrderForm(orderFormId: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const of = await prisma.orderForm.findUnique({
+    where: { id: orderFormId },
+    include: { _count: { select: { proformaInvoices: true } } },
+  });
+  if (!of) return { ok: false, error: "Order form not found." };
+  if (of._count.proformaInvoices > 0) {
+    return {
+      ok: false,
+      error: `Can't delete — ${of._count.proformaInvoices} proforma invoice${of._count.proformaInvoices > 1 ? "s" : ""} reference this order form. Unlink those first.`,
+    };
+  }
+  await prisma.orderForm.delete({ where: { id: orderFormId } }); // cascades order form lines
+  await logAudit({ entityType: "order_form", entityId: orderFormId, action: "deleted", userId: user.id });
+  revalidatePath("/order-forms");
+  return { ok: true };
+}

@@ -8,6 +8,7 @@ import { computeContainerFill } from "@/lib/container";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { OrderFormBuilder, type BuilderLine } from "./builder";
+import { DeleteOrderFormButton } from "./delete-order-form-button";
 import { getOrderFormBlockers } from "../actions";
 import { formatMoney } from "@/lib/money";
 import { formatDate } from "@/lib/date";
@@ -58,6 +59,8 @@ export default async function OrderFormDetailPage({
     upc: l.skuVariant?.upc ?? null,
     quantity: l.quantity,
     fob: formatMoney(l.fobCostSnapshot, l.currency),
+    cbm: l.sample.cbmPerCarton != null ? String(l.sample.cbmPerCarton) : null,
+    casePack: l.skuVariant?.unitsPerCarton ?? l.sample.casePackDefault ?? null,
   }));
 
   return (
@@ -67,6 +70,7 @@ export default async function OrderFormDetailPage({
         description={`${of.factory?.name ?? "No factory"} · created by ${of.createdBy?.name ?? "—"} · ${formatDate(of.createdAt)}`}
       >
         <Badge variant={STATUS_TONE[of.status]} className="capitalize">{of.status}</Badge>
+        {canEdit && <DeleteOrderFormButton orderFormId={of.id} orderFormNumber={of.orderFormNumber} />}
       </PageHeader>
 
       <ContainerFillCard fill={containerFill} />
