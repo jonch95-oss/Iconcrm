@@ -220,6 +220,7 @@ model Sample {
   styleName    String?
   styleNumber  String?
   color        String?
+  size         String?
   season       String?
   description  String?      @db.Text
   status       SampleStatus @default(sample_requested)

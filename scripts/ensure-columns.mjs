@@ -9,6 +9,7 @@ import { PrismaClient } from "@prisma/client";
 const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "color" TEXT`,
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "season" TEXT`,
+  `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "size" TEXT`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "InboundEmail_mailgunMessageKey_key" ON "InboundEmail"("mailgunMessageKey")`,
 ];

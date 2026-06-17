@@ -42,7 +42,7 @@ export async function GET() {
       s.factory?.name ?? "", s.targetCustomer ?? "", s.status,
     ];
     if (s.skuVariants.length === 0) {
-      ws.addRow([...base, "", "", "", ""]);
+      ws.addRow([...base, s.size ?? "", "", "", ""]);
     } else {
       for (const v of s.skuVariants) {
         ws.addRow([...base, v.size, v.color, v.upc, v.skuCode ?? ""]);

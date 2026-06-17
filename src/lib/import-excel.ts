@@ -182,12 +182,14 @@ export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIA
 export async function buildSamplesTemplate(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Sample Request");
-  ws.addRow(["IMAGE", "Brand", "STYLE #", "DESCRIPTION", "COLOR", "Season"]);
+  // CBM, Case Pack and HTS Code feed the Order Form's container-fill /
+  // CBM-total calculation; Size carries one-size or per-style sizing.
+  ws.addRow(["IMAGE", "Brand", "STYLE #", "DESCRIPTION", "COLOR", "Season", "Size", "CBM", "Case Pack", "HTS Code"]);
   ws.getRow(1).font = { bold: true };
   const examples = [
-    ["", "Off White L/AB", "LAB-HB-10002", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27"],
-    ["", "Off White L/AB", "LAB-HB-10004", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27"],
-    ["", "Off White L/AB", "LAB-HB-10005", "EAST WEST SATCHEL", "GRAFFITTI", "ss27"],
+    ["", "Off White L/AB", "LAB-HB-10002", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 0.182, 12, "4202.21.9000"],
+    ["", "Off White L/AB", "LAB-HB-10004", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 0.182, 12, "4202.21.9000"],
+    ["", "Off White L/AB", "LAB-HB-10005", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 0.182, 12, "4202.21.9000"],
   ];
   for (const r of examples) ws.addRow(r);
   // Column widths: wide IMAGE column, comfortable text columns.
@@ -197,6 +199,10 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   ws.getColumn(4).width = 26;
   ws.getColumn(5).width = 22;
   ws.getColumn(6).width = 10;
+  ws.getColumn(7).width = 10;
+  ws.getColumn(8).width = 10;
+  ws.getColumn(9).width = 11;
+  ws.getColumn(10).width = 14;
   // Tall rows so a pasted/embedded photo fits in the IMAGE column.
   for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
   // A small note so users know images go in column A, anchored to each row.

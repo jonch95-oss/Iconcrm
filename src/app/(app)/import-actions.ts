@@ -84,6 +84,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   let currentSampleId: string | null = null;
   let currentSampleNumber = "";
 
+  // Imported samples are given an estimated arrival 6 weeks out from the
+  // upload date (overridable later per sample).
+  const importEta = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+
   for (const row of parsed.rows.slice(0, 2000)) {
     const v = row.values;
     // Key on Sample # when present; otherwise fall back to STYLE # so
@@ -116,6 +120,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           styleName: v.styleName?.trim() || v.description?.trim() || undefined,
           description: v.description?.trim() || undefined,
           color: v.color?.trim() || undefined,
+          size: v.size?.trim() || undefined,
           season: v.season?.trim() || undefined,
           targetCustomer: v.targetCustomer?.trim() || undefined,
           fobCost: toDecimal(v.fobCost) ?? undefined,
@@ -136,7 +141,12 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
 
         const existing = await prisma.sample.findUnique({ where: { sampleNumber } });
         if (existing) {
-          await prisma.sample.update({ where: { id: existing.id }, data: fields });
+          await prisma.sample.update({
+            where: { id: existing.id },
+            // Only set the 6-week ETA when one isn't already present, so a
+            // manually-adjusted ETA survives a re-import.
+            data: { ...fields, ...(existing.sampleEta ? {} : { sampleEta: importEta }) },
+          });
           currentSampleId = existing.id;
           summary.updated += 1;
         } else {
@@ -144,6 +154,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             data: {
               sampleNumber,
               ...fields,
+              sampleEta: importEta,
               status: fields.fobCost ? "quoted" : "sample_requested",
               requestedById: user.id,
             },
@@ -163,11 +174,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       const upc = (v.upc ?? "").trim();
       const size = (v.size ?? "").trim();
       const color = (v.color ?? "").trim();
-      if (upc || (size && color)) {
-        if (!upc) {
-          summary.skipped.push({ row: row.rowNumber, reason: "Size/color without a UPC" });
-          continue;
-        }
+      // A SKU variant is only meaningful when there's a UPC to key it on.
+      // Size/color without a UPC (e.g. one-size handbags) is captured on the
+      // sample itself above, so it's not treated as a missing-UPC error.
+      if (upc) {
         const dup = await prisma.skuVariant.findUnique({ where: { upc } });
         if (dup) {
           if (dup.sampleId !== currentSampleId) {

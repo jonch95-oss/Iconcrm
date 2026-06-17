@@ -6,9 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL, SAMPLE_STATUS_TONE } from "@/lib/status";
 import type { SampleStatus } from "@prisma/client";
-import { formatMoney } from "@/lib/money";
 import { formatDate, isOverdue } from "@/lib/date";
-import { Table as TableIcon, AlertTriangle } from "lucide-react";
+import { Table as TableIcon, AlertTriangle, Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -51,24 +50,41 @@ export default async function SamplesBoardPage() {
                       href={`/samples/${s.id}`}
                       className="block rounded-md border border-[var(--border)] bg-[var(--card)] p-3 text-sm shadow-sm transition-colors hover:bg-[var(--accent)]"
                     >
-                      <div className="flex items-center justify-between">
+                      {s.imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={s.imageUrl}
+                          alt={s.sampleNumber}
+                          className="mb-2 h-32 w-full rounded-md border border-[var(--border)] bg-white object-contain"
+                        />
+                      )}
+                      <div className="flex items-start justify-between gap-2">
                         <span className="font-medium">{s.sampleNumber}</span>
                         {overdue && (
-                          <Badge variant="destructive" className="gap-1">
+                          <Badge variant="destructive" className="gap-1 shrink-0">
                             <AlertTriangle className="h-3 w-3" /> OVERDUE
                           </Badge>
                         )}
                       </div>
-                      <div className="text-xs text-[var(--muted-foreground)]">
-                        {[s.brand, s.category].filter(Boolean).join(" · ") || "—"}
-                      </div>
-                      <div className="mt-1 flex items-center justify-between text-xs text-[var(--muted-foreground)]">
-                        <span>{s.factory?.name ?? "—"}</span>
-                        <span className="tabular-nums">{formatMoney(s.fobCost, s.currency)}</span>
-                      </div>
-                      {s.sampleEta && (
-                        <div className="mt-1 text-xs text-[var(--muted-foreground)]">ETA {formatDate(s.sampleEta)}</div>
+                      {s.description && (
+                        <div className="line-clamp-2 text-xs text-[var(--muted-foreground)]">{s.description}</div>
                       )}
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {s.brand && <Badge variant="secondary">{s.brand}</Badge>}
+                        {s.category && <Badge variant="outline">{s.category}</Badge>}
+                        {s.color && <Badge variant="outline">{s.color}</Badge>}
+                        {s.season && <Badge variant="outline">{s.season}</Badge>}
+                      </div>
+                      <div className="mt-2 flex items-center justify-between gap-2 text-xs text-[var(--muted-foreground)]">
+                        <span className="inline-flex items-center gap-1">
+                          <Calendar className="h-3 w-3" /> Req {formatDate(s.requestedAt)}
+                        </span>
+                        {s.sampleEta && (
+                          <span className="inline-flex items-center gap-1">
+                            <Calendar className="h-3 w-3" /> ETA {formatDate(s.sampleEta)}
+                          </span>
+                        )}
+                      </div>
                     </Link>
                   );
                 })}

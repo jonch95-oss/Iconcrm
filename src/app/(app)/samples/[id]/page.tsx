@@ -189,6 +189,21 @@ export default async function SampleDetailPage({
             <SampleImage sampleId={sample.id} imageUrl={sample.imageUrl} canEdit={canEdit} />
             <Detail label="Factory" value={sample.factory ? <Link className="text-[var(--primary)] hover:underline" href={`/factories/${sample.factory.id}`}>{sample.factory.name}</Link> : "—"} />
             <Detail label="Style #" value={sample.styleNumber ?? "—"} />
+            <Detail label="Color" value={sample.color ?? "—"} />
+            <Detail label="Season" value={sample.season ?? "—"} />
+            <Detail
+              label="Size"
+              value={
+                sample.size ||
+                (sample.skuVariants.length
+                  ? Array.from(new Set(sample.skuVariants.map((v) => v.size).filter(Boolean))).join(", ")
+                  : "") ||
+                "—"
+              }
+            />
+            <Detail label="CBM / carton" value={sample.cbmPerCarton ? String(sample.cbmPerCarton) : "—"} />
+            <Detail label="Case pack" value={sample.casePackDefault ?? "—"} />
+            <Detail label="HTS code" value={sample.htsCode ?? "—"} />
             <Detail label="FOB cost" value={formatMoney(sample.fobCost, sample.currency)} />
             <Detail label="FOB port" value={sample.fobPort ?? "—"} />
             <Detail label="Customer sell price" value={formatMoney(sample.customerSellPrice, sample.currency)} />
