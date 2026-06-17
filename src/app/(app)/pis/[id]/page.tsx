@@ -8,6 +8,7 @@ import { ImportPiLinesButton } from "./import-pi-lines-button";
 import { PiDetail, type PiLineView, type PiSampleOption } from "./pi-detail";
 import { summarizeFob, compareToOrderForm } from "@/lib/match";
 import { OrderFormMatchCard } from "./order-form-match";
+import { AttachmentsCard } from "@/components/attachments-card";
 import { formatMoney } from "@/lib/money";
 import { formatDate, toDateInputValue } from "@/lib/date";
 
@@ -54,6 +55,12 @@ export default async function PiDetailPage({
     where: pi.factoryId ? { factoryId: pi.factoryId } : {},
     include: { skuVariants: true },
     orderBy: { sampleNumber: "asc" },
+  });
+
+  const attachments = await prisma.attachment.findMany({
+    where: { parentType: "pi", parentId: id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, filename: true, blobUrl: true, mimeType: true },
   });
 
   const summary = summarizeFob(pi.lines.map((l) => ({ quantity: l.quantity, variance: l.variance })));
@@ -157,6 +164,14 @@ export default async function PiDetailPage({
           status: pi.status,
         }}
         canEdit={canEdit}
+      />
+
+      <AttachmentsCard
+        parentType="pi"
+        parentId={pi.id}
+        attachments={attachments}
+        canEdit={canEdit}
+        title="PI documents (Excel / PDF)"
       />
     </div>
   );

@@ -13,6 +13,7 @@ import { ProductionSamples, type ProductionRow } from "./production-samples";
 import { PoPnlCard } from "@/components/po-pnl-card";
 import { getPoPnl } from "@/lib/pnl";
 import { cn } from "@/lib/utils";
+import { AttachmentsCard } from "@/components/attachments-card";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,12 @@ export default async function PoDetailPage({
   });
 
   const canEdit = hasRole(user.role, "member");
+
+  const attachments = await prisma.attachment.findMany({
+    where: { parentType: "po", parentId: id },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, filename: true, blobUrl: true, mimeType: true },
+  });
   const currentRank = poRank(po.status);
 
   const productionRows: ProductionRow[] = po.productionSamples.map((ps) => ({
@@ -190,6 +197,14 @@ export default async function PoDetailPage({
           )}
         </CardContent>
       </Card>
+
+      <AttachmentsCard
+        parentType="po"
+        parentId={po.id}
+        attachments={attachments}
+        canEdit={canEdit}
+        title="PO documents (Excel / PDF)"
+      />
     </div>
   );
 }

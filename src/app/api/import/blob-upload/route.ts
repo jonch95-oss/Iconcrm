@@ -23,6 +23,12 @@ export async function POST(request: Request) {
           allowedContentTypes: [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel.sheet.macroEnabled.12",
+            "application/vnd.ms-excel",
+            "application/pdf",
+            "image/png",
+            "image/jpeg",
+            "image/webp",
+            "text/csv",
             "application/octet-stream",
           ],
           maximumSizeInBytes: 50 * 1024 * 1024, // 50MB headroom
