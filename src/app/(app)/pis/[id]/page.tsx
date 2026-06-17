@@ -6,7 +6,8 @@ import { PageHeader } from "@/components/page-header";
 import { PiStatusBadge } from "@/components/status-badge";
 import { ImportPiLinesButton } from "./import-pi-lines-button";
 import { PiDetail, type PiLineView, type PiSampleOption } from "./pi-detail";
-import { summarizeFob } from "@/lib/match";
+import { summarizeFob, compareToOrderForm } from "@/lib/match";
+import { OrderFormMatchCard } from "./order-form-match";
 import { formatMoney } from "@/lib/money";
 import { formatDate, toDateInputValue } from "@/lib/date";
 
@@ -25,10 +26,21 @@ export default async function PiDetailPage({
     where: { id },
     include: {
       factory: true,
-      orderForm: { select: { id: true, orderFormNumber: true } },
+      orderForm: {
+        select: {
+          id: true,
+          orderFormNumber: true,
+          lines: {
+            select: {
+              quantity: true,
+              sample: { select: { id: true, sampleNumber: true, styleNumber: true } },
+            },
+          },
+        },
+      },
       purchaseOrders: { select: { id: true, poNumber: true } },
       lines: {
-        include: { sample: { select: { id: true, sampleNumber: true, imageUrl: true } }, skuVariant: true },
+        include: { sample: { select: { id: true, sampleNumber: true, imageUrl: true, styleNumber: true } }, skuVariant: true },
         orderBy: { createdAt: "asc" },
       },
     },
@@ -44,6 +56,23 @@ export default async function PiDetailPage({
   });
 
   const summary = summarizeFob(pi.lines.map((l) => ({ quantity: l.quantity, variance: l.variance })));
+
+  const ofMatch = pi.orderForm
+    ? compareToOrderForm(
+        pi.orderForm.lines.map((l) => ({
+          sampleId: l.sample.id,
+          sampleNumber: l.sample.sampleNumber,
+          styleNumber: l.sample.styleNumber,
+          quantity: l.quantity,
+        })),
+        pi.lines.map((l) => ({
+          sampleId: l.sample?.id ?? null,
+          sampleNumber: l.sample?.sampleNumber ?? "—",
+          styleNumber: l.sample?.styleNumber ?? null,
+          quantity: l.quantity,
+        })),
+      )
+    : null;
 
   const lines: PiLineView[] = pi.lines.map((l) => ({
     id: l.id,
@@ -96,6 +125,14 @@ export default async function PiDetailPage({
             </>
           )}
         </p>
+      )}
+
+      {pi.orderForm && ofMatch && (
+        <OrderFormMatchCard
+          orderFormId={pi.orderForm.id}
+          orderFormNumber={pi.orderForm.orderFormNumber}
+          match={ofMatch}
+        />
       )}
 
       <PiDetail

@@ -129,3 +129,85 @@ export function computeThreeWay(
 export function isFullyMatched(result: { lines: ThreeWayLine[]; openLines: number }): boolean {
   return result.lines.length > 0 && result.openLines === 0;
 }
+
+
+// ---------------------------------------------------------------------------
+// PI vs Order Form reconciliation (do the PI's styles + quantities match what
+// the order form actually ordered?)
+// ---------------------------------------------------------------------------
+
+export type OFMatchStatus = "matched" | "short" | "over" | "missing_on_pi" | "extra_on_pi";
+
+export interface OFMatchRow {
+  sampleId: string;
+  sampleNumber: string;
+  styleNumber: string | null;
+  orderFormQty: number;
+  piQty: number;
+  diff: number; // piQty - orderFormQty
+  status: OFMatchStatus;
+}
+
+export interface OFMatchResult {
+  rows: OFMatchRow[];
+  matchedCount: number;
+  issueCount: number;
+  ok: boolean; // every style matched and there is at least one row
+}
+
+interface OFMatchLine {
+  sampleId: string | null;
+  sampleNumber: string;
+  styleNumber: string | null;
+  quantity: number;
+}
+
+/**
+ * Compare an order form's lines to a PI's lines, grouped by sample (style).
+ * Flags styles that are short, over, missing from the PI, or extra on the PI.
+ */
+export function compareToOrderForm(ofLines: OFMatchLine[], piLines: OFMatchLine[]): OFMatchResult {
+  const ofQty = new Map<string, number>();
+  const piQty = new Map<string, number>();
+  const labels = new Map<string, { sampleNumber: string; styleNumber: string | null }>();
+
+  const tally = (lines: OFMatchLine[], target: Map<string, number>) => {
+    for (const l of lines) {
+      if (!l.sampleId) continue;
+      target.set(l.sampleId, (target.get(l.sampleId) ?? 0) + (l.quantity || 0));
+      if (!labels.has(l.sampleId)) {
+        labels.set(l.sampleId, { sampleNumber: l.sampleNumber, styleNumber: l.styleNumber });
+      }
+    }
+  };
+  tally(ofLines, ofQty);
+  tally(piLines, piQty);
+
+  const rows: OFMatchRow[] = [];
+  let matchedCount = 0;
+  let issueCount = 0;
+  for (const sampleId of new Set([...ofQty.keys(), ...piQty.keys()])) {
+    const o = ofQty.get(sampleId) ?? 0;
+    const p = piQty.get(sampleId) ?? 0;
+    let status: OFMatchStatus;
+    if (o > 0 && p === 0) status = "missing_on_pi";
+    else if (o === 0 && p > 0) status = "extra_on_pi";
+    else if (p === o) status = "matched";
+    else if (p < o) status = "short";
+    else status = "over";
+    if (status === "matched") matchedCount += 1;
+    else issueCount += 1;
+    const lab = labels.get(sampleId)!;
+    rows.push({
+      sampleId,
+      sampleNumber: lab.sampleNumber,
+      styleNumber: lab.styleNumber,
+      orderFormQty: o,
+      piQty: p,
+      diff: p - o,
+      status,
+    });
+  }
+  rows.sort((a, b) => a.sampleNumber.localeCompare(b.sampleNumber));
+  return { rows, matchedCount, issueCount, ok: issueCount === 0 && rows.length > 0 };
+}
