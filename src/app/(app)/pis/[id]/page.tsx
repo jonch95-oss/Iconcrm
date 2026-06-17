@@ -11,6 +11,7 @@ import { formatMoney } from "@/lib/money";
 import { formatDate, toDateInputValue } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 
 export default async function PiDetailPage({
   params,

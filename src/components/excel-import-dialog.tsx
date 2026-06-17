@@ -46,18 +46,15 @@ export function ExcelImportDialog({
     startTransition(async () => {
       try {
         const fd = new FormData();
-        // Files near/over Vercel's ~4.5MB server-action cap must go straight to
-        // Blob from the browser; small files can post directly. Use Blob for
-        // anything over 3.5MB to stay safely under the cap.
-        if (file.size > 3.5 * 1024 * 1024) {
-          const blob = await upload(file.name, file, {
-            access: "public",
-            handleUploadUrl: "/api/import/blob-upload",
-          });
-          fd.set("blobUrl", blob.url);
-        } else {
-          fd.set("file", file);
-        }
+        // Always upload straight to Vercel Blob from the browser, then import
+        // server-side from the Blob URL. Keeping the file off the server-action
+        // request path entirely means imports of ANY size — a 600KB sheet or a
+        // 60MB one — never hit Vercel's ~4.5MB request-body cap.
+        const blob = await upload(file.name, file, {
+          access: "public",
+          handleUploadUrl: "/api/import/blob-upload",
+        });
+        fd.set("blobUrl", blob.url);
         const res = await onImport(fd);
         setResult(res);
       } catch (e) {

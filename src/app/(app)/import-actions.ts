@@ -244,13 +244,27 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       .then((m) => m.default)
       .catch(() => null);
     let storageDown = false;
+
+    // Resolve each embedded image to the sample that owns its row, then
+    // compress + upload with bounded concurrency. Doing these one-at-a-time
+    // previously blew past the function time limit on sheets with dozens of
+    // photos (the cause of the import "Failed to fetch").
+    type ImageJob = {
+      rowNumber: number;
+      img: NonNullable<ReturnType<typeof imageByRow.get>>;
+      sampleId: string;
+    };
+    const jobs: ImageJob[] = [];
     for (const [rowNumber, img] of imageByRow) {
       const sampleId =
         rowToSample.get(rowNumber) ??
         // Images sometimes anchor a row above/below their data row.
         rowToSample.get(rowNumber + 1) ??
         rowToSample.get(rowNumber - 1);
-      if (!sampleId) continue;
+      if (sampleId) jobs.push({ rowNumber, img, sampleId });
+    }
+
+    const processImage = async ({ rowNumber, img, sampleId }: ImageJob) => {
       try {
         let buffer: Buffer = img.buffer;
         let ext = img.extension;
@@ -275,7 +289,18 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       } catch {
         storageDown = true;
       }
-    }
+    };
+
+    // Run up to 6 image jobs at once so a photo-heavy sheet finishes quickly.
+    const CONCURRENCY = 6;
+    let cursor = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, jobs.length) }, async () => {
+        while (cursor < jobs.length) {
+          await processImage(jobs[cursor++]);
+        }
+      }),
+    );
     if (storageDown) {
       summary.skipped.push({
         row: 0,

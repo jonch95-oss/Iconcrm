@@ -13,6 +13,9 @@ import { marginPercent } from "@/lib/money";
 import { ageInDays, isOverdue } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
+// Excel import (parse + compress/upload embedded photos) can take a while;
+// give it the full Hobby ceiling instead of the ~10s default.
+export const maxDuration = 60;
 
 export default async function SamplesPage({
   searchParams,
