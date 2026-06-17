@@ -6,6 +6,7 @@ import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { LinkManager, type LinkRow, type PoOption } from "./link-manager";
 import { formatMoney } from "@/lib/money";
+import { landedCost } from "@/lib/landed";
 import { formatDate } from "@/lib/date";
 import { RiskBadge } from "@/components/status-badge";
 import { WindowEditor } from "./window-editor";
@@ -71,6 +72,34 @@ export default async function CustomerPoDetailPage({
     cpoLines.map((l) => ({ styleNumber: l.styleNumber, quantity: l.quantity })),
     ourPoStyleLines,
   );
+
+  // Profitability: customer revenue (their unit price) vs our landed cost.
+  const styleStrings = [...new Set(cpoLines.map((l) => l.styleNumber.trim()))];
+  const samplesForStyles = styleStrings.length
+    ? await prisma.sample.findMany({
+        where: { styleNumber: { in: styleStrings } },
+        select: { styleNumber: true, fobCost: true, dutyRatePercent: true, freightPerUnit: true, inlandPerUnit: true, currency: true },
+      })
+    : [];
+  const sampleByStyle = new Map<string, (typeof samplesForStyles)[number]>();
+  for (const sm of samplesForStyles) if (sm.styleNumber) sampleByStyle.set(sm.styleNumber.trim().toUpperCase(), sm);
+
+  let revenue = 0;
+  let cost = 0;
+  let costComplete = cpoLines.length > 0;
+  let currencyMismatch = false;
+  for (const l of cpoLines) {
+    if (l.unitPrice != null) revenue += Number(l.unitPrice) * l.quantity;
+    else costComplete = false;
+    const sm = sampleByStyle.get(l.styleNumber.trim().toUpperCase());
+    if (!sm) { costComplete = false; continue; }
+    if (sm.currency !== cpo.currency) { currencyMismatch = true; costComplete = false; continue; }
+    const landed = landedCost(sm);
+    if (landed == null) { costComplete = false; continue; }
+    cost += Number(landed) * l.quantity;
+  }
+  const grossMargin = revenue - cost;
+  const marginPct = revenue > 0 ? (grossMargin / revenue) * 100 : null;
 
   const allPos = await prisma.purchaseOrder.findMany({
     include: { pi: { select: { piNumber: true, factory: { select: { name: true } } } } },
@@ -167,6 +196,23 @@ export default async function CustomerPoDetailPage({
         </Card>
       </div>
 
+      {cpoLines.length > 0 && (
+        <Card className="mt-4">
+          <CardHeader><CardTitle>Profitability</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            <Row label="Revenue (customer price)" value={formatMoney(revenue, cpo.currency)} />
+            <Row label="Landed cost" value={formatMoney(cost, cpo.currency)} />
+            <Row label="Gross margin" value={formatMoney(grossMargin, cpo.currency)} />
+            <Row label="Margin %" value={marginPct != null ? `${marginPct.toFixed(1)}%` : "—"} />
+            {(!costComplete || currencyMismatch) && (
+              <p className="text-xs text-[var(--muted-foreground)]">
+                {currencyMismatch ? "Some styles are costed in a different currency (no FX applied), so margin is approximate. " : ""}
+                {!costComplete ? "Some styles are missing a landed cost or customer price — margin may understate true profit." : ""}
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
       {cpoLines.length > 0 && (
         <Card className="mt-4">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0">

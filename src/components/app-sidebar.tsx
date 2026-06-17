@@ -25,6 +25,7 @@ const NAV = [
   { href: "/pis", label: "Proforma Invoices", icon: ReceiptText },
   { href: "/pos", label: "Purchase Orders", icon: ClipboardList },
   { href: "/customer-pos", label: "Customer POs", icon: Building2 },
+  { href: "/allocation", label: "Allocation", icon: Boxes },
   { href: "/packing-lists", label: "Packing Lists", icon: Boxes },
   { href: "/shipments", label: "Shipments", icon: Ship },
   { href: "/receive", label: "Receive Samples", icon: PackageCheck },

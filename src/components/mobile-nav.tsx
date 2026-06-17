@@ -20,6 +20,7 @@ const NAV = [
   { href: "/pis", label: "Proforma Invoices" },
   { href: "/pos", label: "Purchase Orders" },
   { href: "/customer-pos", label: "Customer POs" },
+  { href: "/allocation", label: "Allocation" },
   { href: "/packing-lists", label: "Packing Lists" },
   { href: "/shipments", label: "Shipments" },
   { href: "/receive", label: "Receive Samples" },
