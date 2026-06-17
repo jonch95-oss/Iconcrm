@@ -138,6 +138,8 @@ export function isFullyMatched(result: { lines: ThreeWayLine[]; openLines: numbe
 
 export type OFMatchStatus = "matched" | "short" | "over" | "missing_on_pi" | "extra_on_pi";
 
+export type PriceFlag = "match" | "higher" | "lower" | null;
+
 export interface OFMatchRow {
   sampleId: string;
   sampleNumber: string;
@@ -146,6 +148,9 @@ export interface OFMatchRow {
   piQty: number;
   diff: number; // piQty - orderFormQty
   status: OFMatchStatus;
+  orderFormPrice: number | null; // representative FOB on the order form
+  piPrice: number | null; // representative unit price on the PI
+  priceFlag: PriceFlag; // PI price relative to the order form price
 }
 
 export interface OFMatchResult {
@@ -160,6 +165,7 @@ interface OFMatchLine {
   sampleNumber: string;
   styleNumber: string | null;
   quantity: number;
+  unitPrice?: number | null;
 }
 
 /**
@@ -169,19 +175,24 @@ interface OFMatchLine {
 export function compareToOrderForm(ofLines: OFMatchLine[], piLines: OFMatchLine[]): OFMatchResult {
   const ofQty = new Map<string, number>();
   const piQty = new Map<string, number>();
+  const ofPrice = new Map<string, number>();
+  const piPrice = new Map<string, number>();
   const labels = new Map<string, { sampleNumber: string; styleNumber: string | null }>();
 
-  const tally = (lines: OFMatchLine[], target: Map<string, number>) => {
+  const tally = (lines: OFMatchLine[], qtyTarget: Map<string, number>, priceTarget: Map<string, number>) => {
     for (const l of lines) {
       if (!l.sampleId) continue;
-      target.set(l.sampleId, (target.get(l.sampleId) ?? 0) + (l.quantity || 0));
+      qtyTarget.set(l.sampleId, (qtyTarget.get(l.sampleId) ?? 0) + (l.quantity || 0));
+      if (l.unitPrice != null && l.unitPrice > 0 && !priceTarget.has(l.sampleId)) {
+        priceTarget.set(l.sampleId, l.unitPrice); // first non-zero price seen for the style
+      }
       if (!labels.has(l.sampleId)) {
         labels.set(l.sampleId, { sampleNumber: l.sampleNumber, styleNumber: l.styleNumber });
       }
     }
   };
-  tally(ofLines, ofQty);
-  tally(piLines, piQty);
+  tally(ofLines, ofQty, ofPrice);
+  tally(piLines, piQty, piPrice);
 
   const rows: OFMatchRow[] = [];
   let matchedCount = 0;
@@ -198,6 +209,12 @@ export function compareToOrderForm(ofLines: OFMatchLine[], piLines: OFMatchLine[
     if (status === "matched") matchedCount += 1;
     else issueCount += 1;
     const lab = labels.get(sampleId)!;
+    const ofP = ofPrice.get(sampleId) ?? null;
+    const piP = piPrice.get(sampleId) ?? null;
+    let priceFlag: PriceFlag = null;
+    if (ofP != null && piP != null) {
+      priceFlag = piP > ofP ? "higher" : piP < ofP ? "lower" : "match";
+    }
     rows.push({
       sampleId,
       sampleNumber: lab.sampleNumber,
@@ -206,6 +223,9 @@ export function compareToOrderForm(ofLines: OFMatchLine[], piLines: OFMatchLine[
       piQty: p,
       diff: p - o,
       status,
+      orderFormPrice: ofP,
+      piPrice: piP,
+      priceFlag,
     });
   }
   rows.sort((a, b) => a.sampleNumber.localeCompare(b.sampleNumber));

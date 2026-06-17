@@ -42,6 +42,7 @@ export function OrderFormMatchCard({
               <th className="pb-2 text-right font-medium">Order form</th>
               <th className="pb-2 text-right font-medium">PI</th>
               <th className="pb-2 text-right font-medium">Diff</th>
+              <th className="pb-2 text-right font-medium">Unit $ (OF → PI)</th>
               <th className="pb-2 text-right font-medium">Status</th>
             </tr>
           </thead>
@@ -61,6 +62,17 @@ export function OrderFormMatchCard({
                   <td className="py-1.5 text-right tabular-nums">
                     {r.diff > 0 ? `+${r.diff}` : r.diff < 0 ? r.diff : "—"}
                   </td>
+                  <td className="py-1.5 text-right tabular-nums">
+                    {r.orderFormPrice == null && r.piPrice == null ? (
+                      "—"
+                    ) : (
+                      <span className={r.priceFlag === "higher" || r.priceFlag === "lower" ? "text-[var(--destructive)]" : ""}>
+                        {r.orderFormPrice != null ? r.orderFormPrice.toFixed(2) : "—"} →{" "}
+                        {r.piPrice != null ? r.piPrice.toFixed(2) : "—"}
+                        {r.priceFlag === "higher" ? " ▲" : r.priceFlag === "lower" ? " ▼" : ""}
+                      </span>
+                    )}
+                  </td>
                   <td className="py-1.5 text-right">
                     <Badge variant={t.variant}>{t.label}</Badge>
                   </td>
@@ -69,7 +81,7 @@ export function OrderFormMatchCard({
             })}
             {match.rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-2 text-center text-xs text-[var(--muted-foreground)]">
+                <td colSpan={6} className="py-2 text-center text-xs text-[var(--muted-foreground)]">
                   The order form has no lines to compare against.
                 </td>
               </tr>

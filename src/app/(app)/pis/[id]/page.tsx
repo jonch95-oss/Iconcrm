@@ -33,6 +33,7 @@ export default async function PiDetailPage({
           lines: {
             select: {
               quantity: true,
+              fobCostSnapshot: true,
               sample: { select: { id: true, sampleNumber: true, styleNumber: true } },
             },
           },
@@ -64,12 +65,14 @@ export default async function PiDetailPage({
           sampleNumber: l.sample.sampleNumber,
           styleNumber: l.sample.styleNumber,
           quantity: l.quantity,
+          unitPrice: l.fobCostSnapshot != null ? Number(l.fobCostSnapshot) : null,
         })),
         pi.lines.map((l) => ({
           sampleId: l.sample?.id ?? null,
           sampleNumber: l.sample?.sampleNumber ?? "—",
           styleNumber: l.sample?.styleNumber ?? null,
           quantity: l.quantity,
+          unitPrice: l.unitPrice != null ? Number(l.unitPrice) : null,
         })),
       )
     : null;
