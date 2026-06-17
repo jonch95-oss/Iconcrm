@@ -30,6 +30,22 @@ export interface ImportSummary {
 const EMPTY: ImportSummary = { ok: false, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [] };
 
 async function readUpload(formData: FormData): Promise<Buffer | string> {
+  // Large files (sample sheets with embedded photos) are uploaded directly to
+  // Vercel Blob from the browser, bypassing the ~4.5MB server-action body cap.
+  // The client then passes the resulting blobUrl here and we fetch it server-
+  // side (no cap on outbound fetch).
+  const blobUrl = formData.get("blobUrl");
+  if (typeof blobUrl === "string" && blobUrl) {
+    if (!/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i.test(blobUrl)) {
+      return "Invalid upload URL.";
+    }
+    const res = await fetch(blobUrl);
+    if (!res.ok) return "Could not read the uploaded file.";
+    const buf = Buffer.from(await res.arrayBuffer());
+    if (buf.byteLength > 50 * 1024 * 1024) return "File is too large (50 MB max).";
+    return buf;
+  }
+
   const file = formData.get("file");
   if (!(file instanceof File) || file.size === 0) return "Choose an Excel file first.";
   if (file.size > 10 * 1024 * 1024) return "File is too large (10 MB max).";

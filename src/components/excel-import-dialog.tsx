@@ -10,6 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { FileUp, Download } from "lucide-react";
+import { upload } from "@vercel/blob/client";
 import type { ImportSummary } from "@/app/(app)/import-actions";
 
 /**
@@ -41,13 +42,31 @@ export function ExcelImportDialog({
       setResult({ error: "Please use an .xlsx file." } as ImportSummary);
       return;
     }
-    const fd = new FormData();
-    fd.set("file", file);
     setResult(null);
     startTransition(async () => {
-      const res = await onImport(fd);
-      setResult(res);
-      if (inputRef.current) inputRef.current.value = "";
+      try {
+        const fd = new FormData();
+        // Files near/over Vercel's ~4.5MB server-action cap must go straight to
+        // Blob from the browser; small files can post directly. Use Blob for
+        // anything over 3.5MB to stay safely under the cap.
+        if (file.size > 3.5 * 1024 * 1024) {
+          const blob = await upload(file.name, file, {
+            access: "public",
+            handleUploadUrl: "/api/import/blob-upload",
+          });
+          fd.set("blobUrl", blob.url);
+        } else {
+          fd.set("file", file);
+        }
+        const res = await onImport(fd);
+        setResult(res);
+      } catch (e) {
+        setResult({
+          error: e instanceof Error ? e.message : "Upload failed. Please try again.",
+        } as ImportSummary);
+      } finally {
+        if (inputRef.current) inputRef.current.value = "";
+      }
     });
   };
 
