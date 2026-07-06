@@ -7,7 +7,6 @@ import { SamplesTable, type SampleRow } from "./samples-table";
 import { NewSampleDialog } from "./new-sample-dialog";
 import { ImportSamplesButton } from "./import-samples-button";
 import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
-import { Download } from "lucide-react";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
 import { ageInDays, isOverdue } from "@/lib/date";
@@ -84,9 +83,6 @@ export default async function SamplesPage({
       >
         <Button asChild variant="outline">
           <Link href="/samples/board"><LayoutGrid className="h-4 w-4" /> Board</Link>
-        </Button>
-        <Button variant="outline" asChild>
-          <a href="/api/samples/export"><Download className="h-4 w-4" /> Export Excel</a>
         </Button>
         {canEdit && <FetchEmailedSheetsButton />}
         {canEdit && <ImportSamplesButton />}

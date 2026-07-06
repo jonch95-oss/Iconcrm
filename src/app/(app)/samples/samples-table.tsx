@@ -519,6 +519,16 @@ export function SamplesTable({
           <Button variant="outline" size="sm" onClick={exportCsv}>
             <Download className="h-4 w-4" /> CSV
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              const qs = selectedIds.length ? `?ids=${encodeURIComponent(selectedIds.join(","))}` : "";
+              window.location.href = `/api/samples/export${qs}`;
+            }}
+          >
+            <Download className="h-4 w-4" /> Export Excel{selectedIds.length ? ` (${selectedIds.length})` : ""}
+          </Button>
         </div>
       </div>
 
@@ -554,15 +564,6 @@ export function SamplesTable({
               <PackageCheck className="h-4 w-4" /> Mark received
             </Button>
           )}
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => {
-              window.location.href = `/api/samples/export?ids=${encodeURIComponent(selectedIds.join(","))}`;
-            }}
-          >
-            <Download className="h-4 w-4" /> Export Excel
-          </Button>
           {isAdmin && (
             <Button
               size="sm"
