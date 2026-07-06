@@ -3,10 +3,15 @@ import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 
+export const dynamic = "force-dynamic";
+// Fetching + embedding sample photos can take a bit on a large catalog.
+export const maxDuration = 60;
+
 /**
  * Mass export of all samples + variants, in exactly the columns the Excel
  * importer understands — download, bulk-edit, re-upload to apply changes.
- * The Sample # repeats on every row so variant rows always re-attach.
+ * The Sample # repeats on every row so variant rows always re-attach. Each
+ * sample's photo is embedded in column A (round-trips with the importer).
  */
 export async function GET() {
   const user = await getCurrentUser();
@@ -21,7 +26,7 @@ export async function GET() {
   wb.creator = "ICON LUXURY GROUP";
   const ws = wb.addWorksheet("Samples");
   const header = [
-    "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
+    "Image", "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Composition", "CBM/Carton", "Case Pack",
     "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code",
@@ -32,8 +37,11 @@ export async function GET() {
   ws.views = [{ state: "frozen", ySplit: 1 }];
 
   const num = (d: unknown) => (d == null ? "" : Number(d));
+  const imageJobs: { rowNumber: number; url: string }[] = [];
+
   for (const s of samples) {
     const base = [
+      "", // image column A (photo embedded separately)
       s.sampleNumber, s.brand ?? "", s.category ?? "", s.styleNumber ?? "",
       s.styleName ?? "", s.description ?? "",
       num(s.fobCost), num(s.customerSellPrice), num(s.dutyRatePercent),
@@ -41,15 +49,43 @@ export async function GET() {
       s.htsCode ?? "", s.composition ?? "", num(s.cbmPerCarton), s.casePackDefault ?? "",
       s.factory?.name ?? "", s.targetCustomer ?? "", s.status,
     ];
+    let firstRow = 0;
     if (s.skuVariants.length === 0) {
-      ws.addRow([...base, s.size ?? "", "", "", ""]);
+      firstRow = ws.addRow([...base, s.size ?? "", "", "", ""]).number;
     } else {
-      for (const v of s.skuVariants) {
-        ws.addRow([...base, v.size, v.color, v.upc, v.skuCode ?? ""]);
-      }
+      s.skuVariants.forEach((v, i) => {
+        const r = ws.addRow([...base, v.size, v.color, v.upc, v.skuCode ?? ""]).number;
+        if (i === 0) firstRow = r;
+      });
     }
+    if (s.imageUrl && firstRow) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
   }
-  ws.columns.forEach((c, i) => (c.width = i === 5 ? 28 : 15));
+
+  // Fetch + embed photos with bounded concurrency so a big catalog stays fast.
+  const embed = async ({ rowNumber, url }: { rowNumber: number; url: string }) => {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) return;
+      const ct = res.headers.get("content-type") ?? "";
+      const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
+      const buffer = Buffer.from(await res.arrayBuffer());
+      const imageId = wb.addImage({ buffer, extension });
+      ws.getRow(rowNumber).height = 72;
+      // tl.row is 0-based (row 1 = index 0), so worksheet row N anchors at N-1.
+      ws.addImage(imageId, { tl: { col: 0, row: rowNumber - 1 }, ext: { width: 92, height: 92 } });
+    } catch {
+      // Skip images that can't be fetched; the export still succeeds.
+    }
+  };
+  const CONCURRENCY = 8;
+  let cursor = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(CONCURRENCY, imageJobs.length) }, async () => {
+      while (cursor < imageJobs.length) await embed(imageJobs[cursor++]);
+    }),
+  );
+
+  ws.columns.forEach((c, i) => (c.width = i === 0 ? 14 : i === 6 ? 28 : 15));
 
   const buffer = await wb.xlsx.writeBuffer();
   const today = new Date().toISOString().slice(0, 10);
