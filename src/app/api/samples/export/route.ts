@@ -73,8 +73,10 @@ export async function GET(request: Request) {
       if (!res.ok) return;
       const ct = res.headers.get("content-type") ?? "";
       const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
-      const buffer = Buffer.from(await res.arrayBuffer());
-      const imageId = wb.addImage({ buffer, extension });
+      // Pass base64 (string) rather than a Buffer: newer @types/node's
+      // Buffer<ArrayBuffer> isn't assignable to ExcelJS's expected buffer type.
+      const base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
+      const imageId = wb.addImage({ base64, extension });
       ws.getRow(rowNumber).height = 72;
       // tl.row is 0-based (row 1 = index 0), so worksheet row N anchors at N-1.
       ws.addImage(imageId, { tl: { col: 0, row: rowNumber - 1 }, ext: { width: 92, height: 92 } });
