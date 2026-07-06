@@ -554,6 +554,15 @@ export function SamplesTable({
               <PackageCheck className="h-4 w-4" /> Mark received
             </Button>
           )}
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              window.location.href = `/api/samples/export?ids=${encodeURIComponent(selectedIds.join(","))}`;
+            }}
+          >
+            <Download className="h-4 w-4" /> Export Excel
+          </Button>
           {isAdmin && (
             <Button
               size="sm"

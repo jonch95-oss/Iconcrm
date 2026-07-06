@@ -13,11 +13,16 @@ export const maxDuration = 60;
  * The Sample # repeats on every row so variant rows always re-attach. Each
  * sample's photo is embedded in column A (round-trips with the importer).
  */
-export async function GET() {
+export async function GET(request: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Optional ?ids=a,b,c — export only those samples (from the table's checkboxes).
+  const idsParam = new URL(request.url).searchParams.get("ids");
+  const ids = idsParam ? idsParam.split(",").map((x) => x.trim()).filter(Boolean) : null;
+
   const samples = await prisma.sample.findMany({
+    where: ids && ids.length ? { id: { in: ids } } : undefined,
     include: { factory: { select: { name: true } }, skuVariants: { orderBy: { upc: "asc" } } },
     orderBy: { sampleNumber: "asc" },
   });
