@@ -32,6 +32,7 @@ export const SAMPLE_STATUS_LABEL: Record<SampleStatus, string> = {
   shipped: "Shipped",
   packing_list_matched: "Packing List Matched",
   closed: "Closed",
+  revisions_requested: "Revisions Requested",
   dropped: "Dropped",
 };
 
@@ -56,6 +57,7 @@ export const SAMPLE_STATUS_TONE: Record<SampleStatus, BadgeTone> = {
   shipped: "default",
   packing_list_matched: "success",
   closed: "success",
+  revisions_requested: "warning",
   dropped: "destructive",
 };
 

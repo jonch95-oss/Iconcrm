@@ -317,7 +317,12 @@ export async function createOrderFormFromSamples(
         });
       }
     }
-    await logAudit(
+    // Putting a sample on an order form advances it to "On Order Form".
+    for (const s of factorySamples) {
+      const next = advanceSampleStatus(s.status, "on_order_form");
+      if (next !== s.status) await tx.sample.update({ where: { id: s.id }, data: { status: next } });
+    }
+    await logAudit
       {
         entityType: "order_form",
         entityId: orderForm.id,
@@ -533,5 +538,48 @@ export async function bulkDeleteSamples(sampleIds: string[]): Promise<ActionResu
       id: `Deleted ${deletable.length}. Skipped ${linkedIds.size} still used on order forms/PIs.`,
     };
   }
+  return { ok: true };
+}
+
+
+/**
+ * Flag a sample as needing revisions: records the reviewer's note in the
+ * sample's comments, resets the ETA to 6 weeks out, and logs the ETA change.
+ */
+export async function requestRevisions(sampleId: string, comment: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const note = comment.trim();
+  if (!note) return { ok: false, error: "Add a note on what needs revising." };
+
+  const sample = await prisma.sample.findUnique({
+    where: { id: sampleId },
+    select: { id: true, status: true, sampleEta: true },
+  });
+  if (!sample) return { ok: false, error: "Sample not found." };
+
+  const newEta = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+  await prisma.$transaction([
+    prisma.sample.update({
+      where: { id: sampleId },
+      data: { status: "revisions_requested", sampleEta: newEta },
+    }),
+    prisma.comment.create({
+      data: { sampleId, userId: user.id, body: `Revisions requested: ${note}`, tags: ["revision"] },
+    }),
+    prisma.etaRevision.create({
+      data: {
+        parentType: "sample",
+        parentId: sampleId,
+        oldEta: sample.sampleEta,
+        newEta,
+        changedById: user.id,
+        reason: "Revisions requested",
+      },
+    }),
+  ]);
+
+  await logAudit({ entityType: "sample", entityId: sampleId, action: "revisions_requested", userId: user.id, after: { note } });
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
   return { ok: true };
 }

@@ -39,6 +39,7 @@ enum SampleStatus {
   shipped
   packing_list_matched
   closed
+  revisions_requested
   dropped
 }
 

@@ -14,6 +14,7 @@ import { SampleImage } from "./sample-image";
 import { formatDate, formatDateTime, isOverdue } from "@/lib/date";
 import { DROPPED_REASON_LABEL } from "@/lib/status";
 import { SampleActions } from "./sample-actions";
+import { RequestRevisionsButton } from "./request-revisions-button";
 import { CommentForm } from "./comment-form";
 import { SkuManager } from "./sku-manager";
 import { AlertTriangle, Paperclip } from "lucide-react";
@@ -142,6 +143,7 @@ export default async function SampleDetailPage({
             <AlertTriangle className="h-3 w-3" /> OVERDUE
           </Badge>
         )}
+        {canEdit && <RequestRevisionsButton sampleId={sample.id} />}
         <SampleActions
           data={{
             id: sample.id,
