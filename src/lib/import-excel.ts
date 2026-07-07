@@ -25,7 +25,7 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   customerSellPrice: ["sell", "sellprice", "customersellprice", "wholesale", "wholesaleprice", "price", "targetretail", "retail", "msrp"],
   dutyRatePercent: ["duty", "dutyrate", "dutypercent", "dutyratepercent"],
   freightPerUnit: ["freight", "freightperunit", "freightunit"],
-  inlandPerUnit: ["inland", "inlandperunit", "delivery"],
+  inlandPerUnit: ["inland", "inlandperunit", "inlandunit", "delivery"],
   targetCustomer: ["targetcustomer", "customer", "account"],
   factoryName: ["factory", "factoryname", "supplier", "mill"],
   size: ["size", "sz"],
@@ -203,27 +203,43 @@ export const parseInventoryWorkbook = (b: Buffer) => parseWorkbook(b, INVENTORY_
 export async function buildSamplesTemplate(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Sample Request");
-  // CBM, Case Pack and HTS Code feed the Order Form's container-fill /
-  // CBM-total calculation; Size carries one-size or per-style sizing.
-  ws.addRow(["IMAGE", "Brand", "STYLE #", "DESCRIPTION", "COLOR", "Season", "Size", "CBM", "Case Pack", "HTS Code"]);
+  // Every column the importer understands. IMAGE holds an embedded photo per
+  // row; everything else maps to a sample field (headers are matched loosely,
+  // and any column you leave out is simply skipped). FOB/CBM/Case Pack/HTS feed
+  // costing + the Order Form container-fill calc.
+  const columns: { header: string; width: number }[] = [
+    { header: "IMAGE", width: 28 },
+    { header: "Brand", width: 18 },
+    { header: "Category", width: 16 },
+    { header: "STYLE #", width: 16 },
+    { header: "Style Name", width: 20 },
+    { header: "DESCRIPTION", width: 26 },
+    { header: "COLOR", width: 22 },
+    { header: "Season", width: 10 },
+    { header: "Size", width: 10 },
+    { header: "FOB", width: 10 },
+    { header: "Sell Price", width: 11 },
+    { header: "Duty %", width: 9 },
+    { header: "Freight/Unit", width: 12 },
+    { header: "Inland/Unit", width: 12 },
+    { header: "CBM", width: 9 },
+    { header: "Case Pack", width: 11 },
+    { header: "HTS Code", width: 14 },
+    { header: "Composition", width: 18 },
+    { header: "Factory", width: 18 },
+    { header: "Target Customer", width: 18 },
+    { header: "UPC", width: 16 },
+    { header: "SKU Code", width: 14 },
+  ];
+  ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };
   const examples = [
-    ["", "Off White L/AB", "LAB-HB-10002", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 0.182, 12, "4202.21.9000"],
-    ["", "Off White L/AB", "LAB-HB-10004", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 0.182, 12, "4202.21.9000"],
-    ["", "Off White L/AB", "LAB-HB-10005", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 0.182, 12, "4202.21.9000"],
+    ["", "Off White L/AB", "Handbags", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "Off White L/AB", "Handbags", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "Off White L/AB", "Handbags", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
   ];
   for (const r of examples) ws.addRow(r);
-  // Column widths: wide IMAGE column, comfortable text columns.
-  ws.getColumn(1).width = 28;
-  ws.getColumn(2).width = 18;
-  ws.getColumn(3).width = 16;
-  ws.getColumn(4).width = 26;
-  ws.getColumn(5).width = 22;
-  ws.getColumn(6).width = 10;
-  ws.getColumn(7).width = 10;
-  ws.getColumn(8).width = 10;
-  ws.getColumn(9).width = 11;
-  ws.getColumn(10).width = 14;
+  columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
   // Tall rows so a pasted/embedded photo fits in the IMAGE column.
   for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
   // A small note so users know images go in column A, anchored to each row.
