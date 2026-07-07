@@ -322,7 +322,7 @@ export async function createOrderFormFromSamples(
       const next = advanceSampleStatus(s.status, "on_order_form");
       if (next !== s.status) await tx.sample.update({ where: { id: s.id }, data: { status: next } });
     }
-    await logAudit
+    await logAudit(
       {
         entityType: "order_form",
         entityId: orderForm.id,
