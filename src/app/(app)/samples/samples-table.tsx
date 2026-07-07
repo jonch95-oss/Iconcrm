@@ -53,6 +53,7 @@ import {
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
 import { updateSample, createOrderFormFromSamples, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
@@ -81,6 +82,112 @@ export interface SampleRow {
   ageDays: number;
   overdue: boolean;
   requestedBy: string;
+}
+
+function InlineSelect({
+  id,
+  field,
+  value,
+  options,
+  canEdit,
+  allowCustom = false,
+}: {
+  id: string;
+  field: "brand" | "category" | "season";
+  value: string;
+  options: readonly string[];
+  canEdit: boolean;
+  allowCustom?: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [pending, startTransition] = React.useTransition();
+
+  const save = (raw: string) => {
+    const next = raw.trim();
+    setEditing(false);
+    if (next === value) return;
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set(field, next);
+    startTransition(async () => {
+      const res = await updateSample(fd);
+      if (res.ok) {
+        toast.success("Saved");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
+
+  if (!canEdit) {
+    return value ? (
+      <Badge variant="secondary">{value}</Badge>
+    ) : (
+      <span className="text-[var(--muted-foreground)]">—</span>
+    );
+  }
+
+  if (editing) {
+    if (allowCustom) {
+      const listId = `dl-${field}-${id}`;
+      return (
+        <>
+          <input
+            autoFocus
+            list={listId}
+            defaultValue={value}
+            disabled={pending}
+            onBlur={(e) => save(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              else if (e.key === "Escape") setEditing(false);
+            }}
+            className="h-8 w-28 rounded-md border border-[var(--border)] bg-[var(--background)] px-2 text-sm"
+          />
+          <datalist id={listId}>
+            {options.map((o) => (
+              <option key={o} value={o} />
+            ))}
+          </datalist>
+        </>
+      );
+    }
+    return (
+      <select
+        autoFocus
+        defaultValue={value}
+        disabled={pending}
+        onChange={(e) => save(e.target.value)}
+        onBlur={() => setEditing(false)}
+        className="h-8 w-32 rounded-md border border-[var(--border)] bg-[var(--background)] px-1 text-sm"
+      >
+        <option value="">—</option>
+        {options.map((o) => (
+          <option key={o} value={o}>
+            {o}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      disabled={pending}
+      className="rounded-full text-left hover:opacity-80"
+      title="Click to edit"
+    >
+      {value ? (
+        <Badge variant="secondary">{value}</Badge>
+      ) : (
+        <span className="text-xs text-[var(--muted-foreground)]">+ add</span>
+      )}
+    </button>
+  );
 }
 
 function InlineEdit({
@@ -254,9 +361,27 @@ export function SamplesTable({
           </span>
         ),
       },
-      { accessorKey: "brand", header: ({ column }) => <SortBtn column={column} label="Brand" /> },
-      { accessorKey: "category", header: ({ column }) => <SortBtn column={column} label="Category" /> },
-      { accessorKey: "season", header: ({ column }) => <SortBtn column={column} label="Season" /> },
+      {
+        accessorKey: "brand",
+        header: ({ column }) => <SortBtn column={column} label="Brand" />,
+        cell: ({ row }) => (
+          <InlineSelect id={row.original.id} field="brand" value={row.original.brand} options={SAMPLE_BRANDS} canEdit={canEdit} />
+        ),
+      },
+      {
+        accessorKey: "category",
+        header: ({ column }) => <SortBtn column={column} label="Category" />,
+        cell: ({ row }) => (
+          <InlineSelect id={row.original.id} field="category" value={row.original.category} options={SAMPLE_CATEGORIES} canEdit={canEdit} />
+        ),
+      },
+      {
+        accessorKey: "season",
+        header: ({ column }) => <SortBtn column={column} label="Season" />,
+        cell: ({ row }) => (
+          <InlineSelect id={row.original.id} field="season" value={row.original.season} options={seasonOptions} canEdit={canEdit} allowCustom />
+        ),
+      },
       { accessorKey: "styleNumber", header: "Style #" },
       {
         accessorKey: "status",
@@ -347,7 +472,7 @@ export function SamplesTable({
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit],
+    [canEdit, seasonOptions],
   );
 
   const table = useReactTable({
