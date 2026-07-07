@@ -53,6 +53,7 @@ export default async function SamplesPage({
       imageUrl: s.imageUrl,
       brand: s.brand ?? "",
       category: s.category ?? "",
+      season: s.season ?? "",
       styleName: s.styleName ?? "",
       styleNumber: s.styleNumber ?? "",
       status: s.status,

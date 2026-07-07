@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -34,6 +35,8 @@ export function NewSampleDialog({
   const [open, setOpen] = React.useState(false);
   const [currency, setCurrency] = React.useState("USD");
   const [factoryId, setFactoryId] = React.useState("");
+  const [brand, setBrand] = React.useState("");
+  const [category, setCategory] = React.useState("");
   const [dupWarning, setDupWarning] = React.useState<string | null>(null);
 
   const checkDuplicate = React.useCallback(async (value: string) => {
@@ -56,6 +59,8 @@ export function NewSampleDialog({
     const fd = new FormData(e.currentTarget);
     fd.set("currency", currency);
     if (factoryId) fd.set("factoryId", factoryId);
+    if (brand) fd.set("brand", brand);
+    if (category) fd.set("category", category);
     startTransition(async () => {
       const res = await createSample(fd);
       if (res.ok && res.id) {
@@ -85,9 +90,26 @@ export function NewSampleDialog({
               <Label>Sample # *</Label>
               <Input name="sampleNumber" required onBlur={(e) => checkDuplicate(e.target.value)} />
             </div>
-            <Field label="Brand" name="brand" />
+            <div className="space-y-1.5">
+              <Label>Brand</Label>
+              <Select value={brand} onValueChange={setBrand}>
+                <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
+                <SelectContent>
+                  {SAMPLE_BRANDS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <Field label="Color" name="color" />
-            <Field label="Category" name="category" />
+            <div className="space-y-1.5">
+              <Label>Category</Label>
+              <Select value={category} onValueChange={setCategory}>
+                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                <SelectContent>
+                  {SAMPLE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <Field label="Season" name="season" />
             <Field label="Style name" name="styleName" />
             <Field label="Style #" name="styleNumber" />
             <Field label="Target customer" name="targetCustomer" />

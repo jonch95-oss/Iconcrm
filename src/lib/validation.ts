@@ -51,6 +51,7 @@ export const sampleCreateSchema = z.object({
   brand: optionalString,
   color: optionalString,
   category: optionalString,
+  season: optionalString,
   styleName: optionalString,
   styleNumber: optionalString,
   description: optionalString,

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
 
 // ---------------------------------------------------------------------------
 // Excel import parsing (server-side, exceljs).
@@ -200,21 +201,6 @@ export const parseInventoryWorkbook = (b: Buffer) => parseWorkbook(b, INVENTORY_
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,
  *  STYLE #, DESCRIPTION, COLOR, Season). Each data row is tall enough to hold a
  *  thumbnail; the importer reads the embedded picture anchored to that row. */
-export const SAMPLE_CATEGORIES = [
-  "Handbag",
-  "Cooler",
-  "Duffel",
-  "Rolling Duffle",
-  "Cosmetic Bag",
-  "Toiletry Bag",
-  "Wallet",
-  "Belt",
-  "Luggage",
-  "Backpack",
-  "Neck Pillow",
-  "Packing Cube",
-] as const;
-
 export async function buildSamplesTemplate(): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Sample Request");
@@ -224,6 +210,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   // costing + the Order Form container-fill calc.
   const columns: { header: string; width: number }[] = [
     { header: "IMAGE", width: 28 },
+    { header: "Sample #", width: 16 },
     { header: "Brand", width: 18 },
     { header: "Category", width: 16 },
     { header: "STYLE #", width: 16 },
@@ -249,26 +236,34 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };
   const examples = [
-    ["", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
-    ["", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
-    ["", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
   ];
   for (const r of examples) ws.addRow(r);
   columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
 
-  // Category dropdown (data validation) on column C for the data rows.
-  const categoryList = `"${SAMPLE_CATEGORIES.join(",")}"`;
-  for (let r = 2; r <= 500; r++) {
-    ws.getCell(`C${r}`).dataValidation = {
-      type: "list",
-      allowBlank: true,
-      formulae: [categoryList],
-      showErrorMessage: true,
-      errorStyle: "stop",
-      errorTitle: "Category",
-      error: "Pick a category from the list.",
-    };
-  }
+  // Dropdowns (data validation) for Brand + Category on their data-row cells.
+  const colLetter = (i: number) => String.fromCharCode(65 + i);
+  const applyList = (header: string, values: readonly string[], title: string) => {
+    const idx = columns.findIndex((c) => c.header === header);
+    if (idx < 0) return;
+    const letter = colLetter(idx);
+    const formula = `"${values.join(",")}"`;
+    for (let r = 2; r <= 500; r++) {
+      ws.getCell(`${letter}${r}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [formula],
+        showErrorMessage: true,
+        errorStyle: "stop",
+        errorTitle: title,
+        error: `Pick a ${title.toLowerCase()} from the list.`,
+      };
+    }
+  };
+  applyList("Brand", SAMPLE_BRANDS, "Brand");
+  applyList("Category", SAMPLE_CATEGORIES, "Category");
   // Tall rows so a pasted/embedded photo fits in the IMAGE column.
   for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
   // A small note so users know images go in column A, anchored to each row.

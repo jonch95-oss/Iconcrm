@@ -64,6 +64,7 @@ export interface SampleRow {
   imageUrl: string | null;
   brand: string;
   category: string;
+  season: string;
   styleName: string;
   styleNumber: string;
   status: (typeof SAMPLE_PIPELINE)[number] | "revisions_requested" | "dropped";
@@ -178,6 +179,9 @@ export function SamplesTable({
   const [globalFilter, setGlobalFilter] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState(initialStatus);
   const [factoryFilter, setFactoryFilter] = React.useState(initialFactory);
+  const [brandFilter, setBrandFilter] = React.useState("");
+  const [seasonFilter, setSeasonFilter] = React.useState("");
+  const [categoryFilter, setCategoryFilter] = React.useState("");
   const [overdueOnly, setOverdueOnly] = React.useState(initialOverdue);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
@@ -191,10 +195,17 @@ export function SamplesTable({
     return rows.filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false;
       if (factoryFilter && r.factoryId !== factoryFilter) return false;
+      if (brandFilter && r.brand !== brandFilter) return false;
+      if (seasonFilter && r.season !== seasonFilter) return false;
+      if (categoryFilter && r.category !== categoryFilter) return false;
       if (overdueOnly && !r.overdue) return false;
       return true;
     });
-  }, [rows, statusFilter, factoryFilter, overdueOnly]);
+  }, [rows, statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, overdueOnly]);
+
+  const brandOptions = React.useMemo(() => [...new Set(rows.map((r) => r.brand).filter(Boolean))].sort(), [rows]);
+  const seasonOptions = React.useMemo(() => [...new Set(rows.map((r) => r.season).filter(Boolean))].sort(), [rows]);
+  const categoryOptions = React.useMemo(() => [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(), [rows]);
 
   const columns = React.useMemo<ColumnDef<SampleRow>[]>(
     () => [
@@ -245,6 +256,7 @@ export function SamplesTable({
       },
       { accessorKey: "brand", header: ({ column }) => <SortBtn column={column} label="Brand" /> },
       { accessorKey: "category", header: ({ column }) => <SortBtn column={column} label="Category" /> },
+      { accessorKey: "season", header: ({ column }) => <SortBtn column={column} label="Season" /> },
       { accessorKey: "styleNumber", header: "Style #" },
       {
         accessorKey: "status",
@@ -454,6 +466,27 @@ export function SamplesTable({
                 {f.name}
               </SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+        <Select value={brandFilter || "all"} onValueChange={(v) => setBrandFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-40"><SelectValue placeholder="All brands" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All brands</SelectItem>
+            {brandOptions.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={categoryFilter || "all"} onValueChange={(v) => setCategoryFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-40"><SelectValue placeholder="All categories" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All categories</SelectItem>
+            {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={seasonFilter || "all"} onValueChange={(v) => setSeasonFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-36"><SelectValue placeholder="All seasons" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All seasons</SelectItem>
+            {seasonOptions.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
           </SelectContent>
         </Select>
         <Button
