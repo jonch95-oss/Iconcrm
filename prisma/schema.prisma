@@ -696,3 +696,11 @@ model InventoryMovement {
 
   @@index([skuVariantId])
 }
+
+model ColorCode {
+  id        String   @id @default(cuid())
+  color     String   @unique // normalized (UPPER) color name, e.g. "BLACK DENIM"
+  code      String // abbreviation, e.g. "BLK"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}

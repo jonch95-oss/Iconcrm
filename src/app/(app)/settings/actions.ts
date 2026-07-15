@@ -101,3 +101,25 @@ export async function inviteUser(formData: FormData): Promise<ActionResult> {
   revalidatePath("/settings");
   return { ok: true };
 }
+
+
+export async function upsertColorCode(color: string, code: string): Promise<ActionResult> {
+  const user = await assertRole("admin");
+  const c = color.trim().toUpperCase();
+  const cd = code.trim().toUpperCase();
+  if (!c) return { ok: false, error: "Color is required." };
+  if (!cd) return { ok: false, error: "Code is required." };
+  await prisma.colorCode.upsert({ where: { color: c }, update: { code: cd }, create: { color: c, code: cd } });
+  await logAudit({ entityType: "color_code", entityId: c, action: "upserted", userId: user.id, after: { color: c, code: cd } });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteColorCode(id: string): Promise<ActionResult> {
+  const user = await assertRole("admin");
+  const existing = await prisma.colorCode.findUnique({ where: { id } });
+  await prisma.colorCode.delete({ where: { id } });
+  if (existing) await logAudit({ entityType: "color_code", entityId: existing.color, action: "deleted", userId: user.id });
+  revalidatePath("/settings");
+  return { ok: true };
+}
