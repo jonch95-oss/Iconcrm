@@ -207,6 +207,7 @@ export default async function SampleDetailPage({
             <Detail label="CBM / carton" value={sample.cbmPerCarton ? String(sample.cbmPerCarton) : "—"} />
             <Detail label="Case pack" value={sample.casePackDefault ?? "—"} />
             <Detail label="HTS code" value={sample.htsCode ?? "—"} />
+            <Detail label="Material" value={sample.material ?? "—"} />
             <Detail label="FOB cost" value={formatMoney(sample.fobCost, sample.currency)} />
             <Detail label="FOB port" value={sample.fobPort ?? "—"} />
             <Detail label="Customer sell price" value={formatMoney(sample.customerSellPrice, sample.currency)} />

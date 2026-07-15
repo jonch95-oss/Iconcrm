@@ -66,6 +66,7 @@ export const sampleCreateSchema = z.object({
   inlandPerUnit: decimalString,
   htsCode: z.string().optional(),
   composition: z.string().optional(),
+  material: optionalString,
   cbmPerCarton: decimalString,
   casePackDefault: z.string().optional(),
   trackingNumber: z.string().optional(),

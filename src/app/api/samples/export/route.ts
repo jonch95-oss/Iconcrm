@@ -33,7 +33,7 @@ export async function GET(request: Request) {
   const header = [
     "Image", "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
-    "HTS Code", "Composition", "CBM/Carton", "Case Pack",
+    "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
     "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code",
   ];
   ws.addRow(header);
@@ -51,7 +51,7 @@ export async function GET(request: Request) {
       s.styleName ?? "", s.description ?? "",
       num(s.fobCost), num(s.customerSellPrice), num(s.dutyRatePercent),
       num(s.freightPerUnit), num(s.inlandPerUnit),
-      s.htsCode ?? "", s.composition ?? "", num(s.cbmPerCarton), s.casePackDefault ?? "",
+      s.htsCode ?? "", s.material ?? "", s.composition ?? "", num(s.cbmPerCarton), s.casePackDefault ?? "",
       s.factory?.name ?? "", s.targetCustomer ?? "", s.status,
     ];
     let firstRow = 0;

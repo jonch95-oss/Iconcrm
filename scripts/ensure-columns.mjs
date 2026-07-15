@@ -10,6 +10,7 @@ const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "color" TEXT`,
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "season" TEXT`,
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "size" TEXT`,
+  `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "material" TEXT`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'revisions_requested'`,
   `ALTER TABLE "SkuVariant" ALTER COLUMN "upc" DROP NOT NULL`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,

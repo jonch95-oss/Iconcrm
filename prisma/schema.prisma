@@ -259,6 +259,7 @@ model Sample {
   // the 40' HQ container-fill calculator.
   htsCode         String?
   composition     String? // e.g. "100% Cotton" / leather type
+  material        String? // coarse material for HTS lookup, e.g. "Leather"
   cbmPerCarton    Decimal? @db.Decimal(10, 4)
   casePackDefault Int? // units per carton when the variant doesn't specify
 

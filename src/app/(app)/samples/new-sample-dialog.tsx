@@ -110,6 +110,7 @@ export function NewSampleDialog({
               </Select>
             </div>
             <Field label="Season" name="season" />
+            <Field label="Material" name="material" />
             <Field label="Style name" name="styleName" />
             <Field label="Style #" name="styleNumber" />
             <Field label="Target customer" name="targetCustomer" />

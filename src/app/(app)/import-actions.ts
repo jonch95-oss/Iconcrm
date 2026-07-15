@@ -130,6 +130,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           inlandPerUnit: toDecimal(v.inlandPerUnit) ?? undefined,
           htsCode: v.htsCode?.trim() || undefined,
           composition: v.composition?.trim() || undefined,
+          material: v.material?.trim() || undefined,
           cbmPerCarton: toDecimal(v.cbmPerCarton) ?? undefined,
           casePackDefault: v.casePackDefault ? parseInt(v.casePackDefault, 10) || undefined : undefined,
           trackingNumber: v.trackingNumber?.trim() || undefined,

@@ -36,7 +36,8 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   skuCode: ["sku", "skucode", "itemcode"],
   status: ["status", "stage"],
   htsCode: ["hts", "htscode", "htsno", "tariff", "tariffcode"],
-  composition: ["composition", "compositionwpercentages", "fabric", "material", "content", "fibercontent"],
+  composition: ["composition", "compositionwpercentages", "fabric", "content", "fibercontent"],
+  material: ["material", "materials", "matl"],
   cbmPerCarton: ["cbm", "cbmpercarton", "cbmcarton", "cartoncbm"],
   casePackDefault: ["casepack", "caseqty", "unitspercarton", "casepk", "pack"],
   trackingNumber: ["tracking", "trackingno", "trackingnumber", "trackingid", "awb", "airwaybill", "waybill"],
@@ -227,6 +228,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
     { header: "CBM", width: 9 },
     { header: "Case Pack", width: 11 },
     { header: "HTS Code", width: 14 },
+    { header: "Material", width: 16 },
     { header: "Composition", width: 18 },
     { header: "Factory", width: 18 },
     { header: "Target Customer", width: 18 },
@@ -236,9 +238,9 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };
   const examples = [
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
   ];
   for (const r of examples) ws.addRow(r);
   columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
