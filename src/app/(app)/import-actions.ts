@@ -29,6 +29,12 @@ export interface ImportSummary {
   mappedColumns?: Record<string, string>;
 }
 
+// Split a COLOR cell into individual colors. Supports comma / semicolon /
+// slash / pipe / newline / period separators so one row can list several
+// colors (e.g. "Black, Blue, Denim" or "Black. Blue. Denim").
+const splitColors = (raw: string): string[] =>
+  raw.split(/[,;/|\n.]+/).map((c) => c.trim()).filter(Boolean);
+
 const EMPTY: ImportSummary = { ok: false, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [] };
 
 async function readUpload(formData: FormData): Promise<Buffer | string> {
@@ -132,7 +138,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           styleNumber: v.styleNumber?.trim() || undefined,
           styleName: v.styleName?.trim() || v.description?.trim() || undefined,
           description: v.description?.trim() || undefined,
-          color: v.color?.trim() || undefined,
+          color: splitColors(v.color ?? "")[0] || undefined,
           size: v.size?.trim() || undefined,
           season: v.season?.trim() || undefined,
           targetCustomer: v.targetCustomer?.trim() || undefined,
@@ -197,54 +203,62 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       // A Received flag marks the one color whose physical sample we got.
       const upc = (v.upc ?? "").trim();
       const size = (v.size ?? "").trim() || "OS";
-      const color = (v.color ?? "").trim();
       const received = ["y", "yes", "true", "1", "x", "received"].includes((v.received ?? "").trim().toLowerCase());
-      if (upc || color) {
+      const colorList = splitColors(v.color ?? "");
+      if (upc || colorList.length > 0) {
         const provided = v.skuCode?.trim();
-        const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
-        const autoSku = code ? `${currentSampleNumber.replace(/[^a-zA-Z0-9]/g, "")}${code}` : null;
-        const skuCode = provided || autoSku;
         const units = v.casePackDefault ? parseInt(v.casePackDefault, 10) || null : null;
+        const base = currentSampleNumber.replace(/[^a-zA-Z0-9]/g, "");
+        // One or many colors in the cell -> a variant each. A single UPC can
+        // only map to a single color, so it's skipped when several are listed.
+        const colorsToAdd = colorList.length > 0 ? colorList : [""];
+        const single = colorsToAdd.length === 1;
+        for (const color of colorsToAdd) {
+          const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
+          const autoSku = code ? `${base}${code}` : null;
+          const skuCode = provided || autoSku;
+          const rowUpc = single ? upc : "";
 
-        let dup = upc ? await prisma.skuVariant.findUnique({ where: { upc } }) : null;
-        if (!dup && color) {
-          dup = await prisma.skuVariant.findFirst({
-            where: {
-              sampleId: currentSampleId,
-              size: { equals: size, mode: "insensitive" },
-              color: { equals: color || "—", mode: "insensitive" },
-            },
-          });
-        }
-        if (dup) {
-          if (dup.sampleId !== currentSampleId) {
-            summary.skipped.push({ row: row.rowNumber, reason: `UPC ${upc} already belongs to another sample` });
-            continue;
+          let dup = rowUpc ? await prisma.skuVariant.findUnique({ where: { upc: rowUpc } }) : null;
+          if (!dup && color) {
+            dup = await prisma.skuVariant.findFirst({
+              where: {
+                sampleId: currentSampleId,
+                size: { equals: size, mode: "insensitive" },
+                color: { equals: color, mode: "insensitive" },
+              },
+            });
           }
-          await prisma.skuVariant.update({
-            where: { id: dup.id },
-            data: {
-              size,
-              color: color || dup.color,
-              upc: upc || dup.upc,
-              skuCode: skuCode ?? dup.skuCode,
-              unitsPerCarton: units ?? dup.unitsPerCarton,
-              ...(received ? { received: true } : {}),
-            },
-          });
-        } else {
-          await prisma.skuVariant.create({
-            data: {
-              sampleId: currentSampleId,
-              upc: upc || null,
-              size,
-              color: color || "—",
-              skuCode: skuCode ?? null,
-              unitsPerCarton: units,
-              received,
-            },
-          });
-          summary.variantsAdded += 1;
+          if (dup) {
+            if (dup.sampleId !== currentSampleId) {
+              summary.skipped.push({ row: row.rowNumber, reason: `UPC ${rowUpc} already belongs to another sample` });
+              continue;
+            }
+            await prisma.skuVariant.update({
+              where: { id: dup.id },
+              data: {
+                size,
+                color: color || dup.color,
+                upc: rowUpc || dup.upc,
+                skuCode: skuCode ?? dup.skuCode,
+                unitsPerCarton: units ?? dup.unitsPerCarton,
+                ...(received ? { received: true } : {}),
+              },
+            });
+          } else {
+            await prisma.skuVariant.create({
+              data: {
+                sampleId: currentSampleId,
+                upc: rowUpc || null,
+                size,
+                color: color || "—",
+                skuCode: skuCode ?? null,
+                unitsPerCarton: units,
+                received,
+              },
+            });
+            summary.variantsAdded += 1;
+          }
         }
         if (received) receivedSampleIds.add(currentSampleId);
       }

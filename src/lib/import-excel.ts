@@ -262,9 +262,9 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
     // ---- One sample family, three colors: repeat the Sample # per color. The
     //      first row carries the sample details; the color rows just need
     //      Sample # + Color (UPC optional -> SKU auto-builds from the color code).
-    ["", "TB26_ACC0052", "Ted Baker", "Duffel", "TB26_ACC0052", "Weekender Duffle", "WEEKENDER DUFFLE", "Black", "ss26", "OS", 22, 60, "", "", "", 0.06, 20, "", "Nylon", "100% Nylon", "", "", "", "", "Y"],
-    ["", "TB26_ACC0052", "", "", "", "", "", "Blue", "", "OS", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
-    ["", "TB26_ACC0052", "", "", "", "", "", "Green", "", "OS", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    // Several colors in ONE cell -> a variant per color, SKU auto-built from the
+    // color code. (You can also put one color per row, repeating the Sample #.)
+    ["", "TB26_ACC0052", "Ted Baker", "Duffel", "TB26_ACC0052", "Weekender Duffle", "WEEKENDER DUFFLE", "Black, Blue, Denim", "ss26", "OS", 22, 60, "", "", "", 0.06, 20, "", "Nylon", "100% Nylon", "", "", "", "", ""],
   ];
   for (const r of examples) ws.addRow(r);
   columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
@@ -295,7 +295,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   // A small note so users know images go in column A, anchored to each row.
   const note = ws.addRow([]);
   ws.getCell(`A${note.number + 1}`).value =
-    "Repeat the Sample # on a new row per color to group SKUs under one sample family; leave UPC blank to auto-build the SKU from the color code. Paste a photo into column A. Headers are matched loosely; extra columns are ignored.";
+    "List several colors in the COLOR cell (e.g. 'Black, Blue, Denim') OR repeat the Sample # one row per color; either way a SKU is created per color, auto-built from the color code when UPC is blank. Paste a photo into column A. Headers are matched loosely; extra columns are ignored.";
   ws.getCell(`A${note.number + 1}`).font = { italic: true, size: 9, color: { argb: "FF888888" } };
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);
