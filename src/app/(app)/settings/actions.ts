@@ -132,7 +132,9 @@ export async function upsertHtsMapping(
   material: string,
   htsCode: string,
   baseDuty?: string,
-  totalTariff?: string,
+  tariff301?: string,
+  tariffIeepa?: string,
+  tariffRecip?: string,
 ): Promise<ActionResult> {
   await assertRole("admin");
   const c = category.trim().toUpperCase();
@@ -140,10 +142,19 @@ export async function upsertHtsMapping(
   const h = htsCode.trim();
   if (!c) return { ok: false, error: "Category is required." };
   if (!h) return { ok: false, error: "HTS code is required." };
+  const b = toDecimal(baseDuty);
+  const t3 = toDecimal(tariff301);
+  const ie = toDecimal(tariffIeepa);
+  const rc = toDecimal(tariffRecip);
+  const comps = [b, t3, ie, rc];
+  const total = comps.some((x) => x !== null)
+    ? new Prisma.Decimal(comps.reduce((sum, x) => sum + (x ? Number(x) : 0), 0))
+    : null;
+  const data = { htsCode: h, baseDuty: b, tariff301: t3, tariffIeepa: ie, tariffRecip: rc, totalTariff: total };
   await prisma.htsMapping.upsert({
     where: { category_material: { category: c, material: m } },
-    update: { htsCode: h, baseDuty: toDecimal(baseDuty), totalTariff: toDecimal(totalTariff) },
-    create: { category: c, material: m, htsCode: h, baseDuty: toDecimal(baseDuty), totalTariff: toDecimal(totalTariff) },
+    update: data,
+    create: { category: c, material: m, ...data },
   });
   revalidatePath("/settings");
   return { ok: true };
@@ -168,6 +179,9 @@ export async function preloadHtsMappings(): Promise<ActionResult> {
         material: r.material,
         htsCode: r.htsCode,
         baseDuty: r.baseDuty != null ? new Prisma.Decimal(r.baseDuty) : null,
+        tariff301: r.tariff301 != null ? new Prisma.Decimal(r.tariff301) : null,
+        tariffIeepa: r.tariffIeepa != null ? new Prisma.Decimal(r.tariffIeepa) : null,
+        tariffRecip: r.tariffRecip != null ? new Prisma.Decimal(r.tariffRecip) : null,
         totalTariff: r.totalTariff != null ? new Prisma.Decimal(r.totalTariff) : null,
       },
     });

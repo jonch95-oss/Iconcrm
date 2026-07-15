@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
-import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook } from "@/lib/import-excel";
+import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
@@ -614,5 +614,30 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
     }
   }
   revalidatePath(`/samples/${sampleId}`);
+  return summary;
+}
+
+
+/** Import/replace color -> code mappings from Excel (admin). */
+export async function importColorCodes(formData: FormData): Promise<ImportSummary> {
+  await assertRole("admin");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+  const parsed = await parseColorCodeWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+  if (!parsed.mappedColumns.color || !parsed.mappedColumns.code) {
+    return { ...EMPTY, error: "Need a Color column and a Code column." };
+  }
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  for (const row of parsed.rows.slice(0, 5000)) {
+    const v = row.values;
+    const color = (v.color ?? "").trim().toUpperCase();
+    const code = (v.code ?? "").trim().toUpperCase();
+    if (!color || !code) { summary.skipped.push({ row: row.rowNumber, reason: "Missing color or code" }); continue; }
+    const existing = await prisma.colorCode.findUnique({ where: { color } });
+    await prisma.colorCode.upsert({ where: { color }, update: { code }, create: { color, code } });
+    if (existing) summary.updated += 1; else summary.created += 1;
+  }
+  revalidatePath("/settings");
   return summary;
 }

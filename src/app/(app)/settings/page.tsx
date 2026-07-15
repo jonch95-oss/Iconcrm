@@ -35,7 +35,18 @@ export default async function SettingsPage() {
     prisma.htsMapping.findMany({ orderBy: [{ category: "asc" }, { material: "asc" }] }).catch(() => [] as { id: string; category: string; material: string; htsCode: string; baseDuty: unknown; totalTariff: unknown }[]),
     prisma.sample.findMany({ where: { category: { not: null } }, select: { category: true, material: true }, distinct: ["category", "material"] }).catch(() => [] as { category: string | null; material: string | null }[]),
   ]);
-  const htsRows: HtsRow[] = htsMappings.map((h) => ({ id: h.id, category: h.category, material: h.material, htsCode: h.htsCode, totalTariff: h.totalTariff != null ? String(h.totalTariff) : "" }));
+  const dec = (x: unknown) => (x != null ? String(x) : "");
+  const htsRows: HtsRow[] = htsMappings.map((h) => ({
+    id: h.id,
+    category: h.category,
+    material: h.material,
+    htsCode: h.htsCode,
+    baseDuty: dec((h as { baseDuty?: unknown }).baseDuty),
+    tariff301: dec((h as { tariff301?: unknown }).tariff301),
+    tariffIeepa: dec((h as { tariffIeepa?: unknown }).tariffIeepa),
+    tariffRecip: dec((h as { tariffRecip?: unknown }).tariffRecip),
+    totalTariff: dec(h.totalTariff),
+  }));
   const resolveHtsForMissing = buildHtsResolver(htsMappings as { category: string; material: string; htsCode: string; totalTariff: number | null }[]);
   const missingHts: { category: string; material: string }[] = [];
   const seenCM = new Set<string>();

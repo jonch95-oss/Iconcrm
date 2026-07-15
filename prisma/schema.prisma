@@ -712,6 +712,9 @@ model HtsMapping {
   material    String // normalized UPPER; "" = any material for the category
   htsCode     String
   baseDuty    Decimal? @db.Decimal(8, 4)
+  tariff301   Decimal? @db.Decimal(8, 4) // Section 301 (China)
+  tariffIeepa Decimal? @db.Decimal(8, 4) // IEEPA / Fentanyl
+  tariffRecip Decimal? @db.Decimal(8, 4) // reciprocal
   totalTariff Decimal? @db.Decimal(8, 4) // effective China rate (fraction, 0.44 = 44%)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

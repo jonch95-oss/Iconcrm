@@ -62,6 +62,9 @@ const STATEMENTS = [
     CONSTRAINT "HtsMapping_pkey" PRIMARY KEY ("id")
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "HtsMapping_category_material_key" ON "HtsMapping"("category","material")`,
+  `ALTER TABLE "HtsMapping" ADD COLUMN IF NOT EXISTS "tariff301" DECIMAL(8,4)`,
+  `ALTER TABLE "HtsMapping" ADD COLUMN IF NOT EXISTS "tariffIeepa" DECIMAL(8,4)`,
+  `ALTER TABLE "HtsMapping" ADD COLUMN IF NOT EXISTS "tariffRecip" DECIMAL(8,4)`,
 ];
 
 const url =

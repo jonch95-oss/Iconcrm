@@ -3,11 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, AlertTriangle, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { upsertColorCode, deleteColorCode } from "./actions";
+import { ExcelImportDialog } from "@/components/excel-import-dialog";
+import { importColorCodes } from "@/app/(app)/import-actions";
 
 export interface ColorCodeRow {
   id: string;
@@ -60,6 +62,17 @@ export function ColorCodeManager({
 
   return (
     <div className="space-y-6">
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" asChild>
+          <a href="/api/settings/color-codes"><Download className="h-4 w-4" /> Export Excel</a>
+        </Button>
+        <ExcelImportDialog
+          title="Import color codes from Excel"
+          description="Upload a sheet with Color and Code columns. Existing colors are updated; new ones added."
+          buttonLabel="Import Excel"
+          onImport={importColorCodes}
+        />
+      </div>
       {missing.length > 0 && (
         <div className="rounded-md border border-[var(--warning)]/40 bg-[var(--warning)]/10 p-3">
           <div className="mb-2 flex items-center gap-2 text-sm font-medium text-[var(--warning)]">

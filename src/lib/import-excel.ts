@@ -207,6 +207,12 @@ const SKU_ALIASES: Record<string, string[]> = {
 };
 export const parseSkuWorkbook = (b: Buffer) => parseWorkbook(b, SKU_ALIASES);
 
+const COLOR_CODE_ALIASES: Record<string, string[]> = {
+  color: ["color", "colour", "colorname", "name"],
+  code: ["code", "abbreviation", "abbr", "abbrev", "short", "colorcode"],
+};
+export const parseColorCodeWorkbook = (b: Buffer) => parseWorkbook(b, COLOR_CODE_ALIASES);
+
 /** Build the downloadable import template (matches the sample-request sheet
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,
  *  STYLE #, DESCRIPTION, COLOR, Season). Each data row is tall enough to hold a
