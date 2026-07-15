@@ -264,9 +264,11 @@ export async function deleteSkuVariant(id: string, sampleId: string): Promise<Ac
  */
 export async function createOrderFormFromSamples(
   sampleIds: string[],
+  variantIds?: string[],
 ): Promise<ActionResult> {
   const user = await assertRole("member");
   if (sampleIds.length === 0) return { ok: false, error: "No samples selected." };
+  const variantFilter = variantIds ? new Set(variantIds) : null;
 
   const samples = await prisma.sample.findMany({
     where: { id: { in: sampleIds } },
@@ -293,9 +295,12 @@ export async function createOrderFormFromSamples(
         createdById: user.id,
       },
     });
+    const includedSampleIds = new Set<string>();
     for (const s of factorySamples) {
-      if (s.skuVariants.length > 0) {
-        for (const variant of s.skuVariants) {
+      // When a variant selection is given, only include the chosen SKUs.
+      const variants = variantFilter ? s.skuVariants.filter((v) => variantFilter.has(v.id)) : s.skuVariants;
+      if (variants.length > 0) {
+        for (const variant of variants) {
           await tx.orderFormLine.create({
             data: {
               orderFormId: orderForm.id,
@@ -307,7 +312,9 @@ export async function createOrderFormFromSamples(
             },
           });
         }
-      } else {
+        includedSampleIds.add(s.id);
+      } else if (s.skuVariants.length === 0) {
+        // Sample has no SKUs at all — add a single base line.
         await tx.orderFormLine.create({
           data: {
             orderFormId: orderForm.id,
@@ -317,10 +324,13 @@ export async function createOrderFormFromSamples(
             currency: s.currency,
           },
         });
+        includedSampleIds.add(s.id);
       }
+      // else: has SKUs but none were selected — skip this sample.
     }
     // Putting a sample on an order form advances it to "On Order Form".
     for (const s of factorySamples) {
+      if (!includedSampleIds.has(s.id)) continue;
       const next = advanceSampleStatus(s.status, "on_order_form");
       if (next !== s.status) await tx.sample.update({ where: { id: s.id }, data: { status: next } });
     }
@@ -584,4 +594,37 @@ export async function requestRevisions(sampleId: string, comment: string): Promi
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
   return { ok: true };
+}
+
+
+export interface VariantPickSample {
+  sampleId: string;
+  sampleNumber: string;
+  styleNumber: string | null;
+  factoryName: string | null;
+  variants: { id: string; size: string; color: string; upc: string; skuCode: string | null }[];
+}
+
+/** Variants of the selected samples, for the order-form variant picker. */
+export async function listVariantsForSamples(sampleIds: string[]): Promise<VariantPickSample[]> {
+  await assertRole("member");
+  if (sampleIds.length === 0) return [];
+  const samples = await prisma.sample.findMany({
+    where: { id: { in: sampleIds } },
+    select: {
+      id: true,
+      sampleNumber: true,
+      styleNumber: true,
+      factory: { select: { name: true } },
+      skuVariants: { orderBy: [{ color: "asc" }, { size: "asc" }], select: { id: true, size: true, color: true, upc: true, skuCode: true } },
+    },
+    orderBy: { sampleNumber: "asc" },
+  });
+  return samples.map((s) => ({
+    sampleId: s.id,
+    sampleNumber: s.sampleNumber,
+    styleNumber: s.styleNumber,
+    factoryName: s.factory?.name ?? null,
+    variants: s.skuVariants,
+  }));
 }

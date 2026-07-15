@@ -19,7 +19,6 @@ import {
   Download,
   Columns3,
   AlertTriangle,
-  FileSpreadsheet,
   Save,
   PackageCheck,
   Trash2,
@@ -56,7 +55,8 @@ import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
 import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
-import { updateSample, createOrderFormFromSamples, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
+import { updateSample, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
+import { CreateOrderFormButton } from "./create-order-form-dialog";
 import { toast } from "sonner";
 
 export interface SampleRow {
@@ -518,24 +518,6 @@ export function SamplesTable({
     URL.revokeObjectURL(url);
   };
 
-  const createOrderForm = () => {
-    if (mixedFactories) {
-      const ok = window.confirm(
-        `You selected samples from ${selectedFactories.length} factories. Order forms are per-factory; only "${selectedRows.find((r) => r.factoryId === selectedFactories[0])?.factoryName}" samples will be included. Continue?`,
-      );
-      if (!ok) return;
-    }
-    startTransition(async () => {
-      const res = await createOrderFormFromSamples(selectedIds);
-      if (res.ok && res.id) {
-        toast.success("Order form created");
-        router.push(`/order-forms/${res.id}`);
-      } else if (!res.ok) {
-        toast.error(res.error);
-      }
-    });
-  };
-
   // Saved filter views (localStorage).
   const [savedViews, setSavedViews] = React.useState<
     { name: string; status: string; factory: string; overdue: boolean }[]
@@ -699,9 +681,7 @@ export function SamplesTable({
             </Badge>
           )}
           {canEdit && (
-            <Button size="sm" onClick={createOrderForm} disabled={pending}>
-              <FileSpreadsheet className="h-4 w-4" /> Create Order Form
-            </Button>
+            <CreateOrderFormButton selectedIds={selectedIds} />
           )}
           {canEdit && (
             <Button
