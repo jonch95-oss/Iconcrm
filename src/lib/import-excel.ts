@@ -198,6 +198,15 @@ export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIA
 export const parseCustomerPoWorkbook = (b: Buffer) => parseWorkbook(b, CUSTOMER_PO_LINE_ALIASES);
 export const parseInventoryWorkbook = (b: Buffer) => parseWorkbook(b, INVENTORY_ALIASES);
 
+const SKU_ALIASES: Record<string, string[]> = {
+  size: ["size", "sz"],
+  color: ["color", "colour", "clr"],
+  upc: ["upc", "barcode", "ean", "gtin", "upccode"],
+  skuCode: ["sku", "skucode", "itemcode", "skunumber"],
+  unitsPerCarton: ["units", "unitspercarton", "casepack", "caseqty", "pack", "unitscarton"],
+};
+export const parseSkuWorkbook = (b: Buffer) => parseWorkbook(b, SKU_ALIASES);
+
 /** Build the downloadable import template (matches the sample-request sheet
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,
  *  STYLE #, DESCRIPTION, COLOR, Season). Each data row is tall enough to hold a

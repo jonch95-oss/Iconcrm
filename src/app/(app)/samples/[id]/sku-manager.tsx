@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addSkuVariant, deleteSkuVariant } from "../actions";
+import { addSkuVariant, deleteSkuVariant, editSkuVariant } from "../actions";
 import { toast } from "sonner";
 
 export interface SkuRow {
@@ -89,11 +89,11 @@ export function SkuManager({
           ) : (
             skus.map((s) => (
               <TableRow key={s.id}>
-                <TableCell>{s.size}</TableCell>
-                <TableCell>{s.color}</TableCell>
-                <TableCell className="font-mono text-xs">{s.upc}</TableCell>
-                <TableCell className="text-xs">{s.skuCode ?? "—"}</TableCell>
-                <TableCell className="tabular-nums">{s.unitsPerCarton ?? "—"}</TableCell>
+                <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="size" value={s.size} canEdit={canEdit} /></TableCell>
+                <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="color" value={s.color} canEdit={canEdit} /></TableCell>
+                <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
+                <TableCell className="text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="skuCode" value={s.skuCode ?? ""} canEdit={canEdit} /></TableCell>
+                <TableCell className="tabular-nums"><EditableSkuCell id={s.id} sampleId={sampleId} field="unitsPerCarton" value={s.unitsPerCarton != null ? String(s.unitsPerCarton) : ""} canEdit={canEdit} numeric /></TableCell>
                 {canEdit && (
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => remove(s.id)} disabled={pending}>
@@ -120,6 +120,74 @@ export function SkuManager({
         </div>
       )}
     </div>
+  );
+}
+
+function EditableSkuCell({
+  id,
+  sampleId,
+  field,
+  value,
+  canEdit,
+  mono,
+  numeric,
+}: {
+  id: string;
+  sampleId: string;
+  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton";
+  value: string;
+  canEdit: boolean;
+  mono?: boolean;
+  numeric?: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [pending, startTransition] = React.useTransition();
+
+  if (!canEdit) {
+    return <span className={mono ? "font-mono text-xs" : ""}>{value || "—"}</span>;
+  }
+
+  const save = (raw: string) => {
+    setEditing(false);
+    if (raw.trim() === value.trim()) return;
+    startTransition(async () => {
+      const res = await editSkuVariant(id, sampleId, field, raw);
+      if (res.ok) {
+        toast.success("Saved");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
+
+  if (editing) {
+    return (
+      <Input
+        autoFocus
+        defaultValue={value}
+        type={numeric ? "number" : "text"}
+        disabled={pending}
+        className="h-7 w-24 text-xs"
+        onBlur={(e) => save(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          else if (e.key === "Escape") setEditing(false);
+        }}
+      />
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      className={`text-left ${mono ? "font-mono text-xs" : ""}`}
+      onClick={() => setEditing(true)}
+      disabled={pending}
+    >
+      {value || <span className="text-[var(--muted-foreground)]">—</span>}
+    </button>
   );
 }
 

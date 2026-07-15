@@ -5,7 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
-import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook } from "@/lib/import-excel";
+import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
@@ -560,5 +560,59 @@ export async function importInventoryCounts(formData: FormData): Promise<ImportS
 
   await logAudit({ entityType: "inventory", entityId: "bulk_count", action: "import_counts", userId: user.id, after: { rows: summary.created, skipped: summary.skipped.length } });
   revalidatePath("/inventory");
+  return summary;
+}
+
+
+/** Import/replace-in-place a sample's SKU rows from a small per-sample sheet. */
+export async function importSkusForSample(sampleId: string, formData: FormData): Promise<ImportSummary> {
+  await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...EMPTY, error: buf };
+  const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { id: true } });
+  if (!sample) return { ...EMPTY, error: "Sample not found." };
+  const parsed = await parseSkuWorkbook(buf);
+  if (parsed.error) return { ...EMPTY, error: parsed.error };
+
+  const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  for (const row of parsed.rows.slice(0, 3000)) {
+    const v = row.values;
+    const size = (v.size ?? "").trim();
+    const color = (v.color ?? "").trim();
+    const upc = (v.upc ?? "").trim();
+    const skuCode = (v.skuCode ?? "").trim() || null;
+    const units = v.unitsPerCarton ? parseInt(v.unitsPerCarton, 10) || null : null;
+    if (!size && !color && !upc) continue;
+
+    let existing = upc ? await prisma.skuVariant.findUnique({ where: { upc } }) : null;
+    if (!existing && (size || color)) {
+      existing = await prisma.skuVariant.findFirst({
+        where: { sampleId, size: { equals: size, mode: "insensitive" }, color: { equals: color, mode: "insensitive" } },
+      });
+    }
+    if (existing) {
+      if (existing.sampleId !== sampleId) {
+        summary.skipped.push({ row: row.rowNumber, reason: `UPC ${upc} belongs to another sample` });
+        continue;
+      }
+      await prisma.skuVariant.update({
+        where: { id: existing.id },
+        data: {
+          size: size || existing.size,
+          color: color || existing.color,
+          upc: upc || existing.upc,
+          skuCode: skuCode ?? existing.skuCode,
+          unitsPerCarton: units ?? existing.unitsPerCarton,
+        },
+      });
+      summary.updated += 1;
+    } else {
+      await prisma.skuVariant.create({
+        data: { sampleId, size: size || "OS", color: color || "—", upc: upc || null, skuCode, unitsPerCarton: units },
+      });
+      summary.created += 1;
+    }
+  }
+  revalidatePath(`/samples/${sampleId}`);
   return summary;
 }

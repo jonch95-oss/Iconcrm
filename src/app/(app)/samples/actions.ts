@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
 import { buildHtsResolver } from "@/lib/hts";
+import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
 import {
@@ -706,4 +707,34 @@ export async function bulkAddVariantsByColor(
   await logAudit({ entityType: "sample", entityId: sampleId, action: "bulk_skus_by_color", userId: (await assertRole("member")).id, after: { created } });
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true, created, skippedExisting, missingCodes: [...missingCodes].sort() };
+}
+
+
+export async function editSkuVariant(
+  id: string,
+  sampleId: string,
+  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton",
+  value: string,
+): Promise<ActionResult> {
+  await assertRole("member");
+  const v = value.trim();
+  let data: Prisma.SkuVariantUpdateInput;
+  if (field === "unitsPerCarton") {
+    data = { unitsPerCarton: v ? parseInt(v, 10) || null : null };
+  } else if (field === "upc") {
+    if (v) {
+      const dup = await prisma.skuVariant.findUnique({ where: { upc: v }, select: { id: true } });
+      if (dup && dup.id !== id) return { ok: false, error: `UPC ${v} already exists.` };
+    }
+    data = { upc: v || null };
+  } else if (field === "skuCode") {
+    data = { skuCode: v || null };
+  } else if (field === "size") {
+    data = { size: v || "OS" };
+  } else {
+    data = { color: v || "—" };
+  }
+  await prisma.skuVariant.update({ where: { id }, data });
+  revalidatePath(`/samples/${sampleId}`);
+  return { ok: true };
 }

@@ -18,6 +18,7 @@ import { RequestRevisionsButton } from "./request-revisions-button";
 import { CommentForm } from "./comment-form";
 import { SkuManager } from "./sku-manager";
 import { BulkAddSkus } from "./bulk-add-skus";
+import { SkuIoButtons } from "./sku-io-buttons";
 import { AlertTriangle, Paperclip } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -245,6 +246,7 @@ export default async function SampleDetailPage({
 
               <TabsContent value="skus" className="pt-3">
                 {canEdit && <BulkAddSkus sampleId={sample.id} />}
+                {canEdit && <SkuIoButtons sampleId={sample.id} />}
                 <SkuManager
                   sampleId={sample.id}
                   canEdit={canEdit}
