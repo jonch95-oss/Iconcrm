@@ -303,6 +303,7 @@ model SkuVariant {
   upc             String? @unique // UPC lives at size/color level; issued after the SKU
   skuCode         String?
   unitsPerCarton  Int?
+  received        Boolean @default(false) // did we receive this color's physical sample
 
   orderFormLines   OrderFormLine[]
   piLines          PILine[]

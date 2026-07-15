@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
+import { advanceSampleStatus } from "@/lib/status";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
@@ -94,6 +95,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     .findMany({ select: { category: true, material: true, htsCode: true, totalTariff: true } })
     .catch(() => [] as { category: string; material: string; htsCode: string; totalTariff: unknown }[]);
   const resolveHts = buildHtsResolver(htsRows as { category: string; material: string; htsCode: string; totalTariff: number | null }[]);
+
+  // Color codes for SKU auto-generation, and which samples had a color received.
+  const colorCodeRows = await prisma.colorCode.findMany().catch(() => [] as { color: string; code: string }[]);
+  const colorCodeMap = new Map(colorCodeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
+  const receivedSampleIds = new Set<string>();
 
   for (const row of parsed.rows.slice(0, 2000)) {
     const v = row.values;
@@ -185,42 +191,62 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       }
       rowToSample.set(row.rowNumber, currentSampleId);
 
-      // Variant on this row?
+      // SKU variant for this row: any row with a color (or UPC) becomes a
+      // variant grouped under this sample family (repeat the Sample # per color).
+      // UPC is optional — the SKU auto-builds from the color code when absent.
+      // A Received flag marks the one color whose physical sample we got.
       const upc = (v.upc ?? "").trim();
-      const size = (v.size ?? "").trim();
+      const size = (v.size ?? "").trim() || "OS";
       const color = (v.color ?? "").trim();
-      // A SKU variant is only meaningful when there's a UPC to key it on.
-      // Size/color without a UPC (e.g. one-size handbags) is captured on the
-      // sample itself above, so it's not treated as a missing-UPC error.
-      if (upc) {
-        const dup = await prisma.skuVariant.findUnique({ where: { upc } });
+      const received = ["y", "yes", "true", "1", "x", "received"].includes((v.received ?? "").trim().toLowerCase());
+      if (upc || color) {
+        const provided = v.skuCode?.trim();
+        const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
+        const autoSku = code ? `${currentSampleNumber.replace(/[^a-zA-Z0-9]/g, "")}${code}` : null;
+        const skuCode = provided || autoSku;
+        const units = v.casePackDefault ? parseInt(v.casePackDefault, 10) || null : null;
+
+        let dup = upc ? await prisma.skuVariant.findUnique({ where: { upc } }) : null;
+        if (!dup && color) {
+          dup = await prisma.skuVariant.findFirst({
+            where: {
+              sampleId: currentSampleId,
+              size: { equals: size, mode: "insensitive" },
+              color: { equals: color || "—", mode: "insensitive" },
+            },
+          });
+        }
         if (dup) {
           if (dup.sampleId !== currentSampleId) {
             summary.skipped.push({ row: row.rowNumber, reason: `UPC ${upc} already belongs to another sample` });
             continue;
           }
-          // Same sample: bulk-update the variant's details from the sheet.
           await prisma.skuVariant.update({
             where: { id: dup.id },
             data: {
-              size: size || dup.size,
+              size,
               color: color || dup.color,
-              skuCode: v.skuCode?.trim() || dup.skuCode,
+              upc: upc || dup.upc,
+              skuCode: skuCode ?? dup.skuCode,
+              unitsPerCarton: units ?? dup.unitsPerCarton,
+              ...(received ? { received: true } : {}),
             },
           });
-          continue;
+        } else {
+          await prisma.skuVariant.create({
+            data: {
+              sampleId: currentSampleId,
+              upc: upc || null,
+              size,
+              color: color || "—",
+              skuCode: skuCode ?? null,
+              unitsPerCarton: units,
+              received,
+            },
+          });
+          summary.variantsAdded += 1;
         }
-        await prisma.skuVariant.create({
-          data: {
-            sampleId: currentSampleId,
-            upc,
-            size: size || "OS",
-            color: color || "—",
-            skuCode: v.skuCode?.trim() || null,
-            unitsPerCarton: v.casePackDefault ? parseInt(v.casePackDefault, 10) || null : null,
-          },
-        });
-        summary.variantsAdded += 1;
+        if (received) receivedSampleIds.add(currentSampleId);
       }
     } catch (err) {
       summary.skipped.push({
@@ -228,6 +254,19 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         reason: err instanceof Error ? err.message.split("\n")[0].slice(0, 120) : "Unknown error",
       });
     }
+  }
+
+  // Any sample with a color marked received advances to Sample Received.
+  for (const sid of receivedSampleIds) {
+    const sm = await prisma.sample.findUnique({ where: { id: sid }, select: { status: true, sampleReceivedDate: true } });
+    if (!sm) continue;
+    await prisma.sample.update({
+      where: { id: sid },
+      data: {
+        status: advanceSampleStatus(sm.status, "sample_received"),
+        sampleReceivedDate: sm.sampleReceivedDate ?? new Date(),
+      },
+    });
   }
 
   // Live ETAs for any tracking numbers in the file (best-effort, parallel,
@@ -569,18 +608,25 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
   await assertRole("member");
   const buf = await readUpload(formData);
   if (typeof buf === "string") return { ...EMPTY, error: buf };
-  const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { id: true } });
+  const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { id: true, sampleNumber: true } });
   if (!sample) return { ...EMPTY, error: "Sample not found." };
   const parsed = await parseSkuWorkbook(buf);
   if (parsed.error) return { ...EMPTY, error: parsed.error };
 
   const summary: ImportSummary = { ok: true, created: 0, updated: 0, variantsAdded: 0, photosAdded: 0, skipped: [], mappedColumns: parsed.mappedColumns };
+  const ccRows = await prisma.colorCode.findMany().catch(() => [] as { color: string; code: string }[]);
+  const ccMap = new Map(ccRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
+  const base = sample.sampleNumber.replace(/[^a-zA-Z0-9]/g, "");
+  let anyReceived = false;
   for (const row of parsed.rows.slice(0, 3000)) {
     const v = row.values;
     const size = (v.size ?? "").trim();
     const color = (v.color ?? "").trim();
     const upc = (v.upc ?? "").trim();
-    const skuCode = (v.skuCode ?? "").trim() || null;
+    const receivedRow = ["y", "yes", "true", "1", "x", "received"].includes((v.received ?? "").trim().toLowerCase());
+    if (receivedRow) anyReceived = true;
+    const code = color ? ccMap.get(color.toUpperCase()) : undefined;
+    const skuCode = (v.skuCode ?? "").trim() || (code ? `${base}${code}` : null);
     const units = v.unitsPerCarton ? parseInt(v.unitsPerCarton, 10) || null : null;
     if (!size && !color && !upc) continue;
 
@@ -603,14 +649,24 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
           upc: upc || existing.upc,
           skuCode: skuCode ?? existing.skuCode,
           unitsPerCarton: units ?? existing.unitsPerCarton,
+          ...(receivedRow ? { received: true } : {}),
         },
       });
       summary.updated += 1;
     } else {
       await prisma.skuVariant.create({
-        data: { sampleId, size: size || "OS", color: color || "—", upc: upc || null, skuCode, unitsPerCarton: units },
+        data: { sampleId, size: size || "OS", color: color || "—", upc: upc || null, skuCode, unitsPerCarton: units, received: receivedRow },
       });
       summary.created += 1;
+    }
+  }
+  if (anyReceived) {
+    const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
+    if (sm) {
+      await prisma.sample.update({
+        where: { id: sampleId },
+        data: { status: advanceSampleStatus(sm.status, "sample_received"), sampleReceivedDate: sm.sampleReceivedDate ?? new Date() },
+      });
     }
   }
   revalidatePath(`/samples/${sampleId}`);

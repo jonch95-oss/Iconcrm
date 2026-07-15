@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addSkuVariant, deleteSkuVariant, editSkuVariant } from "../actions";
+import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived } from "../actions";
 import { toast } from "sonner";
 
 export interface SkuRow {
@@ -23,6 +24,7 @@ export interface SkuRow {
   upc: string;
   skuCode: string | null;
   unitsPerCarton: number | null;
+  received: boolean;
 }
 
 export function SkuManager({
@@ -66,6 +68,14 @@ export function SkuManager({
     });
   };
 
+  const toggleReceived = (id: string, received: boolean) => {
+    startTransition(async () => {
+      const r = await toggleSkuReceived(id, sampleId, received);
+      if (r.ok) router.refresh();
+      else toast.error(r.error);
+    });
+  };
+
   return (
     <div className="space-y-3">
       <Table>
@@ -76,13 +86,14 @@ export function SkuManager({
             <TableHead>UPC</TableHead>
             <TableHead>SKU code</TableHead>
             <TableHead>Units/carton</TableHead>
+            <TableHead>Received</TableHead>
             {canEdit && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 6 : 5} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 7 : 6} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
@@ -94,6 +105,9 @@ export function SkuManager({
                 <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
                 <TableCell className="text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="skuCode" value={s.skuCode ?? ""} canEdit={canEdit} /></TableCell>
                 <TableCell className="tabular-nums"><EditableSkuCell id={s.id} sampleId={sampleId} field="unitsPerCarton" value={s.unitsPerCarton != null ? String(s.unitsPerCarton) : ""} canEdit={canEdit} numeric /></TableCell>
+                <TableCell>
+                  <Checkbox checked={s.received} disabled={!canEdit || pending} onCheckedChange={(v) => toggleReceived(s.id, !!v)} />
+                </TableCell>
                 {canEdit && (
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => remove(s.id)} disabled={pending}>

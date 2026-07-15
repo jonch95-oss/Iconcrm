@@ -42,6 +42,7 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   casePackDefault: ["casepack", "caseqty", "unitspercarton", "casepk", "pack"],
   trackingNumber: ["tracking", "trackingno", "trackingnumber", "trackingid", "awb", "airwaybill", "waybill"],
   trackingCarrier: ["carrier", "courier", "shipvia", "shippedvia"],
+  received: ["received", "rcvd", "recd", "samplereceived", "got", "inhouse"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {
@@ -204,6 +205,7 @@ const SKU_ALIASES: Record<string, string[]> = {
   upc: ["upc", "barcode", "ean", "gtin", "upccode"],
   skuCode: ["sku", "skucode", "itemcode", "skunumber"],
   unitsPerCarton: ["units", "unitspercarton", "casepack", "caseqty", "pack", "unitscarton"],
+  received: ["received", "rcvd", "recd", "samplereceived"],
 };
 export const parseSkuWorkbook = (b: Buffer) => parseWorkbook(b, SKU_ALIASES);
 
@@ -249,6 +251,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
     { header: "Target Customer", width: 18 },
     { header: "UPC", width: 16 },
     { header: "SKU Code", width: 14 },
+    { header: "Received", width: 10 },
   ];
   ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };
@@ -286,7 +289,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   // A small note so users know images go in column A, anchored to each row.
   const note = ws.addRow([]);
   ws.getCell(`A${note.number + 1}`).value =
-    "Paste a product photo into column A on each style's row. Headers are matched loosely; extra columns are ignored.";
+    "Repeat the Sample # on a new row per color to group SKUs under one sample family; leave UPC blank to auto-build the SKU from the color code. Paste a photo into column A. Headers are matched loosely; extra columns are ignored.";
   ws.getCell(`A${note.number + 1}`).font = { italic: true, size: 9, color: { argb: "FF888888" } };
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);

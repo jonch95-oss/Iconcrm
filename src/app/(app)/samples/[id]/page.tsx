@@ -257,6 +257,7 @@ export default async function SampleDetailPage({
                     upc: s.upc ?? "",
                     skuCode: s.skuCode,
                     unitsPerCarton: s.unitsPerCarton,
+                    received: s.received,
                   }))}
                 />
               </TabsContent>

@@ -738,3 +738,20 @@ export async function editSkuVariant(
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true };
 }
+
+
+export async function toggleSkuReceived(id: string, sampleId: string, received: boolean): Promise<ActionResult> {
+  await assertRole("member");
+  await prisma.skuVariant.update({ where: { id }, data: { received } });
+  if (received) {
+    const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
+    if (sm) {
+      await prisma.sample.update({
+        where: { id: sampleId },
+        data: { status: advanceSampleStatus(sm.status, "sample_received"), sampleReceivedDate: sm.sampleReceivedDate ?? new Date() },
+      });
+    }
+  }
+  revalidatePath(`/samples/${sampleId}`);
+  return { ok: true };
+}

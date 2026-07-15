@@ -34,7 +34,7 @@ export async function GET(request: Request) {
     "Image", "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code",
+    "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code", "Received",
   ];
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       firstRow = ws.addRow([...base, s.size ?? "", "", "", ""]).number;
     } else {
       s.skuVariants.forEach((v, i) => {
-        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? ""]).number;
+        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.received ? "Y" : ""]).number;
         if (i === 0) firstRow = r;
       });
     }

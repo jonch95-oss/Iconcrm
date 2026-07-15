@@ -13,16 +13,16 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     where: { id },
     select: {
       sampleNumber: true,
-      skuVariants: { orderBy: [{ color: "asc" }, { size: "asc" }], select: { size: true, color: true, upc: true, skuCode: true, unitsPerCarton: true } },
+      skuVariants: { orderBy: [{ color: "asc" }, { size: "asc" }], select: { size: true, color: true, upc: true, skuCode: true, unitsPerCarton: true, received: true } },
     },
   });
   if (!sample) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("SKUs");
-  ws.addRow(["Size", "Color", "UPC", "SKU Code", "Units/Carton"]);
+  ws.addRow(["Size", "Color", "UPC", "SKU Code", "Units/Carton", "Received"]);
   ws.getRow(1).font = { bold: true };
-  for (const v of sample.skuVariants) ws.addRow([v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.unitsPerCarton ?? ""]);
+  for (const v of sample.skuVariants) ws.addRow([v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.unitsPerCarton ?? "", v.received ? "Y" : ""]);
   ws.columns.forEach((c) => (c.width = 16));
 
   const buf = await wb.xlsx.writeBuffer();
