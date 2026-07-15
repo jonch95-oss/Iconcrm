@@ -103,7 +103,7 @@ export default async function PiDetailPage({
   const samples: PiSampleOption[] = factorySamples.map((s) => ({
     id: s.id,
     sampleNumber: s.sampleNumber,
-    skus: s.skuVariants.map((v) => ({ id: v.id, label: `${v.size}/${v.color} · ${v.upc}` })),
+    skus: s.skuVariants.map((v) => ({ id: v.id, label: `${v.size}/${v.color} · ${v.upc ?? ""}` })),
   }));
 
   const canEdit = hasRole(user.role, "member");

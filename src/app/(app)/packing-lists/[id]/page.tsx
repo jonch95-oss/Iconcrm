@@ -56,7 +56,7 @@ export default async function PackingListDetailPage({
     if (l.skuVariant) skuLabel.set(l.skuVariant.id, `${l.sample?.sampleNumber ?? ""} ${l.skuVariant.size}/${l.skuVariant.color}`.trim());
   }
   for (const l of pl.lines) {
-    if (l.skuVariant) skuLabel.set(l.skuVariant.id, `${l.skuVariant.size}/${l.skuVariant.color} · ${l.skuVariant.upc}`);
+    if (l.skuVariant) skuLabel.set(l.skuVariant.id, `${l.skuVariant.size}/${l.skuVariant.color} · ${l.skuVariant.upc ?? ""}`);
   }
 
   const progressPct = result.totalPi > 0 ? Math.min(100, Math.round((result.totalShipped / result.totalPi) * 100)) : 0;
@@ -72,7 +72,7 @@ export default async function PackingListDetailPage({
   // SKU options for adding lines = all SKUs that appear on the PI.
   const skuOptions: SkuOption[] = pl.pi.lines
     .filter((l) => l.skuVariant)
-    .map((l) => ({ id: l.skuVariant!.id, label: `${l.sample?.sampleNumber ?? ""} ${l.skuVariant!.size}/${l.skuVariant!.color} · ${l.skuVariant!.upc}` }));
+    .map((l) => ({ id: l.skuVariant!.id, label: `${l.sample?.sampleNumber ?? ""} ${l.skuVariant!.size}/${l.skuVariant!.color} · ${l.skuVariant!.upc ?? ""}` }));
 
   const canEdit = hasRole(user.role, "member");
 

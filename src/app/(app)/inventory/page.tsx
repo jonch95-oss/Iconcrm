@@ -45,7 +45,7 @@ export default async function InventoryPage() {
       style: s.sample?.styleNumber ?? s.sample?.sampleNumber ?? "—",
       size: s.size,
       color: s.color,
-      upc: s.upc,
+      upc: s.upc ?? "",
       onHand: onHandBySku.get(s.id) ?? 0,
     }))
     .sort((a, b) => a.style.localeCompare(b.style) || a.size.localeCompare(b.size));

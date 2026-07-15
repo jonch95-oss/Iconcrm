@@ -17,6 +17,7 @@ import { SampleActions } from "./sample-actions";
 import { RequestRevisionsButton } from "./request-revisions-button";
 import { CommentForm } from "./comment-form";
 import { SkuManager } from "./sku-manager";
+import { BulkAddSkus } from "./bulk-add-skus";
 import { AlertTriangle, Paperclip } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -242,6 +243,7 @@ export default async function SampleDetailPage({
               </TabsList>
 
               <TabsContent value="skus" className="pt-3">
+                {canEdit && <BulkAddSkus sampleId={sample.id} />}
                 <SkuManager
                   sampleId={sample.id}
                   canEdit={canEdit}
@@ -249,7 +251,7 @@ export default async function SampleDetailPage({
                     id: s.id,
                     size: s.size,
                     color: s.color,
-                    upc: s.upc,
+                    upc: s.upc ?? "",
                     skuCode: s.skuCode,
                     unitsPerCarton: s.unitsPerCarton,
                   }))}

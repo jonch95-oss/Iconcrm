@@ -299,7 +299,7 @@ model SkuVariant {
   sample          Sample  @relation(fields: [sampleId], references: [id], onDelete: Cascade)
   size            String
   color           String
-  upc             String  @unique // UPC lives at size/color level
+  upc             String? @unique // UPC lives at size/color level; issued after the SKU
   skuCode         String?
   unitsPerCarton  Int?
 

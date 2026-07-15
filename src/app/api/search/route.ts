@@ -73,7 +73,7 @@ export async function GET(req: NextRequest) {
     })),
     ...skus.map((s) => ({
       type: "UPC",
-      label: s.upc,
+      label: s.upc ?? "",
       sub: s.sample?.sampleNumber ?? "",
       href: `/samples/${s.sampleId}`,
     })),

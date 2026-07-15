@@ -602,7 +602,7 @@ export interface VariantPickSample {
   sampleNumber: string;
   styleNumber: string | null;
   factoryName: string | null;
-  variants: { id: string; size: string; color: string; upc: string; skuCode: string | null }[];
+  variants: { id: string; size: string; color: string; upc: string | null; skuCode: string | null }[];
 }
 
 /** Variants of the selected samples, for the order-form variant picker. */
@@ -627,4 +627,59 @@ export async function listVariantsForSamples(sampleIds: string[]): Promise<Varia
     factoryName: s.factory?.name ?? null,
     variants: s.skuVariants,
   }));
+}
+
+
+/**
+ * Bulk-issue SKUs by color for one sample. For each color x size it creates a
+ * variant with an auto-generated SKU (sample # with non-alphanumerics stripped
+ * + the color's code, e.g. TB26_ACC0052 + BLK -> TB26ACC0052BLK). UPCs are left
+ * blank to be filled in later. Existing size/color combos are skipped, and any
+ * colors without a code mapping are reported so their SKU can be filled once a
+ * code is added in Settings.
+ */
+export async function bulkAddVariantsByColor(
+  sampleId: string,
+  sizes: string[],
+  colors: string[],
+): Promise<{ ok: boolean; created?: number; skippedExisting?: number; missingCodes?: string[]; error?: string }> {
+  await assertRole("member");
+  const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { id: true, sampleNumber: true } });
+  if (!sample) return { ok: false, error: "Sample not found." };
+
+  const cleanSizes = [...new Set(sizes.map((x) => x.trim()).filter(Boolean))];
+  const cleanColors = [...new Set(colors.map((x) => x.trim()).filter(Boolean))];
+  if (cleanSizes.length === 0) cleanSizes.push("OS");
+  if (cleanColors.length === 0) return { ok: false, error: "Add at least one color." };
+
+  const base = sample.sampleNumber.replace(/[^a-zA-Z0-9]/g, "");
+  const codeRows = await prisma.colorCode.findMany();
+  const codeMap = new Map(codeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
+
+  const existing = await prisma.skuVariant.findMany({ where: { sampleId }, select: { size: true, color: true } });
+  const existsKey = new Set(existing.map((v) => `${v.size.trim().toUpperCase()}|${v.color.trim().toUpperCase()}`));
+
+  let created = 0;
+  let skippedExisting = 0;
+  const missingCodes = new Set<string>();
+
+  for (const color of cleanColors) {
+    const code = codeMap.get(color.toUpperCase());
+    if (!code) missingCodes.add(color.toUpperCase());
+    const skuCode = code ? `${base}${code}` : null;
+    for (const size of cleanSizes) {
+      const key = `${size.toUpperCase()}|${color.toUpperCase()}`;
+      if (existsKey.has(key)) {
+        skippedExisting += 1;
+        continue;
+      }
+      existsKey.add(key);
+      await prisma.skuVariant.create({ data: { sampleId, size, color, upc: null, skuCode } });
+      created += 1;
+    }
+  }
+
+  await logAudit({ entityType: "sample", entityId: sampleId, action: "bulk_skus_by_color", userId: (await assertRole("member")).id, after: { created } });
+  revalidatePath(`/samples/${sampleId}`);
+  return { ok: true, created, skippedExisting, missingCodes: [...missingCodes].sort() };
 }

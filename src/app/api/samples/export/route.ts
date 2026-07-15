@@ -59,7 +59,7 @@ export async function GET(request: Request) {
       firstRow = ws.addRow([...base, s.size ?? "", "", "", ""]).number;
     } else {
       s.skuVariants.forEach((v, i) => {
-        const r = ws.addRow([...base, v.size, v.color, v.upc, v.skuCode ?? ""]).number;
+        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? ""]).number;
         if (i === 0) firstRow = r;
       });
     }
