@@ -31,7 +31,7 @@ export async function GET(request: Request) {
   wb.creator = "ICON LUXURY GROUP";
   const ws = wb.addWorksheet("Samples");
   const header = [
-    "Image", "Sample #", "Brand", "Category", "Style #", "Style Name", "Description",
+    "Image", "Sample #", "Brand", "Category", "Season", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
     "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code", "Received",
@@ -47,7 +47,7 @@ export async function GET(request: Request) {
   for (const s of samples) {
     const base = [
       "", // image column A (photo embedded separately)
-      s.sampleNumber, s.brand ?? "", s.category ?? "", s.styleNumber ?? "",
+      s.sampleNumber, s.brand ?? "", s.category ?? "", s.season ?? "", s.styleNumber ?? "",
       s.styleName ?? "", s.description ?? "",
       num(s.fobCost), num(s.customerSellPrice), num(s.dutyRatePercent),
       num(s.freightPerUnit), num(s.inlandPerUnit),

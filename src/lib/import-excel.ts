@@ -258,7 +258,13 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
   const examples = [
     ["", "", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
     ["", "", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
+    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", "", ""],
+    // ---- One sample family, three colors: repeat the Sample # per color. The
+    //      first row carries the sample details; the color rows just need
+    //      Sample # + Color (UPC optional -> SKU auto-builds from the color code).
+    ["", "TB26_ACC0052", "Ted Baker", "Duffel", "TB26_ACC0052", "Weekender Duffle", "WEEKENDER DUFFLE", "Black", "ss26", "OS", 22, 60, "", "", "", 0.06, 20, "", "Nylon", "100% Nylon", "", "", "", "", "Y"],
+    ["", "TB26_ACC0052", "", "", "", "", "", "Blue", "", "OS", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
+    ["", "TB26_ACC0052", "", "", "", "", "", "Green", "", "OS", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""],
   ];
   for (const r of examples) ws.addRow(r);
   columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
