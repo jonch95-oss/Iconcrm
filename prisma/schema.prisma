@@ -705,3 +705,16 @@ model ColorCode {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
+
+model HtsMapping {
+  id          String   @id @default(cuid())
+  category    String // normalized UPPER
+  material    String // normalized UPPER; "" = any material for the category
+  htsCode     String
+  baseDuty    Decimal? @db.Decimal(8, 4)
+  totalTariff Decimal? @db.Decimal(8, 4) // effective China rate (fraction, 0.44 = 44%)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([category, material])
+}

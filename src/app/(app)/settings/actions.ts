@@ -5,6 +5,8 @@ import { z } from "zod";
 import { assertRole } from "@/lib/session";
 import { updateSettings } from "@/lib/settings";
 import { prisma } from "@/lib/db";
+import { toDecimal } from "@/lib/money";
+import { Prisma } from "@prisma/client";
 import type { Role } from "@prisma/client";
 import { logAudit } from "@/lib/audit";
 import { isOwner } from "@/lib/owner";
@@ -120,6 +122,56 @@ export async function deleteColorCode(id: string): Promise<ActionResult> {
   const existing = await prisma.colorCode.findUnique({ where: { id } });
   await prisma.colorCode.delete({ where: { id } });
   if (existing) await logAudit({ entityType: "color_code", entityId: existing.color, action: "deleted", userId: user.id });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+
+export async function upsertHtsMapping(
+  category: string,
+  material: string,
+  htsCode: string,
+  baseDuty?: string,
+  totalTariff?: string,
+): Promise<ActionResult> {
+  await assertRole("admin");
+  const c = category.trim().toUpperCase();
+  const m = material.trim().toUpperCase();
+  const h = htsCode.trim();
+  if (!c) return { ok: false, error: "Category is required." };
+  if (!h) return { ok: false, error: "HTS code is required." };
+  await prisma.htsMapping.upsert({
+    where: { category_material: { category: c, material: m } },
+    update: { htsCode: h, baseDuty: toDecimal(baseDuty), totalTariff: toDecimal(totalTariff) },
+    create: { category: c, material: m, htsCode: h, baseDuty: toDecimal(baseDuty), totalTariff: toDecimal(totalTariff) },
+  });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function deleteHtsMapping(id: string): Promise<ActionResult> {
+  await assertRole("admin");
+  await prisma.htsMapping.delete({ where: { id } });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
+export async function preloadHtsMappings(): Promise<ActionResult> {
+  await assertRole("admin");
+  const { HTS_SEED } = await import("@/lib/hts-seed");
+  for (const r of HTS_SEED) {
+    await prisma.htsMapping.upsert({
+      where: { category_material: { category: r.category, material: r.material } },
+      update: {}, // don't clobber edits on re-run
+      create: {
+        category: r.category,
+        material: r.material,
+        htsCode: r.htsCode,
+        baseDuty: r.baseDuty != null ? new Prisma.Decimal(r.baseDuty) : null,
+        totalTariff: r.totalTariff != null ? new Prisma.Decimal(r.totalTariff) : null,
+      },
+    });
+  }
   revalidatePath("/settings");
   return { ok: true };
 }

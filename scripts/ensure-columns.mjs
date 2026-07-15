@@ -50,6 +50,18 @@ const STATEMENTS = [
     CONSTRAINT "ColorCode_pkey" PRIMARY KEY ("id")
   )`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "ColorCode_color_key" ON "ColorCode"("color")`,
+  `CREATE TABLE IF NOT EXISTS "HtsMapping" (
+    "id" TEXT NOT NULL,
+    "category" TEXT NOT NULL,
+    "material" TEXT NOT NULL DEFAULT '',
+    "htsCode" TEXT NOT NULL,
+    "baseDuty" DECIMAL(8,4),
+    "totalTariff" DECIMAL(8,4),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT "HtsMapping_pkey" PRIMARY KEY ("id")
+  )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "HtsMapping_category_material_key" ON "HtsMapping"("category","material")`,
 ];
 
 const url =

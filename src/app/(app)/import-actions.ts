@@ -6,6 +6,7 @@ import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook } from "@/lib/import-excel";
+import { buildHtsResolver } from "@/lib/hts";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
@@ -88,6 +89,12 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   // upload date (overridable later per sample).
   const importEta = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
 
+  // HTS auto-fill: category + material -> HTS (+ effective duty), always applied.
+  const htsRows = await prisma.htsMapping
+    .findMany({ select: { category: true, material: true, htsCode: true, totalTariff: true } })
+    .catch(() => [] as { category: string; material: string; htsCode: string; totalTariff: unknown }[]);
+  const resolveHts = buildHtsResolver(htsRows as { category: string; material: string; htsCode: string; totalTariff: number | null }[]);
+
   for (const row of parsed.rows.slice(0, 2000)) {
     const v = row.values;
     // Key on Sample # when present; otherwise fall back to STYLE # so
@@ -139,6 +146,13 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             : undefined,
           factoryId,
         };
+
+        // Always set HTS (+ effective duty) from the mapping when it resolves.
+        const htsHit = resolveHts(fields.category, fields.material);
+        if (htsHit) {
+          fields.htsCode = htsHit.htsCode;
+          if (htsHit.totalTariff != null) fields.dutyRatePercent = toDecimal(htsHit.totalTariff * 100) ?? undefined;
+        }
 
         const existing = await prisma.sample.findUnique({ where: { sampleNumber } });
         if (existing) {

@@ -7,6 +7,8 @@ import { getSettings } from "@/lib/settings";
 import { SettingsForm } from "./settings-form";
 import { UserManager, type UserRow } from "./user-manager";
 import { ColorCodeManager, type ColorCodeRow } from "./color-code-manager";
+import { HtsMappingManager, type HtsRow } from "./hts-mapping-manager";
+import { buildHtsResolver } from "@/lib/hts";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +31,24 @@ export default async function SettingsPage() {
   for (const s2 of sampleColors) if (s2.color?.trim()) usedColors.add(s2.color.trim().toUpperCase());
   const missingColors = [...usedColors].filter((c) => c && c !== "—" && !mapped.has(c)).sort();
 
+  const [htsMappings, catMat] = await Promise.all([
+    prisma.htsMapping.findMany({ orderBy: [{ category: "asc" }, { material: "asc" }] }).catch(() => [] as { id: string; category: string; material: string; htsCode: string; baseDuty: unknown; totalTariff: unknown }[]),
+    prisma.sample.findMany({ where: { category: { not: null } }, select: { category: true, material: true }, distinct: ["category", "material"] }).catch(() => [] as { category: string | null; material: string | null }[]),
+  ]);
+  const htsRows: HtsRow[] = htsMappings.map((h) => ({ id: h.id, category: h.category, material: h.material, htsCode: h.htsCode, totalTariff: h.totalTariff != null ? String(h.totalTariff) : "" }));
+  const resolveHtsForMissing = buildHtsResolver(htsMappings as { category: string; material: string; htsCode: string; totalTariff: number | null }[]);
+  const missingHts: { category: string; material: string }[] = [];
+  const seenCM = new Set<string>();
+  for (const cm of catMat) {
+    const cat = (cm.category ?? "").trim();
+    if (!cat) continue;
+    const mat = (cm.material ?? "").trim();
+    const key = `${cat.toUpperCase()}|${mat.toUpperCase()}`;
+    if (seenCM.has(key)) continue;
+    seenCM.add(key);
+    if (!resolveHtsForMissing(cat, mat)) missingHts.push({ category: cat, material: mat });
+  }
+
   const userRows: UserRow[] = users.map((u) => ({
     id: u.id,
     email: u.email,
@@ -45,6 +65,7 @@ export default async function SettingsPage() {
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="users">Users &amp; Roles</TabsTrigger>
           <TabsTrigger value="colors">Color Codes</TabsTrigger>
+          <TabsTrigger value="hts">HTS Codes</TabsTrigger>
         </TabsList>
         <TabsContent value="general" className="pt-4">
           <Card>
@@ -67,6 +88,14 @@ export default async function SettingsPage() {
             <CardHeader><CardTitle>Color codes (for SKU generation)</CardTitle></CardHeader>
             <CardContent>
               <ColorCodeManager codes={codeRows} missing={missingColors} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+        <TabsContent value="hts" className="pt-4">
+          <Card>
+            <CardHeader><CardTitle>HTS codes (category + material → HTS &amp; duty)</CardTitle></CardHeader>
+            <CardContent>
+              <HtsMappingManager rows={htsRows} missing={missingHts} />
             </CardContent>
           </Card>
         </TabsContent>

@@ -6,6 +6,7 @@ import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
+import { buildHtsResolver } from "@/lib/hts";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
 import {
@@ -16,6 +17,19 @@ import {
 } from "@/lib/validation";
 
 type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
+
+async function htsForSample(
+  category?: string | null,
+  material?: string | null,
+): Promise<{ htsCode: string; dutyPercent: number | null } | null> {
+  if (!(category ?? "").trim()) return null;
+  const rows = await prisma.htsMapping
+    .findMany({ select: { category: true, material: true, htsCode: true, totalTariff: true } })
+    .catch(() => [] as { category: string; material: string; htsCode: string; totalTariff: number | null }[]);
+  const hit = buildHtsResolver(rows as { category: string; material: string; htsCode: string; totalTariff: number | null }[])(category, material);
+  if (!hit) return null;
+  return { htsCode: hit.htsCode, dutyPercent: hit.totalTariff != null ? hit.totalTariff * 100 : null };
+}
 
 export async function createSample(formData: FormData): Promise<ActionResult> {
   const user = await assertRole("member");
@@ -34,6 +48,7 @@ export async function createSample(formData: FormData): Promise<ActionResult> {
 
   const eta = parseDateInput(d.sampleEta);
   const received = parseDateInput(d.sampleReceivedDate);
+  const cHts = await htsForSample(d.category, d.material);
   let status: "sample_requested" | "eta_set" | "sample_received" | "quoted" =
     "sample_requested";
   if (d.fobCost) status = "quoted";
@@ -47,6 +62,8 @@ export async function createSample(formData: FormData): Promise<ActionResult> {
       category: d.category,
       season: d.season,
       material: d.material,
+      htsCode: cHts?.htsCode ?? undefined,
+      dutyRatePercent: cHts?.dutyPercent != null ? toDecimal(cHts.dutyPercent) : undefined,
       styleName: d.styleName,
       styleNumber: d.styleNumber,
       description: d.description,
@@ -135,6 +152,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
     await assertRole("admin");
   }
 
+  const uHts = await htsForSample(d.category ?? before.category, d.material ?? before.material);
   const updated = await prisma.sample.update({
     where: { id: d.id },
     data: {
@@ -155,12 +173,16 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
       customerSellPrice:
         d.customerSellPrice !== undefined ? toDecimal(d.customerSellPrice) : before.customerSellPrice,
       dutyRatePercent:
-        d.dutyRatePercent !== undefined ? toDecimal(d.dutyRatePercent) : before.dutyRatePercent,
+        uHts?.dutyPercent != null
+          ? toDecimal(uHts.dutyPercent)
+          : d.dutyRatePercent !== undefined
+            ? toDecimal(d.dutyRatePercent)
+            : before.dutyRatePercent,
       freightPerUnit:
         d.freightPerUnit !== undefined ? toDecimal(d.freightPerUnit) : before.freightPerUnit,
       inlandPerUnit:
         d.inlandPerUnit !== undefined ? toDecimal(d.inlandPerUnit) : before.inlandPerUnit,
-      htsCode: d.htsCode !== undefined ? d.htsCode || null : before.htsCode,
+      htsCode: uHts ? uHts.htsCode : d.htsCode !== undefined ? d.htsCode || null : before.htsCode,
       composition: d.composition !== undefined ? d.composition || null : before.composition,
       cbmPerCarton:
         d.cbmPerCarton !== undefined ? toDecimal(d.cbmPerCarton) : before.cbmPerCarton,
