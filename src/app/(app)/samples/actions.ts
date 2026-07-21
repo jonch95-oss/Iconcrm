@@ -159,15 +159,18 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
     where: { id: d.id },
     data: {
       sampleNumber: d.sampleNumber ?? before.sampleNumber,
-      brand: d.brand ?? before.brand,
+      brand: formData.has("brand") ? (d.brand ?? null) : before.brand,
       color: d.color ?? before.color,
-      category: d.category ?? before.category,
-      season: d.season !== undefined ? normalizeSeason(d.season) || before.season : before.season,
+      category: formData.has("category") ? (d.category ?? null) : before.category,
+      season: formData.has("season") ? (normalizeSeason(String(formData.get("season") ?? "")) || null) : before.season,
       material: d.material !== undefined ? d.material || null : before.material,
       styleName: d.styleName ?? before.styleName,
       styleNumber: d.styleNumber ?? before.styleNumber,
       description: d.description ?? before.description,
-      factoryId: d.factoryId ?? before.factoryId,
+      // formData.has() distinguishes "not sent" from "sent empty": an inline
+      // edit that picks "—" must actually clear the factory, not silently keep
+      // the old one (zod turns "" into undefined).
+      factoryId: formData.has("factoryId") ? (d.factoryId ?? null) : before.factoryId,
       targetCustomer: d.targetCustomer ?? before.targetCustomer,
       fobCost: fob,
       currency: d.currency ?? before.currency,
