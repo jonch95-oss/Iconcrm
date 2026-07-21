@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
 import { buildHtsResolver } from "@/lib/hts";
+import { normalizeSeason } from "@/lib/catalog";
 import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
@@ -61,7 +62,7 @@ export async function createSample(formData: FormData): Promise<ActionResult> {
       sampleNumber: d.sampleNumber,
       brand: d.brand,
       category: d.category,
-      season: d.season,
+      season: normalizeSeason(d.season ?? "") || undefined,
       material: d.material,
       htsCode: cHts?.htsCode ?? undefined,
       dutyRatePercent: cHts?.dutyPercent != null ? toDecimal(cHts.dutyPercent) : undefined,
@@ -161,7 +162,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
       brand: d.brand ?? before.brand,
       color: d.color ?? before.color,
       category: d.category ?? before.category,
-      season: d.season ?? before.season,
+      season: d.season !== undefined ? normalizeSeason(d.season) || before.season : before.season,
       material: d.material !== undefined ? d.material || null : before.material,
       styleName: d.styleName ?? before.styleName,
       styleNumber: d.styleNumber ?? before.styleNumber,

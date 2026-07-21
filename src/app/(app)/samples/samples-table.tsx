@@ -52,7 +52,9 @@ import {
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
-import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS, seasonChoices } from "@/lib/catalog";
+
+const SEASON_CHOICES = seasonChoices();
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
 import { updateSample, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
@@ -82,6 +84,75 @@ export interface SampleRow {
   ageDays: number;
   overdue: boolean;
   requestedBy: string;
+}
+
+function InlineFactorySelect({
+  id,
+  factoryId,
+  factoryName,
+  factories,
+  canEdit,
+}: {
+  id: string;
+  factoryId: string;
+  factoryName: string;
+  factories: { id: string; name: string }[];
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [pending, startTransition] = React.useTransition();
+
+  if (!canEdit) {
+    return factoryName ? <Badge variant="secondary">{factoryName}</Badge> : <span className="text-[var(--muted-foreground)]">—</span>;
+  }
+
+  const save = (next: string) => {
+    setEditing(false);
+    if (next === factoryId) return;
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("factoryId", next);
+    startTransition(async () => {
+      const res = await updateSample(fd);
+      if (res.ok) {
+        toast.success("Saved");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
+
+  if (editing) {
+    return (
+      <select
+        autoFocus
+        defaultValue={factoryId}
+        disabled={pending}
+        onChange={(e) => save(e.target.value)}
+        onBlur={() => setEditing(false)}
+        className="h-8 w-36 rounded-md border border-[var(--border)] bg-[var(--background)] px-1 text-sm"
+      >
+        <option value="">—</option>
+        {factories.map((f) => (
+          <option key={f.id} value={f.id}>
+            {f.name}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => setEditing(true)} disabled={pending} className="text-left">
+      {factoryName ? (
+        <Badge variant="secondary">{factoryName}</Badge>
+      ) : (
+        <span className="text-xs text-[var(--muted-foreground)]">+ set</span>
+      )}
+    </button>
+  );
 }
 
 function InlineSelect({
@@ -379,7 +450,7 @@ export function SamplesTable({
         accessorKey: "season",
         header: ({ column }) => <SortBtn column={column} label="Season" />,
         cell: ({ row }) => (
-          <InlineSelect id={row.original.id} field="season" value={row.original.season} options={seasonOptions} canEdit={canEdit} allowCustom />
+          <InlineSelect id={row.original.id} field="season" value={row.original.season} options={SEASON_CHOICES} canEdit={canEdit} />
         ),
       },
       { accessorKey: "styleNumber", header: "Style #" },
@@ -397,7 +468,19 @@ export function SamplesTable({
           </div>
         ),
       },
-      { accessorKey: "factoryName", header: ({ column }) => <SortBtn column={column} label="Factory" /> },
+      {
+        accessorKey: "factoryName",
+        header: ({ column }) => <SortBtn column={column} label="Factory" />,
+        cell: ({ row }) => (
+          <InlineFactorySelect
+            id={row.original.id}
+            factoryId={row.original.factoryId}
+            factoryName={row.original.factoryName}
+            factories={factories}
+            canEdit={canEdit}
+          />
+        ),
+      },
       {
         accessorKey: "sampleEta",
         header: ({ column }) => <SortBtn column={column} label="ETA" />,
@@ -472,7 +555,7 @@ export function SamplesTable({
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit, seasonOptions],
+    [canEdit, factories],
   );
 
   const table = useReactTable({

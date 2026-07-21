@@ -7,6 +7,7 @@ import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
+import { normalizeSeason } from "@/lib/catalog";
 import { advanceSampleStatus } from "@/lib/status";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
@@ -121,13 +122,15 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         let factoryId: string | undefined;
         const factoryName = (v.factoryName ?? "").trim();
         if (factoryName) {
+          // Factories are admin-managed: match an existing one, never create.
           if (!factoryCache.has(factoryName)) {
-            const f =
-              (await prisma.factory.findFirst({ where: { name: { equals: factoryName, mode: "insensitive" } } })) ??
-              (await prisma.factory.create({ data: { name: factoryName } }));
-            factoryCache.set(factoryName, f.id);
+            const f = await prisma.factory.findFirst({ where: { name: { equals: factoryName, mode: "insensitive" } } });
+            if (f) factoryCache.set(factoryName, f.id);
           }
           factoryId = factoryCache.get(factoryName);
+          if (!factoryId) {
+            summary.skipped.push({ row: row.rowNumber, reason: `Unknown factory "${factoryName}" — add it under Factories first` });
+          }
         }
 
         const statusRaw = (v.status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
@@ -140,7 +143,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           description: v.description?.trim() || undefined,
           color: splitColors(v.color ?? "")[0] || undefined,
           size: v.size?.trim() || undefined,
-          season: v.season?.trim() || undefined,
+          season: normalizeSeason(v.season ?? "") || undefined,
           targetCustomer: v.targetCustomer?.trim() || undefined,
           fobCost: toDecimal(v.fobCost) ?? undefined,
           customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
@@ -158,6 +161,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             : undefined,
           factoryId,
         };
+
+        const rawSeason = (v.season ?? "").trim();
+        if (rawSeason && !normalizeSeason(rawSeason)) {
+          summary.skipped.push({ row: row.rowNumber, reason: `Season "${rawSeason}" ignored — use SSxx, FWxx or Holiday` });
+        }
 
         // Always set HTS (+ effective duty) from the mapping when it resolves.
         const htsHit = resolveHts(fields.category, fields.material);

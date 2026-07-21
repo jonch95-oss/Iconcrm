@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS, seasonChoices } from "@/lib/catalog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -37,6 +37,7 @@ export function NewSampleDialog({
   const [factoryId, setFactoryId] = React.useState("");
   const [brand, setBrand] = React.useState("");
   const [category, setCategory] = React.useState("");
+  const [season, setSeason] = React.useState("");
   const [dupWarning, setDupWarning] = React.useState<string | null>(null);
 
   const checkDuplicate = React.useCallback(async (value: string) => {
@@ -61,6 +62,7 @@ export function NewSampleDialog({
     if (factoryId) fd.set("factoryId", factoryId);
     if (brand) fd.set("brand", brand);
     if (category) fd.set("category", category);
+    if (season) fd.set("season", season);
     startTransition(async () => {
       const res = await createSample(fd);
       if (res.ok && res.id) {
@@ -109,7 +111,15 @@ export function NewSampleDialog({
                 </SelectContent>
               </Select>
             </div>
-            <Field label="Season" name="season" />
+            <div className="space-y-1.5">
+              <Label>Season</Label>
+              <Select value={season} onValueChange={setSeason}>
+                <SelectTrigger><SelectValue placeholder="Select season" /></SelectTrigger>
+                <SelectContent>
+                  {seasonChoices().map((sn) => <SelectItem key={sn} value={sn}>{sn}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <Field label="Material" name="material" />
             <Field label="Style name" name="styleName" />
             <Field label="Style #" name="styleNumber" />
