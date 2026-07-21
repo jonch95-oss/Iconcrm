@@ -2,6 +2,7 @@ import Link from "next/link";
 import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/page-header";
 import { NewFactoryDialog } from "./new-factory-dialog";
+import { FactoryRowActions } from "./factory-row-actions";
 import { EmptyState } from "@/components/empty-state";
 import {
   Table,
@@ -39,6 +40,7 @@ export default async function FactoriesPage() {
                 <TableHead>Samples</TableHead>
                 <TableHead>PIs</TableHead>
                 <TableHead>Payment terms</TableHead>
+                <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -54,6 +56,9 @@ export default async function FactoriesPage() {
                   <TableCell className="tabular-nums">{f._count.samples}</TableCell>
                   <TableCell className="tabular-nums">{f._count.proformaInvoices}</TableCell>
                   <TableCell className="text-xs">{f.paymentTermsDefault ?? "—"}</TableCell>
+                  <TableCell className="text-right">
+                    <FactoryRowActions id={f.id} name={f.name} samples={f._count.samples} pis={f._count.proformaInvoices} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>

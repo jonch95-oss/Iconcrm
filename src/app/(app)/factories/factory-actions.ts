@@ -47,3 +47,33 @@ export async function createFactory(formData: FormData): Promise<ActionResult> {
   revalidatePath("/samples");
   return { ok: true, id: factory.id };
 }
+
+
+/**
+ * Delete a factory. Any samples / order forms / PIs pointing at it are
+ * explicitly unlinked first (set to no factory) so the delete can't fail on a
+ * foreign key. Useful for clearing junk factories created by older imports.
+ */
+export async function deleteFactory(id: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const factory = await prisma.factory.findUnique({ where: { id }, select: { id: true, name: true } });
+  if (!factory) return { ok: false, error: "Factory not found." };
+
+  await prisma.$transaction([
+    prisma.sample.updateMany({ where: { factoryId: id }, data: { factoryId: null } }),
+    prisma.orderForm.updateMany({ where: { factoryId: id }, data: { factoryId: null } }),
+    prisma.proformaInvoice.updateMany({ where: { factoryId: id }, data: { factoryId: null } }),
+    prisma.factory.delete({ where: { id } }),
+  ]);
+
+  await logAudit({
+    entityType: "factory",
+    entityId: id,
+    action: "deleted",
+    userId: user.id,
+    before: { name: factory.name },
+  });
+  revalidatePath("/factories");
+  revalidatePath("/samples");
+  return { ok: true };
+}
