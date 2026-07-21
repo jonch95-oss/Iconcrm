@@ -8,6 +8,7 @@ import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
+import { createHash } from "crypto";
 import { advanceSampleStatus } from "@/lib/status";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
@@ -350,8 +351,21 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       if (sampleId) jobs.push({ rowNumber, img, sampleId });
     }
 
-    const processImage = async ({ rowNumber, img, sampleId }: ImageJob) => {
+    // Current photo hashes, so unchanged images are skipped entirely. Each
+    // upload costs a Blob "advanced operation", and re-importing a sheet used
+    // to re-upload every photo — this makes repeat imports nearly free.
+    const existingHashes = new Map<string, string | null>();
+    if (jobs.length > 0) {
+      const rows = await prisma.sample
+        .findMany({ where: { id: { in: [...new Set(jobs.map((j) => j.sampleId))] } }, select: { id: true, imageHash: true } })
+        .catch(() => [] as { id: string; imageHash: string | null }[]);
+      for (const r of rows) existingHashes.set(r.id, r.imageHash);
+    }
+
+    const processImage = async ({ img, sampleId }: ImageJob) => {
       try {
+        const hash = createHash("sha256").update(img.buffer).digest("hex");
+        if (existingHashes.get(sampleId) === hash) return; // unchanged — no upload
         let buffer: Buffer = img.buffer;
         let ext = img.extension;
         if (sharp) {
@@ -366,11 +380,13 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           }
         }
         const url = await uploadBlob(
-          `samples/${sampleId}/import-row-${rowNumber}.${ext}`,
+          `samples/${sampleId}/photo.${ext}`,
           buffer,
           `image/${ext}`,
+          { addRandomSuffix: false },
         );
-        await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url } });
+        await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url, imageHash: hash } });
+        existingHashes.set(sampleId, hash);
         summary.photosAdded += 1;
       } catch {
         storageDown = true;

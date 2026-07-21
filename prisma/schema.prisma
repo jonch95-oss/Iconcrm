@@ -248,6 +248,8 @@ model Sample {
   // Primary product image (Vercel Blob URL) — carried into order forms,
   // line sheets, and PI views.
   imageUrl String?
+  // sha256 of the last imported photo, so re-imports skip unchanged images
+  imageHash String?
 
   // Inbound parcel tracking for the physical sample (courier from factory).
   trackingNumber  String?

@@ -8,6 +8,7 @@ export async function uploadBlob(
   filename: string,
   data: Buffer | string,
   contentType?: string,
+  opts?: { addRandomSuffix?: boolean },
 ): Promise<string> {
   const token = process.env.BLOB_READ_WRITE_TOKEN;
   if (!token) {
@@ -22,7 +23,9 @@ export async function uploadBlob(
     access: "public",
     token,
     contentType,
-    addRandomSuffix: true,
+    // Deterministic paths (addRandomSuffix: false) overwrite in place instead
+    // of creating a new object every write — avoids orphans and extra ops.
+    addRandomSuffix: opts?.addRandomSuffix ?? true,
   });
   return blob.url;
 }
