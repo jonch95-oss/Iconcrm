@@ -13,6 +13,7 @@ const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "material" TEXT`,
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "imageHash" TEXT`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'revisions_requested'`,
+  `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'on_hold'`,
   `ALTER TABLE "SkuVariant" ALTER COLUMN "upc" DROP NOT NULL`,
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "received" BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,

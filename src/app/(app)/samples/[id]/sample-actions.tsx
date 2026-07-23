@@ -177,7 +177,7 @@ export function SampleActions({
                 <Select value={status} onValueChange={setStatus}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {[...SAMPLE_PIPELINE, "dropped"].map((s) => (
+                    {[...SAMPLE_PIPELINE, "on_hold", "dropped"].map((s) => (
                       <SelectItem key={s} value={s}>
                         {SAMPLE_STATUS_LABEL[s as keyof typeof SAMPLE_STATUS_LABEL]}
                       </SelectItem>

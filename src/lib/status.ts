@@ -33,6 +33,7 @@ export const SAMPLE_STATUS_LABEL: Record<SampleStatus, string> = {
   packing_list_matched: "Packing List Matched",
   closed: "Closed",
   revisions_requested: "Revisions Requested",
+  on_hold: "On Hold",
   dropped: "Dropped",
 };
 
@@ -58,6 +59,7 @@ export const SAMPLE_STATUS_TONE: Record<SampleStatus, BadgeTone> = {
   packing_list_matched: "success",
   closed: "success",
   revisions_requested: "warning",
+  on_hold: "warning",
   dropped: "destructive",
 };
 
@@ -76,7 +78,7 @@ export function advanceSampleStatus(
   current: SampleStatus,
   target: SampleStatus,
 ): SampleStatus {
-  if (current === "dropped") return current;
+  if (current === "dropped" || current === "on_hold") return current;
   return sampleRank(target) > sampleRank(current) ? target : current;
 }
 

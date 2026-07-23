@@ -11,7 +11,7 @@ import { Table as TableIcon, AlertTriangle, Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
-const COLUMNS: SampleStatus[] = [...SAMPLE_PIPELINE, "revisions_requested", "dropped"];
+const COLUMNS: SampleStatus[] = [...SAMPLE_PIPELINE, "revisions_requested", "on_hold", "dropped"];
 
 export default async function SamplesBoardPage() {
   await requireUser();

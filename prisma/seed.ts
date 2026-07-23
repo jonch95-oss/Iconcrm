@@ -119,7 +119,7 @@ async function main() {
   const rankFor: Record<SampleStatus, number> = {
     sample_requested: 0, eta_set: 1, sample_received: 2, quoted: 3, on_order_form: 4,
     pi_received: 5, pi_matched: 6, po_issued: 7, in_production: 8, shipped: 9,
-    packing_list_matched: 10, closed: 11, revisions_requested: -1, dropped: -1,
+    packing_list_matched: 10, closed: 11, revisions_requested: -1, on_hold: -1, dropped: -1,
   };
 
   const samples = [];
