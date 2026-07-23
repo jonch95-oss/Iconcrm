@@ -86,6 +86,68 @@ export interface SampleRow {
   requestedBy: string;
 }
 
+function InlineStatusSelect({
+  id,
+  status,
+  canEdit,
+}: {
+  id: string;
+  status: SampleRow["status"];
+  canEdit: boolean;
+}) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [pending, startTransition] = React.useTransition();
+
+  if (!canEdit) return <SampleStatusBadge status={status} />;
+
+  const save = (next: string) => {
+    setEditing(false);
+    if (next === status) return;
+    const fd = new FormData();
+    fd.set("id", id);
+    fd.set("status", next);
+    startTransition(async () => {
+      const res = await updateSample(fd);
+      if (res.ok) {
+        toast.success("Status updated");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+      }
+    });
+  };
+
+  if (editing) {
+    // Only allow flipping to Requested or On Hold (plus the current value) so
+    // no one accidentally sets Sample Received / Revisions Requested here —
+    // those are driven by the Received flow and the Request-revisions button.
+    const opts = Array.from(new Set<string>([status, "sample_requested", "on_hold"]));
+    return (
+      <select
+        autoFocus
+        defaultValue={status}
+        disabled={pending}
+        onChange={(e) => save(e.target.value)}
+        onBlur={() => setEditing(false)}
+        className="h-8 rounded-md border border-[var(--border)] bg-[var(--background)] px-1 text-xs"
+      >
+        {opts.map((o) => (
+          <option key={o} value={o}>
+            {SAMPLE_STATUS_LABEL[o as keyof typeof SAMPLE_STATUS_LABEL]}
+          </option>
+        ))}
+      </select>
+    );
+  }
+
+  return (
+    <button type="button" onClick={() => setEditing(true)} disabled={pending} title="Change status (Requested / On Hold)">
+      <SampleStatusBadge status={status} />
+    </button>
+  );
+}
+
 function InlineFactorySelect({
   id,
   factoryId,
@@ -466,7 +528,7 @@ export function SamplesTable({
         header: ({ column }) => <SortBtn column={column} label="Status" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <SampleStatusBadge status={row.original.status} />
+            <InlineStatusSelect id={row.original.id} status={row.original.status} canEdit={!!isAdmin} />
             {row.original.overdue && (
               <Badge variant="destructive" className="gap-1">
                 <AlertTriangle className="h-3 w-3" /> OVERDUE
@@ -562,7 +624,7 @@ export function SamplesTable({
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit, factories],
+    [canEdit, factories, isAdmin],
   );
 
   const table = useReactTable({
