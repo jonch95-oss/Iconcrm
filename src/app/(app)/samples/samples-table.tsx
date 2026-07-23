@@ -360,6 +360,13 @@ export function SamplesTable({
   const [brandFilter, setBrandFilter] = React.useState("");
   const [seasonFilter, setSeasonFilter] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("");
+
+  // Keep the checked-row selection in sync with what's visible: changing any
+  // filter or the search clears the selection, so exports (line sheet, Excel)
+  // always match the current view instead of a stale cross-filter selection.
+  React.useEffect(() => {
+    setRowSelection({});
+  }, [statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, globalFilter, overdueOnly]);
   const [overdueOnly, setOverdueOnly] = React.useState(initialOverdue);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
