@@ -149,10 +149,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
   if (status === "dropped" && !d.droppedReason && !before.droppedReason) {
     return { ok: false, error: "A dropped reason is required to drop a sample." };
   }
-  // Manual status override requires admin.
-  if (d.status && d.status !== before.status) {
-    await assertRole("admin");
-  }
+  // Status changes are allowed for any editor (member+).
 
   const uHts = await htsForSample(d.category ?? before.category, d.material ?? before.material);
   const updated = await prisma.sample.update({

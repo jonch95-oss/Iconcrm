@@ -528,7 +528,7 @@ export function SamplesTable({
         header: ({ column }) => <SortBtn column={column} label="Status" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <InlineStatusSelect id={row.original.id} status={row.original.status} canEdit={!!isAdmin} />
+            <InlineStatusSelect id={row.original.id} status={row.original.status} canEdit={canEdit} />
             {row.original.overdue && (
               <Badge variant="destructive" className="gap-1">
                 <AlertTriangle className="h-3 w-3" /> OVERDUE
