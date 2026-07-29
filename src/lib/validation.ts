@@ -15,6 +15,8 @@ export const sampleStatusEnum = z.enum([
   "shipped",
   "packing_list_matched",
   "closed",
+  "revisions_requested",
+  "on_hold",
   "dropped",
 ]);
 
