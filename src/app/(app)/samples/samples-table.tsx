@@ -823,6 +823,17 @@ export function SamplesTable({
           >
             <Download className="h-4 w-4" /> Export Excel{selectedIds.length ? ` (${selectedIds.length})` : ""}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Same columns without embedded photos — small file, fast to re-import for bulk edits"
+            onClick={() => {
+              const base = selectedIds.length ? `?ids=${encodeURIComponent(selectedIds.join(","))}&photos=0` : "?photos=0";
+              window.location.href = `/api/samples/export${base}`;
+            }}
+          >
+            <Download className="h-4 w-4" /> Export (data only){selectedIds.length ? ` (${selectedIds.length})` : ""}
+          </Button>
         </div>
       </div>
 

@@ -18,8 +18,11 @@ export async function GET(request: Request) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   // Optional ?ids=a,b,c — export only those samples (from the table's checkboxes).
-  const idsParam = new URL(request.url).searchParams.get("ids");
+  const sp = new URL(request.url).searchParams;
+  const idsParam = sp.get("ids");
   const ids = idsParam ? idsParam.split(",").map((x) => x.trim()).filter(Boolean) : null;
+  // ?photos=0 → skip embedded images for a lightweight, fast data-only round-trip.
+  const withPhotos = sp.get("photos") !== "0";
 
   const samples = await prisma.sample.findMany({
     where: ids && ids.length ? { id: { in: ids } } : undefined,
@@ -63,7 +66,7 @@ export async function GET(request: Request) {
         if (i === 0) firstRow = r;
       });
     }
-    if (s.imageUrl && firstRow) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
+    if (withPhotos && s.imageUrl && firstRow) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
   }
 
   // Fetch + embed photos with bounded concurrency so a big catalog stays fast.
@@ -84,22 +87,25 @@ export async function GET(request: Request) {
       // Skip images that can't be fetched; the export still succeeds.
     }
   };
-  const CONCURRENCY = 8;
-  let cursor = 0;
-  await Promise.all(
-    Array.from({ length: Math.min(CONCURRENCY, imageJobs.length) }, async () => {
-      while (cursor < imageJobs.length) await embed(imageJobs[cursor++]);
-    }),
-  );
+  if (withPhotos) {
+    const CONCURRENCY = 8;
+    let cursor = 0;
+    await Promise.all(
+      Array.from({ length: Math.min(CONCURRENCY, imageJobs.length) }, async () => {
+        while (cursor < imageJobs.length) await embed(imageJobs[cursor++]);
+      }),
+    );
+  }
 
   ws.columns.forEach((c, i) => (c.width = i === 0 ? 14 : i === 6 ? 28 : 15));
 
   const buffer = await wb.xlsx.writeBuffer();
   const today = new Date().toISOString().slice(0, 10);
+  const suffix = withPhotos ? "" : "-data";
   return new NextResponse(new Uint8Array(Buffer.from(buffer)), {
     headers: {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="samples-export-${today}.xlsx"`,
+      "Content-Disposition": `attachment; filename="samples-export${suffix}-${today}.xlsx"`,
     },
   });
 }
