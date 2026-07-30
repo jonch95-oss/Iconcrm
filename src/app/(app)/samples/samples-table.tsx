@@ -52,7 +52,7 @@ import {
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
-import { SAMPLE_CATEGORIES, SAMPLE_BRANDS, seasonChoices } from "@/lib/catalog";
+import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
 
 const SEASON_CHOICES = seasonChoices();
 import { formatMoney } from "@/lib/money";
@@ -400,6 +400,7 @@ function InlineEdit({
 export function SamplesTable({
   rows,
   factories,
+  brands,
   canEdit,
   isAdmin,
   initialOverdue,
@@ -408,6 +409,7 @@ export function SamplesTable({
 }: {
   rows: SampleRow[];
   factories: { id: string; name: string }[];
+  brands: string[];
   canEdit: boolean;
   isAdmin?: boolean;
   initialOverdue: boolean;
@@ -450,7 +452,7 @@ export function SamplesTable({
     });
   }, [rows, statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, overdueOnly]);
 
-  const brandOptions = React.useMemo(() => [...new Set(rows.map((r) => r.brand).filter(Boolean))].sort(), [rows]);
+  const brandOptions = React.useMemo(() => [...new Set([...brands, ...rows.map((r) => r.brand)].filter(Boolean))].sort(), [rows, brands]);
   const seasonOptions = React.useMemo(() => [...new Set(rows.map((r) => r.season).filter(Boolean))].sort(), [rows]);
   const categoryOptions = React.useMemo(() => [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(), [rows]);
 
@@ -505,7 +507,7 @@ export function SamplesTable({
         accessorKey: "brand",
         header: ({ column }) => <SortBtn column={column} label="Brand" />,
         cell: ({ row }) => (
-          <InlineSelect id={row.original.id} field="brand" value={row.original.brand} options={SAMPLE_BRANDS} canEdit={canEdit} />
+          <InlineSelect id={row.original.id} field="brand" value={row.original.brand} options={brands} canEdit={canEdit} />
         ),
       },
       {
@@ -624,7 +626,7 @@ export function SamplesTable({
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit, factories, isAdmin],
+    [canEdit, factories, brands, isAdmin],
   );
 
   const table = useReactTable({

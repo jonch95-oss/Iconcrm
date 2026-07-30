@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { SAMPLE_CATEGORIES, SAMPLE_BRANDS, seasonChoices } from "@/lib/catalog";
+import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -28,8 +28,10 @@ import { toast } from "sonner";
 
 export function NewSampleDialog({
   factories,
+  brands,
 }: {
   factories: { id: string; name: string }[];
+  brands: string[];
 }) {
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
@@ -97,7 +99,7 @@ export function NewSampleDialog({
               <Select value={brand} onValueChange={setBrand}>
                 <SelectTrigger><SelectValue placeholder="Select brand" /></SelectTrigger>
                 <SelectContent>
-                  {SAMPLE_BRANDS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                  {brands.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

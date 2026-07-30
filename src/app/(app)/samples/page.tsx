@@ -10,6 +10,7 @@ import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
 import { ageInDays, isOverdue } from "@/lib/date";
+import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 // Excel import (parse + compress/upload embedded photos) can take a while;
@@ -23,6 +24,7 @@ export default async function SamplesPage({
 }) {
   const user = await requireUser();
   const sp = await searchParams;
+  const settings = await getSettings();
 
   const [samples, factories, etaCounts] = await Promise.all([
     prisma.sample.findMany({
@@ -87,11 +89,12 @@ export default async function SamplesPage({
         </Button>
         {canEdit && <FetchEmailedSheetsButton />}
         {canEdit && <ImportSamplesButton />}
-        {canEdit && <NewSampleDialog factories={factories} />}
+        {canEdit && <NewSampleDialog factories={factories} brands={settings.brands} />}
       </PageHeader>
       <SamplesTable
         rows={rows}
         factories={factories}
+        brands={settings.brands}
         canEdit={canEdit}
         isAdmin={isAdmin}
         initialOverdue={sp.overdue === "1"}

@@ -92,5 +92,54 @@ for (const sql of STATEMENTS) {
     console.warn("[ensure-columns] skipped:", (e?.message ?? String(e)).slice(0, 140));
   }
 }
+// ---------------------------------------------------------------------------
+// Brand cleanup (idempotent). Brands are admin-managed via settings.brands.
+// Merge case/space variants of each approved brand into its canonical spelling
+// (e.g. "PALM ANGELS" -> "Palm Angels"), then blank anything that isn't on the
+// approved list so it can be re-picked from the dropdown. Runs on every deploy;
+// after the first pass there is nothing left to change.
+// ---------------------------------------------------------------------------
+const DEFAULT_BRANDS = [
+  "Ted Baker", "Champion", "Off White", "Off White L/AB",
+  "Palm Angels", "Palm Angels PLAY", "Pink London",
+];
+try {
+  const norm = (x) => String(x ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  const row = await prisma.$queryRawUnsafe(
+    `SELECT value FROM "AppSetting" WHERE key = 'app_settings' LIMIT 1`,
+  );
+  let brands = DEFAULT_BRANDS;
+  const val = row?.[0]?.value;
+  if (val && Array.isArray(val.brands) && val.brands.length) brands = val.brands;
+
+  // 1) Merge case/space variants into the canonical spelling.
+  let merged = 0;
+  for (const canon of brands) {
+    const n = await prisma.$executeRawUnsafe(
+      `UPDATE "Sample" SET "brand" = $1
+         WHERE "brand" IS NOT NULL
+           AND lower(btrim(regexp_replace("brand", '\s+', ' ', 'g'))) = lower(btrim($1))
+           AND "brand" <> $1`,
+      canon,
+    );
+    merged += Number(n) || 0;
+  }
+
+  // 2) Blank brands that aren't on the approved list.
+  const allowedKeys = brands.map(norm);
+  const placeholders = allowedKeys.map((_, i) => `$${i + 1}`).join(", ");
+  const blanked = allowedKeys.length
+    ? await prisma.$executeRawUnsafe(
+        `UPDATE "Sample" SET "brand" = NULL
+           WHERE "brand" IS NOT NULL AND btrim("brand") <> ''
+             AND lower(btrim(regexp_replace("brand", '\s+', ' ', 'g'))) NOT IN (${placeholders})`,
+        ...allowedKeys,
+      )
+    : 0;
+  console.log(`[ensure-columns] brands: merged ${merged}, blanked ${Number(blanked) || 0} (list of ${brands.length}).`);
+} catch (e) {
+  console.warn("[ensure-columns] brand cleanup skipped:", (e?.message ?? String(e)).slice(0, 160));
+}
+
 await prisma.$disconnect();
 console.log(`[ensure-columns] ${ok}/${STATEMENTS.length} ensured.`);

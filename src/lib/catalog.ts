@@ -26,6 +26,20 @@ export const SAMPLE_BRANDS = [
   "Pink London",
 ] as const;
 
+/**
+ * Normalize a free-text brand to the admin-approved list (case/space
+ * insensitive). Returns the canonical spelling when matched, else "".
+ * Pass the admin list (settings.brands) as `allowed`.
+ */
+export function normalizeBrand(raw: string, allowed: readonly string[] = SAMPLE_BRANDS): string {
+  const key = (raw ?? "").trim().toLowerCase().replace(/\s+/g, " ");
+  if (!key) return "";
+  for (const b of allowed) {
+    if (b.trim().toLowerCase().replace(/\s+/g, " ") === key) return b;
+  }
+  return "";
+}
+
 // Seasons are restricted to SSxx / FWxx / Holiday.
 export const SEASON_PATTERN = /^(SS|FW)\d{2}$/;
 

@@ -41,8 +41,31 @@ export const DEFAULT_SETTINGS: AppSettings = {
   poNumberStart: 1,
   orderFormPrefix: "OF",
   followUpCadenceDays: 7,
-  brands: ["Aurora", "Northwind", "Coastline", "Vertex", "Maple & Co"],
-  categories: ["Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Footwear"],
+  // Allowed brands — drives the Brand dropdown in the table, the New Sample
+  // form, and the import template. Admin-editable under Settings › General.
+  brands: [
+    "Ted Baker",
+    "Champion",
+    "Off White",
+    "Off White L/AB",
+    "Palm Angels",
+    "Palm Angels PLAY",
+    "Pink London",
+  ],
+  categories: [
+    "Handbag",
+    "Cooler",
+    "Duffel",
+    "Rolling Duffle",
+    "Cosmetic Bag",
+    "Toiletry Bag",
+    "Wallet",
+    "Belt",
+    "Luggage",
+    "Backpack",
+    "Neck Pillow",
+    "Packing Cube",
+  ],
   inlandBufferDaysDefault: 5,
   riskThresholdDays: 7,
 };

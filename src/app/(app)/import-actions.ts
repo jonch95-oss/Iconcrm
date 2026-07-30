@@ -7,7 +7,8 @@ import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
-import { normalizeSeason } from "@/lib/catalog";
+import { normalizeSeason, normalizeBrand } from "@/lib/catalog";
+import { getSettings } from "@/lib/settings";
 import { createHash } from "crypto";
 import { advanceSampleStatus } from "@/lib/status";
 import { computeFobLine } from "@/lib/match";
@@ -109,6 +110,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   const colorCodeMap = new Map(colorCodeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
   const receivedSampleIds = new Set<string>();
 
+  // Brands are admin-managed: normalize each row to the approved list, blank
+  // (and flag) anything that isn't on it. Keeps free-text uploads from
+  // creating casing duplicates like "PALM ANGELS" vs "Palm Angels".
+  const allowedBrands = (await getSettings()).brands;
+
   for (const row of parsed.rows.slice(0, 2000)) {
     const v = row.values;
     // Key on Sample # when present; otherwise fall back to STYLE # so
@@ -137,7 +143,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         const statusRaw = (v.status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
         const fields = {
           status: VALID_STATUS.has(statusRaw) ? (statusRaw as SampleStatus) : undefined,
-          brand: v.brand?.trim() || undefined,
+          brand: normalizeBrand(v.brand ?? "", allowedBrands) || undefined,
           category: v.category?.trim() || undefined,
           styleNumber: v.styleNumber?.trim() || undefined,
           styleName: v.styleName?.trim() || v.description?.trim() || undefined,
@@ -162,6 +168,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             : undefined,
           factoryId,
         };
+
+        const rawBrand = (v.brand ?? "").trim();
+        if (rawBrand && !normalizeBrand(rawBrand, allowedBrands)) {
+          summary.skipped.push({ row: row.rowNumber, reason: `Brand "${rawBrand}" ignored — add it under Settings › General first` });
+        }
 
         const rawSeason = (v.season ?? "").trim();
         if (rawSeason && !normalizeSeason(rawSeason)) {

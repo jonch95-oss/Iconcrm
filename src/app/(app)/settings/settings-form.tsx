@@ -36,7 +36,7 @@ export function SettingsForm({ settings }: { settings: AppSettings }) {
         </div>
         <Area name="missingInfoRecipients" label="Missing-info recipients (emails, one per line)" value={settings.missingInfoRecipients.join("\n")} />
         <Area name="internalPoDistribution" label="Internal PO distribution list (emails)" value={settings.internalPoDistribution.join("\n")} />
-        <Area name="brands" label="Brand option list" value={settings.brands.join("\n")} />
+        <Area name="brands" label="Allowed brands (one per line) — drives the Brand dropdown everywhere" value={settings.brands.join("\n")} />
         <Area name="categories" label="Category option list" value={settings.categories.join("\n")} />
       </div>
 

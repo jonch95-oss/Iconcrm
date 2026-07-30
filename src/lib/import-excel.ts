@@ -219,7 +219,7 @@ export const parseColorCodeWorkbook = (b: Buffer) => parseWorkbook(b, COLOR_CODE
  *  layout: a wide IMAGE column where a photo is embedded per row, then Brand,
  *  STYLE #, DESCRIPTION, COLOR, Season). Each data row is tall enough to hold a
  *  thumbnail; the importer reads the embedded picture anchored to that row. */
-export async function buildSamplesTemplate(): Promise<Buffer> {
+export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BRANDS): Promise<Buffer> {
   const wb = new ExcelJS.Workbook();
   const ws = wb.addWorksheet("Sample Request");
   // Every column the importer understands. IMAGE holds an embedded photo per
@@ -288,7 +288,7 @@ export async function buildSamplesTemplate(): Promise<Buffer> {
       };
     }
   };
-  applyList("Brand", SAMPLE_BRANDS, "Brand");
+  applyList("Brand", brands, "Brand");
   applyList("Category", SAMPLE_CATEGORIES, "Category");
   // Tall rows so a pasted/embedded photo fits in the IMAGE column.
   for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
