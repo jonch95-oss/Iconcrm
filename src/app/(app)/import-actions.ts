@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
+import { del } from "@vercel/blob";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
@@ -53,7 +54,10 @@ async function readUpload(formData: FormData): Promise<Buffer | string> {
     const res = await fetch(blobUrl);
     if (!res.ok) return "Could not read the uploaded file.";
     const buf = Buffer.from(await res.arrayBuffer());
-    if (buf.byteLength > 50 * 1024 * 1024) return "File is too large (50 MB max).";
+    // We now hold the bytes in memory; delete the temporary upload from Blob so
+    // import files (often tens of MB with embedded photos) don't accumulate.
+    await del(blobUrl).catch(() => {});
+    if (buf.byteLength > 250 * 1024 * 1024) return "File is too large (250 MB max).";
     return buf;
   }
 

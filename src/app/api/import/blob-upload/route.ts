@@ -31,7 +31,7 @@ export async function POST(request: Request) {
             "text/csv",
             "application/octet-stream",
           ],
-          maximumSizeInBytes: 50 * 1024 * 1024, // 50MB headroom
+          maximumSizeInBytes: 250 * 1024 * 1024, // 250MB — image-rich export round-trips can be 50MB+
           tokenPayload: JSON.stringify({ uploadedBy: session.user.email ?? "" }),
         };
       },
