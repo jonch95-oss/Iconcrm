@@ -377,9 +377,16 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       for (const r of rows) existingHashes.set(r.id, r.imageHash);
     }
 
+    // Bump when the image pipeline changes so already-stored photos are
+    // reprocessed once on the next import. v2 = transparency-aware (keep PNG
+    // alpha; flatten opaque onto white) — replaces v1's black-background JPEGs.
+    const PIPELINE_VERSION = "v2";
     const processImage = async ({ img, sampleId }: ImageJob) => {
       try {
-        const hash = createHash("sha256").update(img.buffer).digest("hex");
+        const hash = `${PIPELINE_VERSION}:${createHash("sha256").update(img.buffer).digest("hex")}`;
+        // Skip only when the SAME bytes were already processed by the CURRENT
+        // pipeline. Bare (unversioned) hashes from older imports won't match, so
+        // their images regenerate with the transparency-aware pipeline.
         if (existingHashes.get(sampleId) === hash) return; // unchanged — no upload
         let buffer: Buffer = img.buffer;
         let ext = img.extension;
