@@ -385,14 +385,20 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         let ext = img.extension;
         if (sharp) {
           try {
-            buffer = await sharp(img.buffer)
-              .resize({ width: 700, height: 700, fit: "inside", withoutEnlargement: true })
-              // JPEG has no alpha channel: composite any transparency onto white
-              // first, otherwise transparent PNGs come out with a black background.
-              .flatten({ background: "#ffffff" })
-              .jpeg({ quality: 72 })
-              .toBuffer();
-            ext = "jpeg";
+            const meta = await sharp(img.buffer).metadata();
+            const base = sharp(img.buffer).resize({ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true });
+            if (meta.hasAlpha) {
+              // Transparent images (e.g. product cutouts) are kept as PNG so
+              // they display exactly as they do in the source sheet. Converting
+              // to JPEG would drop the alpha channel and paint the background.
+              buffer = await base.png({ compressionLevel: 9 }).toBuffer();
+              ext = "png";
+            } else {
+              // Opaque photos compress well as JPEG; flatten guards against any
+              // stray alpha rendering as a black background.
+              buffer = await base.flatten({ background: "#ffffff" }).jpeg({ quality: 80 }).toBuffer();
+              ext = "jpeg";
+            }
           } catch {
             // If sharp can't read it, fall back to the original bytes.
           }
