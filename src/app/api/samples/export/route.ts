@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { getSettings } from "@/lib/settings";
+import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
 
 export const dynamic = "force-dynamic";
 // Fetching + embedding sample photos can take a bit on a large catalog.
@@ -23,6 +25,7 @@ export async function GET(request: Request) {
   const ids = idsParam ? idsParam.split(",").map((x) => x.trim()).filter(Boolean) : null;
   // ?photos=0 → skip embedded images for a lightweight, fast data-only round-trip.
   const withPhotos = sp.get("photos") !== "0";
+  const { brands } = await getSettings();
 
   const samples = await prisma.sample.findMany({
     where: ids && ids.length ? { id: { in: ids } } : undefined,
@@ -98,6 +101,27 @@ export async function GET(request: Request) {
   }
 
   ws.columns.forEach((c, i) => (c.width = i === 0 ? 14 : i === 6 ? 28 : 15));
+
+  // Data-validation dropdowns so re-imported edits can't introduce rejected
+  // values. Columns follow the header order above: C=Brand, D=Category, E=Season.
+  const lastRow = Math.max(ws.rowCount, 1);
+  const applyList = (letter: string, values: readonly string[], title: string) => {
+    const formula = `"${values.join(",")}"`;
+    for (let r = 2; r <= lastRow; r++) {
+      ws.getCell(`${letter}${r}`).dataValidation = {
+        type: "list",
+        allowBlank: true,
+        formulae: [formula],
+        showErrorMessage: true,
+        errorStyle: "stop",
+        errorTitle: title,
+        error: `Pick a ${title.toLowerCase()} from the list.`,
+      };
+    }
+  };
+  applyList("C", brands, "Brand");
+  applyList("D", SAMPLE_CATEGORIES, "Category");
+  applyList("E", seasonChoices(), "Season");
 
   const buffer = await wb.xlsx.writeBuffer();
   const today = new Date().toISOString().slice(0, 10);

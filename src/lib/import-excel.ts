@@ -1,5 +1,5 @@
 import ExcelJS from "exceljs";
-import { SAMPLE_CATEGORIES, SAMPLE_BRANDS } from "@/lib/catalog";
+import { SAMPLE_CATEGORIES, SAMPLE_BRANDS, seasonChoices } from "@/lib/catalog";
 
 // ---------------------------------------------------------------------------
 // Excel import parsing (server-side, exceljs).
@@ -290,6 +290,7 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
   };
   applyList("Brand", brands, "Brand");
   applyList("Category", SAMPLE_CATEGORIES, "Category");
+  applyList("Season", seasonChoices(), "Season");
   // Tall rows so a pasted/embedded photo fits in the IMAGE column.
   for (let r = 2; r <= examples.length + 1; r++) ws.getRow(r).height = 120;
   // A small note so users know images go in column A, anchored to each row.
