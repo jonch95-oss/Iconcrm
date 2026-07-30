@@ -387,6 +387,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           try {
             buffer = await sharp(img.buffer)
               .resize({ width: 700, height: 700, fit: "inside", withoutEnlargement: true })
+              // JPEG has no alpha channel: composite any transparency onto white
+              // first, otherwise transparent PNGs come out with a black background.
+              .flatten({ background: "#ffffff" })
               .jpeg({ quality: 72 })
               .toBuffer();
             ext = "jpeg";
