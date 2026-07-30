@@ -93,26 +93,43 @@ for (const sql of STATEMENTS) {
   }
 }
 // ---------------------------------------------------------------------------
-// Brand cleanup (idempotent). Brands are admin-managed via settings.brands.
-// Merge case/space variants of each approved brand into its canonical spelling
-// (e.g. "PALM ANGELS" -> "Palm Angels"), then blank anything that isn't on the
-// approved list so it can be re-picked from the dropdown. Runs on every deploy;
-// after the first pass there is nothing left to change.
+// Brand hygiene (idempotent, non-destructive). Brands are admin-managed via
+// settings.brands. Earlier builds seeded a PLACEHOLDER brand list; repair it to
+// the real brands so the dropdown, import normalization and this cleanup all
+// key off the correct set. Then merge case/space variants of each approved
+// brand into its canonical spelling. We intentionally do NOT blank brands here:
+// a wrong/short list would wipe real data. Enforcement happens at the dropdown
+// and on import instead.
 // ---------------------------------------------------------------------------
-const DEFAULT_BRANDS = [
+const REAL_BRANDS = [
   "Ted Baker", "Champion", "Off White", "Off White L/AB",
   "Palm Angels", "Palm Angels PLAY", "Pink London",
 ];
+const PLACEHOLDER_BRANDS = ["Aurora", "Northwind", "Coastline", "Vertex", "Maple & Co"];
 try {
   const norm = (x) => String(x ?? "").trim().toLowerCase().replace(/\s+/g, " ");
   const row = await prisma.$queryRawUnsafe(
     `SELECT value FROM "AppSetting" WHERE key = 'app_settings' LIMIT 1`,
   );
-  let brands = DEFAULT_BRANDS;
-  const val = row?.[0]?.value;
-  if (val && Array.isArray(val.brands) && val.brands.length) brands = val.brands;
+  const val = row?.[0]?.value ?? null;
+  let brands = Array.isArray(val?.brands) && val.brands.length ? val.brands : REAL_BRANDS;
 
-  // 1) Merge case/space variants into the canonical spelling.
+  // Repair a persisted placeholder list (or a missing/empty one) to the real
+  // brands, writing it back so getSettings() serves the correct list.
+  const isPlaceholder =
+    !Array.isArray(val?.brands) ||
+    val.brands.length === 0 ||
+    JSON.stringify(brands.map(norm).sort()) === JSON.stringify(PLACEHOLDER_BRANDS.map(norm).sort());
+  if (val && isPlaceholder) {
+    brands = REAL_BRANDS;
+    await prisma.$executeRawUnsafe(
+      `UPDATE "AppSetting" SET value = jsonb_set(value, '{brands}', $1::jsonb) WHERE key = 'app_settings'`,
+      JSON.stringify(REAL_BRANDS),
+    );
+    console.log("[ensure-columns] brands: repaired placeholder settings.brands -> real list.");
+  }
+
+  // Merge case/space variants into the canonical spelling (safe, no deletions).
   let merged = 0;
   for (const canon of brands) {
     const n = await prisma.$executeRawUnsafe(
@@ -124,19 +141,7 @@ try {
     );
     merged += Number(n) || 0;
   }
-
-  // 2) Blank brands that aren't on the approved list.
-  const allowedKeys = brands.map(norm);
-  const placeholders = allowedKeys.map((_, i) => `$${i + 1}`).join(", ");
-  const blanked = allowedKeys.length
-    ? await prisma.$executeRawUnsafe(
-        `UPDATE "Sample" SET "brand" = NULL
-           WHERE "brand" IS NOT NULL AND btrim("brand") <> ''
-             AND lower(btrim(regexp_replace("brand", '\s+', ' ', 'g'))) NOT IN (${placeholders})`,
-        ...allowedKeys,
-      )
-    : 0;
-  console.log(`[ensure-columns] brands: merged ${merged}, blanked ${Number(blanked) || 0} (list of ${brands.length}).`);
+  console.log(`[ensure-columns] brands: merged ${merged} variant(s) (list of ${brands.length}).`);
 } catch (e) {
   console.warn("[ensure-columns] brand cleanup skipped:", (e?.message ?? String(e)).slice(0, 160));
 }

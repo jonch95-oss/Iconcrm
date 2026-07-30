@@ -23,7 +23,7 @@ function daysFromNow(d: number): Date {
   return new Date(Date.now() + d * 24 * 60 * 60 * 1000);
 }
 
-const BRANDS = ["Aurora", "Northwind", "Coastline", "Vertex", "Maple & Co"];
+const BRANDS = ["Ted Baker", "Champion", "Off White", "Off White L/AB", "Palm Angels", "Palm Angels PLAY", "Pink London"];
 const CATEGORIES = ["Tops", "Bottoms", "Outerwear", "Dresses", "Accessories", "Footwear"];
 const SIZES = ["XS", "S", "M", "L", "XL"];
 const COLORS = ["Black", "Navy", "Ivory", "Olive", "Rust"];

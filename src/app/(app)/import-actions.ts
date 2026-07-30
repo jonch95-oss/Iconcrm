@@ -147,7 +147,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         const statusRaw = (v.status ?? "").trim().toLowerCase().replace(/[\s-]+/g, "_");
         const fields = {
           status: VALID_STATUS.has(statusRaw) ? (statusRaw as SampleStatus) : undefined,
-          brand: normalizeBrand(v.brand ?? "", allowedBrands) || undefined,
+          brand: normalizeBrand(v.brand ?? "", allowedBrands) || (v.brand?.trim() || undefined),
           category: v.category?.trim() || undefined,
           styleNumber: v.styleNumber?.trim() || undefined,
           styleName: v.styleName?.trim() || v.description?.trim() || undefined,
@@ -175,7 +175,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
 
         const rawBrand = (v.brand ?? "").trim();
         if (rawBrand && !normalizeBrand(rawBrand, allowedBrands)) {
-          summary.skipped.push({ row: row.rowNumber, reason: `Brand "${rawBrand}" ignored — add it under Settings › General first` });
+          summary.skipped.push({ row: row.rowNumber, reason: `Brand "${rawBrand}" kept as-is — not in the brand list; add it under Settings › General to standardize` });
         }
 
         const rawSeason = (v.season ?? "").trim();
