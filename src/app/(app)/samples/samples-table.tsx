@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { GroupSamplesDialog } from "./group-samples-dialog";
 import { useRouter } from "next/navigation";
 import {
   useReactTable,
@@ -68,6 +69,7 @@ export interface SampleRow {
   sampleNumber: string;
   imageUrl: string | null;
   brand: string;
+  color: string;
   category: string;
   season: string;
   styleName: string;
@@ -878,6 +880,12 @@ export function SamplesTable({
           )}
           {canEdit && (
             <CreateOrderFormButton selectedIds={selectedIds} />
+          )}
+          {canEdit && (
+            <GroupSamplesDialog
+              selected={selectedRows.map((r) => ({ id: r.id, sampleNumber: r.sampleNumber, color: r.color }))}
+              onDone={() => setRowSelection({})}
+            />
           )}
           {canEdit && (
             <Button

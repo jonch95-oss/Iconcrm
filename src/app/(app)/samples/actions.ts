@@ -819,3 +819,107 @@ export async function fillSkuCodesForSample(
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true, filled, missing: [...missing].sort() };
 }
+
+/**
+ * Group several per-color samples into ONE master sample family. Each selected
+ * sample becomes a color SKU on the master (master # + color code), carrying its
+ * image, received date and sample ETA. The source sample records are removed.
+ * Sample numbers are otherwise untouched — this is opt-in via selection.
+ */
+export async function groupSamplesIntoMaster(
+  formData: FormData,
+): Promise<ActionResult & { merged?: number; missing?: string[] }> {
+  const user = await assertRole("member");
+  const masterNumber = String(formData.get("masterNumber") ?? "").trim();
+  let ids: string[] = [];
+  try { ids = JSON.parse(String(formData.get("sampleIds") ?? "[]")); } catch { /* ignore */ }
+  if (!masterNumber) return { ok: false, error: "Enter a master sample number." };
+  if (ids.length < 2) return { ok: false, error: "Select at least two samples to group." };
+
+  const sources = await prisma.sample.findMany({ where: { id: { in: ids } }, include: { skuVariants: true } });
+  if (sources.length < 2) return { ok: false, error: "Couldn't load the selected samples." };
+
+  const codeRows = await prisma.colorCode.findMany();
+  const codeMap = new Map(codeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
+  const base = skuBase(masterNumber);
+  const missing = new Set<string>();
+
+  try {
+    const masterId = await prisma.$transaction(async (tx) => {
+      let master = await tx.sample.findUnique({ where: { sampleNumber: masterNumber } });
+      const tmpl = sources[0];
+      if (!master) {
+        master = await tx.sample.create({
+          data: {
+            sampleNumber: masterNumber, styleNumber: masterNumber,
+            brand: tmpl.brand, category: tmpl.category, season: tmpl.season,
+            styleName: tmpl.styleName, description: tmpl.description, material: tmpl.material,
+            factoryId: tmpl.factoryId, targetCustomer: tmpl.targetCustomer,
+            status: "sample_requested", requestedById: user.id,
+          },
+        });
+      }
+      const masterId = master.id;
+
+      // Remove the source samples FIRST (cascades their variants/comments),
+      // freeing any UPCs so we can re-create them on the master.
+      const del = sources.filter((s) => s.id !== masterId).map((s) => s.id);
+      if (del.length) {
+        await tx.orderFormLine.deleteMany({ where: { sampleId: { in: del } } });
+        await tx.sample.deleteMany({ where: { id: { in: del } } });
+      }
+
+      let firstImage: { url: string; hash: string | null } | null =
+        master.imageUrl ? { url: master.imageUrl, hash: master.imageHash } : null;
+
+      for (const src of sources) {
+        if (src.id === masterId) continue;
+        const srcVar = src.skuVariants[0];
+        const color = ((src.color ?? "").trim() || (srcVar?.color ?? "").trim() || "—");
+        const code = codeMap.get(color.toUpperCase());
+        if (!code && color !== "—") missing.add(color.toUpperCase());
+        const skuCode = code ? `${base}${code.toUpperCase()}` : null;
+
+        const existing = await tx.skuVariant.findFirst({
+          where: { sampleId: masterId, color: { equals: color, mode: "insensitive" } },
+        });
+        if (existing) {
+          await tx.skuVariant.update({
+            where: { id: existing.id },
+            data: {
+              skuCode: existing.skuCode ?? skuCode,
+              received: existing.received || !!src.sampleReceivedDate,
+              sampleReceivedDate: existing.sampleReceivedDate ?? src.sampleReceivedDate,
+              sampleEta: existing.sampleEta ?? src.sampleEta,
+              imageUrl: existing.imageUrl ?? src.imageUrl,
+              imageHash: existing.imageHash ?? src.imageHash,
+            },
+          });
+        } else {
+          await tx.skuVariant.create({
+            data: {
+              sampleId: masterId, size: srcVar?.size || "OS", color, upc: srcVar?.upc ?? null, skuCode,
+              unitsPerCarton: srcVar?.unitsPerCarton ?? null,
+              received: !!src.sampleReceivedDate,
+              sampleReceivedDate: src.sampleReceivedDate,
+              sampleEta: src.sampleEta,
+              imageUrl: src.imageUrl, imageHash: src.imageHash,
+            },
+          });
+        }
+        if (!firstImage && src.imageUrl) firstImage = { url: src.imageUrl, hash: src.imageHash };
+      }
+
+      if (firstImage && !master.imageUrl) {
+        await tx.sample.update({ where: { id: masterId }, data: { imageUrl: firstImage.url, imageHash: firstImage.hash } });
+      }
+      return masterId;
+    });
+
+    await logAudit({ entityType: "sample", entityId: masterId, action: "grouped_samples", userId: user.id, after: { masterNumber, count: sources.length } });
+    revalidatePath("/samples");
+    return { ok: true, id: masterId, merged: sources.length, missing: [...missing].sort() };
+  } catch {
+    return { ok: false, error: "Couldn't group — a selected sample may be linked to an order form or PI. Unlink it first, then retry." };
+  }
+}
