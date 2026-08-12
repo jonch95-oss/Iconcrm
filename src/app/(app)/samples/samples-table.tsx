@@ -70,7 +70,7 @@ export interface SampleRow {
   season: string;
   styleName: string;
   styleNumber: string;
-  status: (typeof SAMPLE_PIPELINE)[number] | "revisions_requested" | "on_hold" | "dropped";
+  status: (typeof SAMPLE_PIPELINE)[number] | "revisions_requested" | "on_hold" | "produced_without_sample" | "approved_by_image" | "dropped";
   factoryId: string;
   factoryName: string;
   sampleEta: string | null;
@@ -709,7 +709,7 @@ export function SamplesTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {[...SAMPLE_PIPELINE, "revisions_requested", "on_hold", "dropped"].map((s) => (
+            {[...SAMPLE_PIPELINE, "revisions_requested", "on_hold", "produced_without_sample", "approved_by_image", "dropped"].map((s) => (
               <SelectItem key={s} value={s}>
                 {SAMPLE_STATUS_LABEL[s as keyof typeof SAMPLE_STATUS_LABEL]}
               </SelectItem>

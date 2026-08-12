@@ -14,6 +14,8 @@ const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "imageHash" TEXT`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'revisions_requested'`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'on_hold'`,
+  `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'produced_without_sample'`,
+  `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'approved_by_image'`,
   `ALTER TABLE "SkuVariant" ALTER COLUMN "upc" DROP NOT NULL`,
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "received" BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,

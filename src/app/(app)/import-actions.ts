@@ -19,7 +19,7 @@ import type { Prisma, SampleStatus } from "@prisma/client";
 const VALID_STATUS = new Set([
   "sample_requested", "eta_set", "sample_received", "quoted", "on_order_form",
   "pi_received", "pi_matched", "po_issued", "in_production", "shipped",
-  "packing_list_matched", "closed", "on_hold", "revisions_requested", "dropped",
+  "packing_list_matched", "closed", "on_hold", "revisions_requested", "produced_without_sample", "approved_by_image", "dropped",
 ]);
 
 export interface ImportSummary {

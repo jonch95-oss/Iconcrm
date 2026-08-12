@@ -116,7 +116,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
     if (dup) return { ok: false, error: `Sample # ${d.sampleNumber} already exists.` };
   }
 
-  const newEta = d.sampleEta !== undefined ? parseDateInput(d.sampleEta) : before.sampleEta;
+  let newEta = d.sampleEta !== undefined ? parseDateInput(d.sampleEta) : before.sampleEta;
   const received =
     d.sampleReceivedDate !== undefined
       ? parseDateInput(d.sampleReceivedDate)
@@ -150,6 +150,21 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
     return { ok: false, error: "A dropped reason is required to drop a sample." };
   }
   // Status changes are allowed for any editor (member+).
+
+  // "Produced without sample" implies a long lead time: set the ETA to 100 days
+  // out when first entering this status (logged as a revision, never silent).
+  if (status === "produced_without_sample" && before.status !== "produced_without_sample") {
+    const eta100 = new Date(Date.now() + 100 * 24 * 60 * 60 * 1000);
+    await changeEta({
+      parentType: "sample",
+      parentId: before.id,
+      oldEta: before.sampleEta,
+      newEta: eta100,
+      reason: "Produced without sample (+100 days)",
+      userId: user.id,
+    });
+    newEta = eta100;
+  }
 
   const uHts = await htsForSample(d.category ?? before.category, d.material ?? before.material);
   const updated = await prisma.sample.update({

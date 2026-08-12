@@ -34,6 +34,8 @@ export const SAMPLE_STATUS_LABEL: Record<SampleStatus, string> = {
   closed: "Closed",
   revisions_requested: "Revisions Requested",
   on_hold: "On Hold",
+  produced_without_sample: "Produced w/o Sample",
+  approved_by_image: "Approved by Image",
   dropped: "Dropped",
 };
 
@@ -60,6 +62,8 @@ export const SAMPLE_STATUS_TONE: Record<SampleStatus, BadgeTone> = {
   closed: "success",
   revisions_requested: "warning",
   on_hold: "warning",
+  produced_without_sample: "default",
+  approved_by_image: "success",
   dropped: "destructive",
 };
 
@@ -78,7 +82,7 @@ export function advanceSampleStatus(
   current: SampleStatus,
   target: SampleStatus,
 ): SampleStatus {
-  if (current === "dropped" || current === "on_hold") return current;
+  if (current === "dropped" || current === "on_hold" || current === "produced_without_sample") return current;
   return sampleRank(target) > sampleRank(current) ? target : current;
 }
 

@@ -41,6 +41,8 @@ enum SampleStatus {
   closed
   revisions_requested
   on_hold
+  produced_without_sample
+  approved_by_image
   dropped
 }
 
