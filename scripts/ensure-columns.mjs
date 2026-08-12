@@ -111,6 +111,23 @@ try {
   console.warn("[ensure-columns] sku casing skipped:", (e?.message ?? String(e)).slice(0, 140));
 }
 
+// Backfill missing SKU codes for existing variants: sample # (alphanumerics)
+// + color code, uppercased. Only fills blanks and only where a color code is
+// mapped; leaves sample numbers untouched. Idempotent.
+try {
+  const n = await prisma.$executeRawUnsafe(
+    `UPDATE "SkuVariant" v
+       SET "skuCode" = upper(regexp_replace(s."sampleNumber", '[^a-zA-Z0-9]', '', 'g')) || upper(btrim(cc."code"))
+       FROM "Sample" s, "ColorCode" cc
+      WHERE v."sampleId" = s."id"
+        AND (v."skuCode" IS NULL OR v."skuCode" = '')
+        AND upper(btrim(v."color")) = upper(btrim(cc."color"))`,
+  );
+  if (Number(n) > 0) console.log(`[ensure-columns] skuCodes backfilled: ${Number(n)}.`);
+} catch (e) {
+  console.warn("[ensure-columns] sku backfill skipped:", (e?.message ?? String(e)).slice(0, 140));
+}
+
 // ---------------------------------------------------------------------------
 // Brand hygiene (idempotent, non-destructive). Brands are admin-managed via
 // settings.brands. Earlier builds seeded a PLACEHOLDER brand list; repair it to

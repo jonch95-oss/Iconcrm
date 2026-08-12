@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Wand2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived } from "../actions";
+import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample } from "../actions";
 import { toast } from "sonner";
 
 export interface SkuRow {
@@ -74,6 +74,19 @@ export function SkuManager({
       const r = await toggleSkuReceived(id, sampleId, received);
       if (r.ok) router.refresh();
       else toast.error(r.error);
+    });
+  };
+
+  const fillCodes = () => {
+    startTransition(async () => {
+      const r = await fillSkuCodesForSample(sampleId);
+      if (!r.ok) { toast.error(r.error); return; }
+      if ((r.filled ?? 0) > 0) toast.success(`Filled ${r.filled} SKU code${r.filled === 1 ? "" : "s"}`);
+      else if ((r.missing?.length ?? 0) === 0) toast.info("All SKU codes are already set");
+      if (r.missing && r.missing.length > 0) {
+        toast.warning(`No color code for: ${r.missing.join(", ")}. Add them under Settings › Color Codes.`);
+      }
+      router.refresh();
     });
   };
 
@@ -140,6 +153,9 @@ export function SkuManager({
           <SmallField label="Units/carton" value={form.unitsPerCarton} onChange={(v) => setForm((f) => ({ ...f, unitsPerCarton: v }))} type="number" />
           <Button size="sm" onClick={add} disabled={pending}>
             <Plus className="h-4 w-4" /> Add SKU
+          </Button>
+          <Button size="sm" variant="outline" onClick={fillCodes} disabled={pending} title="Fill missing SKU codes from sample # + color code">
+            <Wand2 className="h-4 w-4" /> Fill SKU codes
           </Button>
         </div>
       )}
