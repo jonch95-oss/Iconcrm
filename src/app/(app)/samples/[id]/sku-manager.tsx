@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Wand2, ImagePlus } from "lucide-react";
+import { Plus, Trash2, Wand2, ImagePlus, MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +14,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample, uploadSkuVariantImage } from "../actions";
+import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample, uploadSkuVariantImage, addComment } from "../actions";
+import { Textarea } from "@/components/ui/textarea";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 
@@ -28,6 +30,7 @@ export interface SkuRow {
   received: boolean;
   imageUrl: string | null;
   sampleEta: string; // yyyy-mm-dd or ""
+  comments: { id: string; body: string; imageUrl: string | null; author: string; createdAt: string }[];
 }
 
 export function SkuManager({
@@ -107,13 +110,14 @@ export function SkuManager({
             <TableHead>Units/carton</TableHead>
             <TableHead>Sample ETA</TableHead>
             <TableHead>Received</TableHead>
+            <TableHead>Comments</TableHead>
             {canEdit && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 9 : 8} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 10 : 9} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
@@ -130,6 +134,7 @@ export function SkuManager({
                 <TableCell>
                   <Checkbox checked={s.received} disabled={!canEdit || pending} onCheckedChange={(v) => toggleReceived(s.id, !!v)} />
                 </TableCell>
+                <TableCell><VariantCommentsDialog sampleId={sampleId} variantId={s.id} color={s.color} comments={s.comments} canEdit={canEdit} /></TableCell>
                 {canEdit && (
                   <TableCell>
                     <Button variant="ghost" size="icon" onClick={() => remove(s.id)} disabled={pending}>
@@ -159,6 +164,71 @@ export function SkuManager({
         </div>
       )}
     </div>
+  );
+}
+
+function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }: { sampleId: string; variantId: string; color: string; comments: SkuRow["comments"]; canEdit: boolean }) {
+  const router = useRouter();
+  const [open, setOpen] = React.useState(false);
+  const [body, setBody] = React.useState("");
+  const [file, setFile] = React.useState<File | null>(null);
+  const [pending, start] = React.useTransition();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const submit = () => {
+    if (!body.trim() && !file) { toast.error("Add a comment or image."); return; }
+    start(async () => {
+      try {
+        const fd = new FormData();
+        fd.set("sampleId", sampleId); fd.set("skuVariantId", variantId); fd.set("body", body);
+        if (file) {
+          const blob = await upload(`comments/${sampleId}/${variantId}/${Date.now()}-${file.name}`, file, { access: "public", handleUploadUrl: "/api/import/blob-upload" });
+          fd.set("imageUrl", blob.url);
+        }
+        const res = await addComment(fd);
+        if (!res.ok) { toast.error(res.error); return; }
+        setBody(""); setFile(null); if (inputRef.current) inputRef.current.value = "";
+        toast.success("Comment added"); router.refresh();
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    });
+  };
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="ghost" size="sm" className="h-7 gap-1 px-2">
+          <MessageSquare className="h-3.5 w-3.5" /> {comments.length || ""}
+        </Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader><DialogTitle>Comments — {color || "color"}</DialogTitle></DialogHeader>
+        <div className="max-h-72 space-y-2 overflow-auto">
+          {comments.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No comments for this color yet.</p>}
+          {comments.map((c) => (
+            <div key={c.id} className="rounded-md border border-[var(--border)] p-2 text-sm">
+              <div className="mb-1 flex justify-between text-xs text-[var(--muted-foreground)]"><span>{c.author}</span><span>{new Date(c.createdAt).toLocaleString()}</span></div>
+              {c.body && <p className="whitespace-pre-wrap">{c.body}</p>}
+              {c.imageUrl && (
+                <a href={c.imageUrl} target="_blank" rel="noopener noreferrer">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={c.imageUrl} alt="ref" className="mt-1 max-h-32 rounded border border-[var(--border)] object-contain bg-white" />
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+        {canEdit && (
+          <div className="space-y-2 border-t border-[var(--border)] pt-2">
+            <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={`Comment about ${color || "this color"}…`} rows={2} />
+            <div className="flex items-center justify-between">
+              <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={pending}>
+                <ImagePlus className="h-4 w-4" /> {file ? file.name.slice(0, 16) : "Image"}
+              </Button>
+              <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
+              <Button size="sm" onClick={submit} disabled={pending || (!body.trim() && !file)}>{pending ? "Posting…" : "Comment"}</Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 

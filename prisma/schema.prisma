@@ -319,6 +319,7 @@ model SkuVariant {
   orderFormLines   OrderFormLine[]
   piLines          PILine[]
   packingListLines PackingListLine[]
+  comments         Comment[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -333,12 +334,15 @@ model Comment {
   userId    String?
   user      User?    @relation(fields: [userId], references: [id])
   authorLabel String? // for inbound email comments where author is not a User
+  skuVariantId String? // when set, the comment is about a specific color SKU
+  skuVariant   SkuVariant? @relation(fields: [skuVariantId], references: [id], onDelete: Cascade)
   body      String   @db.Text
   imageUrl  String?  // optional reference image attached to the comment
   tags      String[] @default([]) // e.g. "duplicate-email"
   createdAt DateTime @default(now())
 
   @@index([sampleId])
+  @@index([skuVariantId])
 }
 
 // Never overwrite ETAs — log every change.

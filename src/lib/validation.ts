@@ -97,6 +97,7 @@ export const skuVariantSchema = z.object({
 
 export const commentSchema = z.object({
   sampleId: z.string().min(1),
+  skuVariantId: optionalString,
   body: z.string().trim().optional(),
   imageUrl: optionalString,
 });

@@ -253,6 +253,15 @@ export default async function SampleDetailPage({
                   canEdit={canEdit}
                   skus={sample.skuVariants.map((s) => ({
                     id: s.id,
+                    comments: sample.comments
+                      .filter((c) => c.skuVariantId === s.id)
+                      .map((c) => ({
+                        id: c.id,
+                        body: c.body,
+                        imageUrl: c.imageUrl,
+                        author: c.user?.name ?? c.authorLabel ?? "External",
+                        createdAt: c.createdAt.toISOString(),
+                      })),
                     size: s.size,
                     color: s.color,
                     upc: s.upc ?? "",
@@ -268,7 +277,7 @@ export default async function SampleDetailPage({
               <TabsContent value="comments" className="space-y-4 pt-3">
                 {canEdit && <CommentForm sampleId={sample.id} />}
                 <ul className="space-y-3">
-                  {sample.comments.map((c) => (
+                  {sample.comments.filter((c) => !c.skuVariantId).map((c) => (
                     <li key={c.id} className="rounded-md border border-[var(--border)] p-3 text-sm">
                       <div className="mb-1 flex items-center justify-between">
                         <span className="font-medium">{c.user?.name ?? c.authorLabel ?? "External"}</span>
@@ -290,7 +299,7 @@ export default async function SampleDetailPage({
                       )}
                     </li>
                   ))}
-                  {sample.comments.length === 0 && (
+                  {sample.comments.filter((c) => !c.skuVariantId).length === 0 && (
                     <p className="text-sm text-[var(--muted-foreground)]">No comments yet.</p>
                   )}
                 </ul>

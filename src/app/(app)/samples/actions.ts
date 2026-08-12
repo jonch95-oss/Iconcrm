@@ -262,7 +262,7 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   const imageUrl = parsed.data.imageUrl?.trim() || null;
   if (!body && !imageUrl) return { ok: false, error: "Add a comment or an image." };
   await prisma.comment.create({
-    data: { sampleId: parsed.data.sampleId, userId: user.id, body, imageUrl },
+    data: { sampleId: parsed.data.sampleId, skuVariantId: parsed.data.skuVariantId || null, userId: user.id, body, imageUrl },
   });
   revalidatePath(`/samples/${parsed.data.sampleId}`);
   return { ok: true };

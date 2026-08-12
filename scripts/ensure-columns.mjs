@@ -14,6 +14,8 @@ const STATEMENTS = [
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "imageHash" TEXT`,
   `ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "excludeFromGrouping" BOOLEAN NOT NULL DEFAULT false`,
   `ALTER TABLE "Comment" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT`,
+  `ALTER TABLE "Comment" ADD COLUMN IF NOT EXISTS "skuVariantId" TEXT`,
+  `CREATE INDEX IF NOT EXISTS "Comment_skuVariantId_idx" ON "Comment"("skuVariantId")`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'revisions_requested'`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'on_hold'`,
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'produced_without_sample'`,
