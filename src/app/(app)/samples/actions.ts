@@ -257,9 +257,12 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
 export async function addComment(formData: FormData): Promise<ActionResult> {
   const user = await assertRole("member");
   const parsed = commentSchema.safeParse(Object.fromEntries(formData));
-  if (!parsed.success) return { ok: false, error: "Comment cannot be empty" };
+  if (!parsed.success) return { ok: false, error: "Invalid comment" };
+  const body = (parsed.data.body ?? "").trim();
+  const imageUrl = parsed.data.imageUrl?.trim() || null;
+  if (!body && !imageUrl) return { ok: false, error: "Add a comment or an image." };
   await prisma.comment.create({
-    data: { sampleId: parsed.data.sampleId, userId: user.id, body: parsed.data.body },
+    data: { sampleId: parsed.data.sampleId, userId: user.id, body, imageUrl },
   });
   revalidatePath(`/samples/${parsed.data.sampleId}`);
   return { ok: true };

@@ -330,6 +330,7 @@ model Comment {
   user      User?    @relation(fields: [userId], references: [id])
   authorLabel String? // for inbound email comments where author is not a User
   body      String   @db.Text
+  imageUrl  String?  // optional reference image attached to the comment
   tags      String[] @default([]) // e.g. "duplicate-email"
   createdAt DateTime @default(now())
 

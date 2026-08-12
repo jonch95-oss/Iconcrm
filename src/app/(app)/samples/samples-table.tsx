@@ -876,6 +876,17 @@ export function SamplesTable({
           >
             <Download className="h-4 w-4" /> Export (data only){selectedIds.length ? ` (${selectedIds.length})` : ""}
           </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            title="Export comments (with attached images) to Excel"
+            onClick={() => {
+              const qs = selectedIds.length ? `?ids=${encodeURIComponent(selectedIds.join(","))}` : "";
+              window.location.href = `/api/samples/comments-export${qs}`;
+            }}
+          >
+            <Download className="h-4 w-4" /> Comments{selectedIds.length ? ` (${selectedIds.length})` : ""}
+          </Button>
         </div>
       </div>
 

@@ -272,7 +272,13 @@ export default async function SampleDetailPage({
                         <span className="font-medium">{c.user?.name ?? c.authorLabel ?? "External"}</span>
                         <span className="text-xs text-[var(--muted-foreground)]">{formatDateTime(c.createdAt)}</span>
                       </div>
-                      <p className="whitespace-pre-wrap">{c.body}</p>
+                      {c.body && <p className="whitespace-pre-wrap">{c.body}</p>}
+                      {c.imageUrl && (
+                        <a href={c.imageUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={c.imageUrl} alt="comment reference" className="max-h-40 rounded border border-[var(--border)] object-contain bg-white" />
+                        </a>
+                      )}
                       {c.tags.length > 0 && (
                         <div className="mt-2 flex gap-1">
                           {c.tags.map((t) => (
