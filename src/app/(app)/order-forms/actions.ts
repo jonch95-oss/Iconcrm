@@ -5,12 +5,32 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { advanceSampleStatus, sampleRank } from "@/lib/status";
+import type { SampleStatus } from "@prisma/client";
 import { sendEmail } from "@/lib/email";
 import { MissingInfoEmail } from "@/emails/missing-info";
 import { getSettings } from "@/lib/settings";
 import { magicLink } from "@/lib/tokens";
 
 type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
+
+/**
+ * If a sample is marked "On Order Form" but is no longer on ANY order form,
+ * revert it to its natural pre-order-form status (recomputed from ETA /
+ * received / FOB). No-op otherwise.
+ */
+async function revertSampleIfOffOrderForm(sampleId: string): Promise<void> {
+  const sm = await prisma.sample.findUnique({
+    where: { id: sampleId },
+    select: { status: true, sampleEta: true, sampleReceivedDate: true, fobCost: true, _count: { select: { orderFormLines: true } } },
+  });
+  if (!sm || sm.status !== "on_order_form" || sm._count.orderFormLines > 0) return;
+  const candidates: SampleStatus[] = ["sample_requested"];
+  if (sm.sampleEta) candidates.push("eta_set");
+  if (sm.sampleReceivedDate) candidates.push("sample_received");
+  if (sm.fobCost) candidates.push("quoted");
+  const reverted = candidates.reduce((a, b) => (sampleRank(b) > sampleRank(a) ? b : a));
+  if (reverted !== sm.status) await prisma.sample.update({ where: { id: sampleId }, data: { status: reverted } });
+}
 
 export async function updateLineQuantity(
   lineId: string,
@@ -51,8 +71,10 @@ export async function deleteOrderFormLine(
       entityType: "order_form", entityId: orderFormId, action: "line_removed", userId: user.id,
       before: { line: label, qty: before.quantity },
     });
+    await revertSampleIfOffOrderForm(before.sampleId);
   }
   revalidatePath(`/order-forms/${orderFormId}`);
+  revalidatePath("/samples");
   return { ok: true };
 }
 

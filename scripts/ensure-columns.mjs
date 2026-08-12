@@ -100,6 +100,26 @@ for (const sql of STATEMENTS) {
   }
 }
 // ---------------------------------------------------------------------------
+// Fix stale "On Order Form" samples: if a sample says on_order_form but is on
+// NO order form, revert to its natural status (FOB->quoted, else received, else
+// ETA->eta_set, else requested). Recompute precedence matches the app.
+// ---------------------------------------------------------------------------
+try {
+  const n = await prisma.$executeRawUnsafe(
+    `UPDATE "Sample" s SET "status" = (CASE
+         WHEN s."fobCost" IS NOT NULL THEN 'quoted'
+         WHEN s."sampleReceivedDate" IS NOT NULL THEN 'sample_received'
+         WHEN s."sampleEta" IS NOT NULL THEN 'eta_set'
+         ELSE 'sample_requested' END)::"SampleStatus"
+       WHERE s."status" = 'on_order_form'
+         AND NOT EXISTS (SELECT 1 FROM "OrderFormLine" l WHERE l."sampleId" = s."id")`,
+  );
+  if (Number(n) > 0) console.log(`[ensure-columns] stale on_order_form reverted: ${Number(n)}.`);
+} catch (e) {
+  console.warn("[ensure-columns] on_order_form revert skipped:", (e?.message ?? String(e)).slice(0, 140));
+}
+
+// ---------------------------------------------------------------------------
 // Status hygiene: a sample that has an ETA but is still "sample_requested"
 // should read "eta_set" (having an ETA is exactly what distinguishes them).
 // Only bumps requested -> eta_set; never touches received/on_hold/etc.
