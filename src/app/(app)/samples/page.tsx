@@ -2,7 +2,7 @@ import { prisma } from "@/lib/db";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { LayoutGrid } from "lucide-react";
+import { LayoutGrid, Boxes } from "lucide-react";
 import { SamplesTable, type SampleRow } from "./samples-table";
 import { NewSampleDialog } from "./new-sample-dialog";
 import { ImportSamplesButton } from "./import-samples-button";
@@ -90,6 +90,11 @@ export default async function SamplesPage({
         <Button asChild variant="outline">
           <Link href="/samples/board"><LayoutGrid className="h-4 w-4" /> Board</Link>
         </Button>
+        {isAdmin && (
+          <Button asChild variant="outline">
+            <Link href="/samples/groups"><Boxes className="h-4 w-4" /> Suggested groups</Link>
+          </Button>
+        )}
         {canEdit && <FetchEmailedSheetsButton />}
         {canEdit && <ImportSamplesButton />}
         {canEdit && <NewSampleDialog factories={factories} brands={settings.brands} />}
