@@ -429,6 +429,7 @@ export function SamplesTable({
   const [brandFilter, setBrandFilter] = React.useState("");
   const [seasonFilter, setSeasonFilter] = React.useState("");
   const [categoryFilter, setCategoryFilter] = React.useState("");
+  const [colorFilter, setColorFilter] = React.useState("");
   const [overdueOnly, setOverdueOnly] = React.useState(initialOverdue);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
 
@@ -437,7 +438,7 @@ export function SamplesTable({
   // always match the current view instead of a stale cross-filter selection.
   React.useEffect(() => {
     setRowSelection({});
-  }, [statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, globalFilter, overdueOnly]);
+  }, [statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, colorFilter, globalFilter, overdueOnly]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({
     styleNumber: false,
     requestedBy: false,
@@ -452,14 +453,23 @@ export function SamplesTable({
       if (brandFilter && r.brand !== brandFilter) return false;
       if (seasonFilter && r.season !== seasonFilter) return false;
       if (categoryFilter && r.category !== categoryFilter) return false;
+      if (colorFilter) {
+        const cf = colorFilter.toUpperCase();
+        const hit = (r.color || "").toUpperCase() === cf || r.variants.some((v) => (v.color || "").toUpperCase() === cf);
+        if (!hit) return false;
+      }
       if (overdueOnly && !r.overdue) return false;
       return true;
     });
-  }, [rows, statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, overdueOnly]);
+  }, [rows, statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, colorFilter, overdueOnly]);
 
   const brandOptions = React.useMemo(() => [...new Set([...brands, ...rows.map((r) => r.brand)].filter(Boolean))].sort(), [rows, brands]);
   const seasonOptions = React.useMemo(() => [...new Set(rows.map((r) => r.season).filter(Boolean))].sort(), [rows]);
   const categoryOptions = React.useMemo(() => [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(), [rows]);
+  const colorOptions = React.useMemo(
+    () => [...new Set(rows.flatMap((r) => [r.color, ...r.variants.map((v) => v.color)]).filter(Boolean))].sort(),
+    [rows],
+  );
 
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
   const toggleExpanded = React.useCallback(
@@ -763,6 +773,13 @@ export function SamplesTable({
           <SelectContent>
             <SelectItem value="all">All categories</SelectItem>
             {categoryOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <Select value={colorFilter || "all"} onValueChange={(v) => setColorFilter(v === "all" ? "" : v)}>
+          <SelectTrigger className="h-9 w-36"><SelectValue placeholder="All colors" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All colors</SelectItem>
+            {colorOptions.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={seasonFilter || "all"} onValueChange={(v) => setSeasonFilter(v === "all" ? "" : v)}>

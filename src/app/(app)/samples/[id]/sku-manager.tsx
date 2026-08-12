@@ -83,9 +83,11 @@ export function SkuManager({
       const r = await fillSkuCodesForSample(sampleId);
       if (!r.ok) { toast.error(r.error); return; }
       if ((r.filled ?? 0) > 0) toast.success(`Filled ${r.filled} SKU code${r.filled === 1 ? "" : "s"}`);
-      else if ((r.missing?.length ?? 0) === 0) toast.info("All SKU codes are already set");
-      if (r.missing && r.missing.length > 0) {
-        toast.warning(`No color code for: ${r.missing.join(", ")}. Add them under Settings › Color Codes.`);
+      else toast.info("All SKU codes are already set");
+      if (r.created && r.created.length > 0) {
+        toast.message(`Auto-generated color codes: ${r.created.map((c) => `${c.color}→${c.code}`).join(", ")}`, {
+          description: "Review or rename them under Settings › Color Codes.",
+        });
       }
       router.refresh();
     });

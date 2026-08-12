@@ -8,7 +8,7 @@ import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
-import { autoSkuCode, skuBase } from "@/lib/sku";
+import { autoSkuCode, skuBase, deriveColorCode } from "@/lib/sku";
 import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
@@ -798,26 +798,36 @@ export async function toggleSkuReceived(id: string, sampleId: string, received: 
  */
 export async function fillSkuCodesForSample(
   sampleId: string,
-): Promise<ActionResult & { filled?: number; missing?: string[] }> {
+): Promise<ActionResult & { filled?: number; created?: { color: string; code: string }[] }> {
   await assertRole("member");
   const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { sampleNumber: true } });
   if (!sample) return { ok: false, error: "Sample not found" };
   const codeRows = await prisma.colorCode.findMany();
   const codeMap = new Map(codeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
+  const usedCodes = new Set(codeRows.map((c) => c.code.trim().toUpperCase()));
   const variants = await prisma.skuVariant.findMany({
     where: { sampleId, OR: [{ skuCode: null }, { skuCode: "" }] },
     select: { id: true, color: true },
   });
   let filled = 0;
-  const missing = new Set<string>();
+  const created: { color: string; code: string }[] = [];
   for (const v of variants) {
-    const code = codeMap.get((v.color ?? "").trim().toUpperCase());
-    if (!code) { if (v.color && v.color !== "—") missing.add(v.color.toUpperCase()); continue; }
+    const colorKey = (v.color ?? "").trim().toUpperCase();
+    if (!colorKey || colorKey === "—") continue;
+    let code = codeMap.get(colorKey);
+    if (!code) {
+      // No mapping yet — auto-generate one and save it to the (editable) map.
+      code = deriveColorCode(colorKey, usedCodes);
+      await prisma.colorCode.create({ data: { color: colorKey, code } }).catch(() => {});
+      codeMap.set(colorKey, code);
+      created.push({ color: colorKey, code });
+    }
     await prisma.skuVariant.update({ where: { id: v.id }, data: { skuCode: autoSkuCode(sample.sampleNumber, code) } });
     filled += 1;
   }
   revalidatePath(`/samples/${sampleId}`);
-  return { ok: true, filled, missing: [...missing].sort() };
+  revalidatePath("/settings");
+  return { ok: true, filled, created };
 }
 
 /**
