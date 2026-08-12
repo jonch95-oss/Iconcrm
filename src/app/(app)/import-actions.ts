@@ -9,6 +9,7 @@ import { toDecimal } from "@/lib/money";
 import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason, normalizeBrand } from "@/lib/catalog";
+import { autoSkuCode, skuBase } from "@/lib/sku";
 import { getSettings } from "@/lib/settings";
 import { createHash } from "crypto";
 import { advanceSampleStatus } from "@/lib/status";
@@ -232,15 +233,15 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
       if (upc || colorList.length > 0) {
         const provided = v.skuCode?.trim();
         const units = v.casePackDefault ? parseInt(v.casePackDefault, 10) || null : null;
-        const base = currentSampleNumber.replace(/[^a-zA-Z0-9]/g, "");
+        const base = skuBase(currentSampleNumber);
         // One or many colors in the cell -> a variant each. A single UPC can
         // only map to a single color, so it's skipped when several are listed.
         const colorsToAdd = colorList.length > 0 ? colorList : [""];
         const single = colorsToAdd.length === 1;
         for (const color of colorsToAdd) {
           const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
-          const autoSku = code ? `${base}${code}` : null;
-          const skuCode = provided || autoSku;
+          const autoSku = code ? `${base}${code.trim().toUpperCase()}` : null;
+          const skuCode = (provided ? provided.toUpperCase() : null) || autoSku;
           const rowUpc = single ? upc : "";
 
           let dup = rowUpc ? await prisma.skuVariant.findUnique({ where: { upc: rowUpc } }) : null;

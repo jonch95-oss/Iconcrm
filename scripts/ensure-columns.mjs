@@ -95,6 +95,20 @@ for (const sql of STATEMENTS) {
   }
 }
 // ---------------------------------------------------------------------------
+// SKU casing: SKUs are the sample # + color code, uppercased. Backfill any
+// legacy lowercase skuCodes so display is consistent (idempotent).
+// ---------------------------------------------------------------------------
+try {
+  const n = await prisma.$executeRawUnsafe(
+    `UPDATE "SkuVariant" SET "skuCode" = upper("skuCode")
+       WHERE "skuCode" IS NOT NULL AND "skuCode" <> upper("skuCode")`,
+  );
+  if (Number(n) > 0) console.log(`[ensure-columns] skuCodes uppercased: ${Number(n)}.`);
+} catch (e) {
+  console.warn("[ensure-columns] sku casing skipped:", (e?.message ?? String(e)).slice(0, 140));
+}
+
+// ---------------------------------------------------------------------------
 // Brand hygiene (idempotent, non-destructive). Brands are admin-managed via
 // settings.brands. Earlier builds seeded a PLACEHOLDER brand list; repair it to
 // the real brands so the dropdown, import normalization and this cleanup all

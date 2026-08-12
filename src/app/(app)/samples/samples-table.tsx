@@ -22,6 +22,7 @@ import {
   Save,
   PackageCheck,
   Trash2,
+  Palette,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
+  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -81,6 +83,7 @@ export interface SampleRow {
   customerSellPrice: string | null;
   marginPercent: string | null;
   skuCount: number;
+  variants: { id: string; color: string; skuCode: string }[];
   ageDays: number;
   overdue: boolean;
   requestedBy: string;
@@ -397,6 +400,39 @@ function InlineEdit({
   );
 }
 
+function ColorsCell({ sampleId, variants }: { sampleId: string; variants: { id: string; color: string; skuCode: string }[] }) {
+  // Dedupe to one entry per color (a color may span multiple sizes) so the
+  // dropdown shows the sample family: each color child + its SKU.
+  const byColor = new Map<string, string>();
+  for (const v of variants) {
+    const key = (v.color || "").trim().toUpperCase();
+    if (key && !byColor.has(key)) byColor.set(key, v.skuCode);
+  }
+  const colors = [...byColor.entries()];
+  if (colors.length === 0) return <span className="text-[var(--muted-foreground)]">—</span>;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" size="sm" className="h-7 gap-1 px-2">
+          <Palette className="h-3.5 w-3.5" /> {colors.length}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuLabel>Colors in this family</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {colors.map(([color, sku]) => (
+          <DropdownMenuItem key={color} asChild>
+            <Link href={`/samples/${sampleId}`} className="flex items-center justify-between gap-3">
+              <span>{color}</span>
+              <span className="font-mono text-xs text-[var(--muted-foreground)]">{sku || "—"}</span>
+            </Link>
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function SamplesTable({
   rows,
   factories,
@@ -618,6 +654,12 @@ export function SamplesTable({
         accessorKey: "skuCount",
         header: "SKUs",
         cell: ({ row }) => <span className="tabular-nums">{row.original.skuCount}</span>,
+      },
+      {
+        id: "colors",
+        header: "Colors",
+        enableSorting: false,
+        cell: ({ row }) => <ColorsCell sampleId={row.original.id} variants={row.original.variants} />,
       },
       {
         accessorKey: "ageDays",

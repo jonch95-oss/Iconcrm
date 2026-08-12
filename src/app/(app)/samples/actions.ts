@@ -8,6 +8,7 @@ import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
+import { autoSkuCode, skuBase } from "@/lib/sku";
 import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
@@ -268,15 +269,28 @@ export async function addSkuVariant(formData: FormData): Promise<ActionResult> {
   const user = await assertRole("member");
   const parsed = skuVariantSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: parsed.error.issues[0]?.message ?? "Invalid" };
-  const dup = await prisma.skuVariant.findUnique({ where: { upc: parsed.data.upc } });
-  if (dup) return { ok: false, error: `UPC ${parsed.data.upc} already exists.` };
+  const upc = parsed.data.upc?.trim() || null;
+  if (upc) {
+    const dup = await prisma.skuVariant.findUnique({ where: { upc } });
+    if (dup) return { ok: false, error: `UPC ${upc} already exists.` };
+  }
+  // Auto-build the SKU from the sample # + color code (uppercase) when not
+  // typed in, so every color variant gets a consistent SKU automatically.
+  let skuCode = parsed.data.skuCode?.trim().toUpperCase() || null;
+  if (!skuCode) {
+    const [sample, cc] = await Promise.all([
+      prisma.sample.findUnique({ where: { id: parsed.data.sampleId }, select: { sampleNumber: true } }),
+      prisma.colorCode.findFirst({ where: { color: { equals: parsed.data.color.trim(), mode: "insensitive" } } }),
+    ]);
+    if (sample && cc) skuCode = autoSkuCode(sample.sampleNumber, cc.code);
+  }
   await prisma.skuVariant.create({
     data: {
       sampleId: parsed.data.sampleId,
       size: parsed.data.size,
       color: parsed.data.color,
-      upc: parsed.data.upc,
-      skuCode: parsed.data.skuCode,
+      upc,
+      skuCode,
       unitsPerCarton: parsed.data.unitsPerCarton ?? null,
     },
   });
@@ -285,7 +299,7 @@ export async function addSkuVariant(formData: FormData): Promise<ActionResult> {
     entityId: parsed.data.sampleId,
     action: "sku_added",
     userId: user.id,
-    after: { upc: parsed.data.upc },
+    after: { upc, skuCode },
   });
   revalidatePath(`/samples/${parsed.data.sampleId}`);
   return { ok: true };
@@ -693,7 +707,7 @@ export async function bulkAddVariantsByColor(
   if (cleanSizes.length === 0) cleanSizes.push("OS");
   if (cleanColors.length === 0) return { ok: false, error: "Add at least one color." };
 
-  const base = sample.sampleNumber.replace(/[^a-zA-Z0-9]/g, "");
+  const base = skuBase(sample.sampleNumber);
   const codeRows = await prisma.colorCode.findMany();
   const codeMap = new Map(codeRows.map((c) => [c.color.trim().toUpperCase(), c.code]));
 
@@ -707,7 +721,7 @@ export async function bulkAddVariantsByColor(
   for (const color of cleanColors) {
     const code = codeMap.get(color.toUpperCase());
     if (!code) missingCodes.add(color.toUpperCase());
-    const skuCode = code ? `${base}${code}` : null;
+    const skuCode = code ? `${base}${code.trim().toUpperCase()}` : null;
     for (const size of cleanSizes) {
       const key = `${size.toUpperCase()}|${color.toUpperCase()}`;
       if (existsKey.has(key)) {

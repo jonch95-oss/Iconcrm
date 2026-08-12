@@ -87,7 +87,7 @@ export const skuVariantSchema = z.object({
   sampleId: z.string().min(1),
   size: z.string().trim().min(1, "Size required"),
   color: z.string().trim().min(1, "Color required"),
-  upc: z.string().trim().min(1, "UPC required"),
+  upc: optionalString,
   skuCode: optionalString,
   unitsPerCarton: z
     .string()
