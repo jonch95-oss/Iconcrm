@@ -923,3 +923,12 @@ export async function groupSamplesIntoMaster(
     return { ok: false, error: "Couldn't group — a selected sample may be linked to an order form or PI. Unlink it first, then retry." };
   }
 }
+
+/** Lightweight color edit used by the Suggested Groups screen. */
+export async function updateSampleColor(sampleId: string, color: string): Promise<ActionResult> {
+  await assertRole("member");
+  await prisma.sample.update({ where: { id: sampleId }, data: { color: color.trim() || null } });
+  revalidatePath("/samples");
+  revalidatePath("/samples/groups");
+  return { ok: true };
+}
