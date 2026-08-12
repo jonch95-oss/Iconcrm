@@ -17,6 +17,7 @@ const norm = (v: unknown) =>
 /** field -> accepted normalized header names */
 const SAMPLE_ALIASES: Record<string, string[]> = {
   sampleNumber: ["sample", "sampleno", "samplenumber", "samplenum", "smpl", "s"],
+  masterNumber: ["master", "mastersample", "mastersampleno", "mastersamplenumber", "masternumber", "masterno", "masterstyle", "parent", "parentsample", "family"],
   brand: ["brand", "vendor", "label"],
   category: ["category", "cat", "producttype", "type"],
   styleNumber: ["style", "styleno", "stylenumber", "stylenum", "styleref"],
@@ -252,6 +253,8 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
     { header: "UPC", width: 16 },
     { header: "SKU Code", width: 14 },
     { header: "Received", width: 10 },
+    { header: "Master Sample #", width: 18 },
+    { header: "Color ETA", width: 12 },
   ];
   ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };

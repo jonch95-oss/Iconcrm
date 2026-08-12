@@ -29,7 +29,7 @@ export async function GET(request: Request) {
 
   const samples = await prisma.sample.findMany({
     where: ids && ids.length ? { id: { in: ids } } : undefined,
-    include: { factory: { select: { name: true } }, skuVariants: { orderBy: { upc: "asc" } } },
+    include: { factory: { select: { name: true } }, skuVariants: { orderBy: { upc: "asc" } }, comments: { orderBy: { createdAt: "asc" }, select: { body: true } } },
     orderBy: { sampleNumber: "asc" },
   });
 
@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "Image", "Sample #", "Brand", "Category", "Season", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code", "Received",
+    "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments",
   ];
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -60,13 +60,15 @@ export async function GET(request: Request) {
       s.htsCode ?? "", s.material ?? "", s.composition ?? "", num(s.cbmPerCarton), s.casePackDefault ?? "",
       s.factory?.name ?? "", s.targetCustomer ?? "", s.status,
     ];
+    const commentsText = s.comments.map((c) => c.body).filter(Boolean).join(" | ");
+    const vEta = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
     let firstRow = 0;
     if (s.skuVariants.length === 0) {
-      firstRow = ws.addRow([...base, s.size ?? "", "", "", ""]).number;
+      firstRow = ws.addRow([...base, s.size ?? "", "", "", "", "", commentsText]).number;
       if (withPhotos && s.imageUrl) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
     } else {
       s.skuVariants.forEach((v, i) => {
-        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.received ? "Y" : ""]).number;
+        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.received ? "Y" : "", vEta(v.sampleEta), i === 0 ? commentsText : ""]).number;
         if (i === 0) firstRow = r;
         // Embed each color's own image on its row (falls back to the sample
         // photo on the first row) so per-color images round-trip on re-import.

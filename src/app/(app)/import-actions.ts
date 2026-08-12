@@ -126,7 +126,8 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     // Key on Sample # when present; otherwise fall back to STYLE # so
     // sample-request sheets (IMAGE / Brand / STYLE # / DESCRIPTION / COLOR /
     // Season) import one sample per style row, same as the emailed sheets.
-    const sampleNumber = ((v.sampleNumber ?? v.styleNumber) ?? "").trim();
+    // A Master Sample # groups rows (with distinct Sample #s) into one family.
+    const sampleNumber = ((v.masterNumber ?? v.sampleNumber ?? v.styleNumber) ?? "").trim();
 
     try {
       if (sampleNumber && sampleNumber !== currentSampleNumber) {
