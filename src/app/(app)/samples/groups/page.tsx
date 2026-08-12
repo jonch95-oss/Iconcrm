@@ -15,7 +15,7 @@ export default async function SuggestedGroupsPage() {
   await requireRole("admin");
 
   const samples = await prisma.sample.findMany({
-    where: { status: { notIn: ["dropped"] } },
+    where: { status: { notIn: ["dropped"] }, excludeFromGrouping: false },
     select: { id: true, sampleNumber: true, color: true, material: true, status: true, brand: true },
     orderBy: { sampleNumber: "asc" },
     take: 5000,

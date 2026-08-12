@@ -3,13 +3,13 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Boxes, AlertTriangle, Trash2 } from "lucide-react";
+import { Boxes, AlertTriangle, Trash2, SplitSquareHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { groupSamplesIntoMaster, updateSampleColor, updateSampleMaterial, deleteSample } from "../actions";
+import { groupSamplesIntoMaster, updateSampleColor, updateSampleMaterial, deleteSample, setExcludeFromGrouping } from "../actions";
 import type { GroupCluster } from "@/lib/grouping";
 import { SAMPLE_STATUS_LABEL } from "@/lib/status";
 import type { SampleStatus } from "@prisma/client";
@@ -83,6 +83,14 @@ function ClusterCard({ cluster, onDone }: { cluster: GroupCluster; onDone: () =>
       router.refresh();
     });
   };
+  const keepSeparate = () => {
+    start(async () => {
+      const res = await setExcludeFromGrouping(members.map((m) => m.id), true);
+      if (!res.ok) { toast.error(res.error); return; }
+      onDone();
+      toast.success("Marked separate — won't be suggested again");
+    });
+  };
 
   const toggle = (id: string) =>
     setPicked((p) => {
@@ -123,6 +131,9 @@ function ClusterCard({ cluster, onDone }: { cluster: GroupCluster; onDone: () =>
         <div className="flex items-center gap-2">
           <span className="text-xs text-[var(--muted-foreground)]">Master #</span>
           <Input value={master} onChange={(e) => setMaster(e.target.value)} className="h-8 w-48" />
+          <Button size="sm" variant="outline" onClick={keepSeparate} disabled={pending} title="These are separate — don't suggest grouping them again">
+            <SplitSquareHorizontal className="h-4 w-4" /> Not a group
+          </Button>
           <Button size="sm" onClick={group} disabled={pending || picked.size < 2 || !master.trim()}>
             <Boxes className="h-4 w-4" /> {pending ? "Grouping..." : "Group"}
           </Button>

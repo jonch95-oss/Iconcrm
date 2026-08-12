@@ -941,3 +941,13 @@ export async function updateSampleMaterial(sampleId: string, material: string): 
   revalidatePath("/samples/groups");
   return { ok: true };
 }
+
+/** Mark samples "keep separate" (or clear it) so they stop appearing as a
+ *  suggested group. */
+export async function setExcludeFromGrouping(sampleIds: string[], exclude = true): Promise<ActionResult> {
+  await assertRole("member");
+  if (sampleIds.length === 0) return { ok: false, error: "No samples." };
+  await prisma.sample.updateMany({ where: { id: { in: sampleIds } }, data: { excludeFromGrouping: exclude } });
+  revalidatePath("/samples/groups");
+  return { ok: true };
+}

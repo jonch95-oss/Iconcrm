@@ -228,6 +228,7 @@ model Sample {
   season       String?
   description  String?      @db.Text
   status       SampleStatus @default(sample_requested)
+  excludeFromGrouping Boolean @default(false) // admin marked "keep separate" in suggested groups
 
   requestedById String?
   requestedBy   User?   @relation("RequestedSamples", fields: [requestedById], references: [id])
