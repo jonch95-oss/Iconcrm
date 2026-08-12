@@ -168,6 +168,7 @@ export default async function SampleDetailPage({
     cbmPerCarton: sample.cbmPerCarton?.toString() ?? "",
     casePackDefault: sample.casePackDefault?.toString() ?? "",
     color: sample.color ?? "",
+    material: sample.material ?? "",
     trackingNumber: sample.trackingNumber ?? "",
             factoryId: sample.factoryId ?? "",
             status: sample.status,

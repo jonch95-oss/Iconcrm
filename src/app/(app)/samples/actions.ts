@@ -1000,3 +1000,24 @@ export async function suggestRelatedSamples(
     .map((m) => ({ id: m.id, sampleNumber: m.sampleNumber, color: m.color ?? "", material: m.material ?? "" }));
   return { ok: true, suggestions };
 }
+
+/** Set (or clear) a single color variant's image from a Blob URL. */
+export async function uploadSkuVariantImage(formData: FormData): Promise<ActionResult> {
+  await assertRole("member");
+  const variantId = String(formData.get("variantId") ?? "");
+  const sampleId = String(formData.get("sampleId") ?? "");
+  const blobUrl = String(formData.get("blobUrl") ?? "");
+  if (!variantId || !blobUrl) return { ok: false, error: "Missing image." };
+  if (!/^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i.test(blobUrl)) {
+    return { ok: false, error: "Invalid upload URL." };
+  }
+  await prisma.skuVariant.update({ where: { id: variantId }, data: { imageUrl: blobUrl, imageHash: null } });
+  // If the sample has no photo yet, use this color as its thumbnail.
+  const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { imageUrl: true } });
+  if (sample && !sample.imageUrl) {
+    await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: blobUrl } });
+  }
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
+  return { ok: true };
+}

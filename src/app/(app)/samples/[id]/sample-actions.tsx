@@ -31,6 +31,7 @@ export interface SampleEditData {
   sampleNumber: string;
   brand: string;
   color: string;
+  material: string;
   category: string;
   styleName: string;
   styleNumber: string;
@@ -148,6 +149,7 @@ export function SampleActions({
             <F label="Inland / unit" name="inlandPerUnit" defaultValue={data.inlandPerUnit} type="number" step="0.01" />
             <F label="HTS code" name="htsCode" defaultValue={data.htsCode} />
             <F label="Composition (100% Cotton…)" name="composition" defaultValue={data.composition} />
+            <F label="Material (Leather, Nylon…)" name="material" defaultValue={data.material} />
             <F label="CBM / carton" name="cbmPerCarton" defaultValue={data.cbmPerCarton} type="number" step="0.0001" />
             <F label="Case pack (units/carton)" name="casePackDefault" defaultValue={data.casePackDefault} type="number" step="1" />
             <F label="Tracking # (inbound sample)" name="trackingNumber" defaultValue={data.trackingNumber} />

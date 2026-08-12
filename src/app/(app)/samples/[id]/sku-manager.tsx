@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Trash2, Wand2 } from "lucide-react";
+import { Plus, Trash2, Wand2, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,7 +14,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample } from "../actions";
+import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample, uploadSkuVariantImage } from "../actions";
+import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 
 export interface SkuRow {
@@ -119,14 +120,7 @@ export function SkuManager({
           ) : (
             skus.map((s) => (
               <TableRow key={s.id}>
-                <TableCell>
-                  {s.imageUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={s.imageUrl} alt={s.color} className="h-10 w-10 rounded object-contain bg-white" />
-                  ) : (
-                    <span className="text-[var(--muted-foreground)]">—</span>
-                  )}
-                </TableCell>
+                <TableCell><VariantImageCell id={s.id} sampleId={sampleId} imageUrl={s.imageUrl} color={s.color} canEdit={canEdit} /></TableCell>
                 <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="size" value={s.size} canEdit={canEdit} /></TableCell>
                 <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="color" value={s.color} canEdit={canEdit} /></TableCell>
                 <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
@@ -165,6 +159,44 @@ export function SkuManager({
         </div>
       )}
     </div>
+  );
+}
+
+function VariantImageCell({ id, sampleId, imageUrl, color, canEdit }: { id: string; sampleId: string; imageUrl: string | null; color: string; canEdit: boolean }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  const onPick = (file: File | undefined) => {
+    if (!file) return;
+    start(async () => {
+      try {
+        const blob = await upload(`variants/${id}/${Date.now()}-${file.name}`, file, { access: "public", handleUploadUrl: "/api/import/blob-upload" });
+        const fd = new FormData();
+        fd.set("variantId", id); fd.set("sampleId", sampleId); fd.set("blobUrl", blob.url);
+        const res = await uploadSkuVariantImage(fd);
+        if (!res.ok) toast.error(res.error); else { toast.success("Image updated"); router.refresh(); }
+      } catch (e) { toast.error(e instanceof Error ? e.message : "Upload failed"); }
+      finally { if (inputRef.current) inputRef.current.value = ""; }
+    });
+  };
+  if (!canEdit) {
+    return imageUrl
+      ? // eslint-disable-next-line @next/next/no-img-element
+        <img src={imageUrl} alt={color} className="h-10 w-10 rounded object-contain bg-white" />
+      : <span className="text-[var(--muted-foreground)]">—</span>;
+  }
+  return (
+    <>
+      <button type="button" onClick={() => inputRef.current?.click()} disabled={pending} title="Upload color image" className="group relative block h-10 w-10">
+        {imageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={imageUrl} alt={color} className="h-10 w-10 rounded object-contain bg-white" />
+        ) : (
+          <span className="flex h-10 w-10 items-center justify-center rounded border border-dashed border-[var(--border)] text-[var(--muted-foreground)]"><ImagePlus className="h-4 w-4" /></span>
+        )}
+      </button>
+      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPick(e.target.files?.[0])} />
+    </>
   );
 }
 
