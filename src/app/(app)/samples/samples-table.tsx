@@ -22,7 +22,8 @@ import {
   Save,
   PackageCheck,
   Trash2,
-  Palette,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,7 +50,6 @@ import {
   DropdownMenuCheckboxItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
@@ -400,39 +400,6 @@ function InlineEdit({
   );
 }
 
-function ColorsCell({ sampleId, variants }: { sampleId: string; variants: { id: string; color: string; skuCode: string }[] }) {
-  // Dedupe to one entry per color (a color may span multiple sizes) so the
-  // dropdown shows the sample family: each color child + its SKU.
-  const byColor = new Map<string, string>();
-  for (const v of variants) {
-    const key = (v.color || "").trim().toUpperCase();
-    if (key && !byColor.has(key)) byColor.set(key, v.skuCode);
-  }
-  const colors = [...byColor.entries()];
-  if (colors.length === 0) return <span className="text-[var(--muted-foreground)]">—</span>;
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="h-7 gap-1 px-2">
-          <Palette className="h-3.5 w-3.5" /> {colors.length}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-64">
-        <DropdownMenuLabel>Colors in this family</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {colors.map(([color, sku]) => (
-          <DropdownMenuItem key={color} asChild>
-            <Link href={`/samples/${sampleId}`} className="flex items-center justify-between gap-3">
-              <span>{color}</span>
-              <span className="font-mono text-xs text-[var(--muted-foreground)]">{sku || "—"}</span>
-            </Link>
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
 export function SamplesTable({
   rows,
   factories,
@@ -492,6 +459,11 @@ export function SamplesTable({
   const seasonOptions = React.useMemo(() => [...new Set(rows.map((r) => r.season).filter(Boolean))].sort(), [rows]);
   const categoryOptions = React.useMemo(() => [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(), [rows]);
 
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({});
+  const toggleExpanded = React.useCallback(
+    (id: string) => setExpanded((e) => ({ ...e, [id]: !e[id] })),
+    [],
+  );
   const columns = React.useMemo<ColumnDef<SampleRow>[]>(
     () => [
       {
@@ -518,26 +490,38 @@ export function SamplesTable({
       {
         accessorKey: "sampleNumber",
         header: ({ column }) => <SortBtn column={column} label="Sample #" />,
-        cell: ({ row }) => (
-          <span className="flex items-center gap-2">
-            {row.original.imageUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={row.original.imageUrl}
-                alt=""
-                className="h-8 w-8 shrink-0 rounded border border-[var(--border)] bg-white object-contain"
-              />
-            ) : (
-              <span className="h-8 w-8 shrink-0 rounded border border-dashed border-[var(--border)]" />
-            )}
-            <Link
-              href={`/samples/${row.original.id}`}
-              className="font-medium text-[var(--primary)] hover:underline"
-            >
-              {row.original.sampleNumber}
-            </Link>
-          </span>
-        ),
+        cell: ({ row }) => {
+          const hasKids = row.original.variants.length > 0;
+          const open = !!expanded[row.original.id];
+          return (
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => hasKids && toggleExpanded(row.original.id)}
+                className={`shrink-0 rounded p-0.5 hover:bg-[var(--accent)] ${hasKids ? "text-[var(--muted-foreground)]" : "invisible"}`}
+                aria-label={open ? "Collapse SKUs" : "Expand SKUs"}
+              >
+                {open ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </button>
+              {row.original.imageUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={row.original.imageUrl}
+                  alt=""
+                  className="h-8 w-8 shrink-0 rounded border border-[var(--border)] bg-white object-contain"
+                />
+              ) : (
+                <span className="h-8 w-8 shrink-0 rounded border border-dashed border-[var(--border)]" />
+              )}
+              <Link
+                href={`/samples/${row.original.id}`}
+                className="font-medium text-[var(--primary)] hover:underline"
+              >
+                {row.original.sampleNumber}
+              </Link>
+            </span>
+          );
+        },
       },
       {
         accessorKey: "brand",
@@ -656,19 +640,13 @@ export function SamplesTable({
         cell: ({ row }) => <span className="tabular-nums">{row.original.skuCount}</span>,
       },
       {
-        id: "colors",
-        header: "Colors",
-        enableSorting: false,
-        cell: ({ row }) => <ColorsCell sampleId={row.original.id} variants={row.original.variants} />,
-      },
-      {
         accessorKey: "ageDays",
         header: ({ column }) => <SortBtn column={column} label="Age" />,
         cell: ({ row }) => <span className="tabular-nums">{row.original.ageDays}d</span>,
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit, factories, brands, isAdmin],
+    [canEdit, factories, brands, isAdmin, expanded, toggleExpanded],
   );
 
   const table = useReactTable({
@@ -980,13 +958,32 @@ export function SamplesTable({
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-xs">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <React.Fragment key={row.id}>
+                  <TableRow data-state={row.getIsSelected() && "selected"}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-xs">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                  {expanded[row.original.id] && row.original.variants.length > 0 && (
+                    <TableRow className="bg-[var(--muted)]/40 hover:bg-[var(--muted)]/40">
+                      <TableCell colSpan={row.getVisibleCells().length} className="py-1.5">
+                        <div className="space-y-1 pl-16">
+                          {row.original.variants.map((v) => (
+                            <div key={v.id} className="flex items-center gap-3 text-xs">
+                              <span className="text-[var(--muted-foreground)]">&#9492;</span>
+                              <Link href={`/samples/${row.original.id}`} className="font-mono text-[var(--primary)] hover:underline">
+                                {v.skuCode || "(no SKU yet)"}
+                              </Link>
+                              {v.color && <span className="text-[var(--muted-foreground)]">{v.color}</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </React.Fragment>
               ))
             )}
           </TableBody>
