@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { groupSamplesIntoMaster, updateSampleColor, deleteSample } from "../actions";
+import { groupSamplesIntoMaster, updateSampleColor, updateSampleMaterial, deleteSample } from "../actions";
 import type { GroupCluster } from "@/lib/grouping";
 import { SAMPLE_STATUS_LABEL } from "@/lib/status";
 import type { SampleStatus } from "@prisma/client";
@@ -62,6 +62,16 @@ function ClusterCard({ cluster, onDone }: { cluster: GroupCluster; onDone: () =>
       if (!res.ok) toast.error(res.error);
     });
   };
+  const setMaterial = (id: string, material: string) => {
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, material } : m)));
+  };
+  const saveMaterial = (id: string, material: string) => {
+    start(async () => {
+      const res = await updateSampleMaterial(id, material);
+      if (!res.ok) toast.error(res.error);
+      else router.refresh(); // material change may re-split/merge the group
+    });
+  };
   const removeMember = (id: string) => {
     if (!confirm("Delete this sample? This can't be undone.")) return;
     start(async () => {
@@ -103,7 +113,7 @@ function ClusterCard({ cluster, onDone }: { cluster: GroupCluster; onDone: () =>
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
         <CardTitle className="flex items-center gap-2 text-base">
-          {cluster.brand || "—"} · {members.length} samples
+          {cluster.brand || "—"} · {cluster.material || "(no material)"} · {members.length} samples
           {dupColors.length > 0 && (
             <Badge variant="warning" className="gap-1">
               <AlertTriangle className="h-3 w-3" /> dup color: {dupColors.join(", ")}
@@ -132,7 +142,14 @@ function ClusterCard({ cluster, onDone }: { cluster: GroupCluster; onDone: () =>
                 placeholder="color"
                 onChange={(e) => setColor(m.id, e.target.value)}
                 onBlur={(e) => saveColor(m.id, e.target.value)}
-                className={`h-7 w-40 text-xs ${isDup ? "border-[var(--warning)]" : ""}`}
+                className={`h-7 w-36 text-xs ${isDup ? "border-[var(--warning)]" : ""}`}
+              />
+              <Input
+                value={m.material}
+                placeholder="material"
+                onChange={(e) => setMaterial(m.id, e.target.value)}
+                onBlur={(e) => saveMaterial(m.id, e.target.value)}
+                className="h-7 w-36 text-xs"
               />
               <span className="text-xs text-[var(--muted-foreground)]">
                 {SAMPLE_STATUS_LABEL[m.status as SampleStatus] ?? m.status}

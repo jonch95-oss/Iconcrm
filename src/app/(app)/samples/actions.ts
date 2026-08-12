@@ -932,3 +932,12 @@ export async function updateSampleColor(sampleId: string, color: string): Promis
   revalidatePath("/samples/groups");
   return { ok: true };
 }
+
+/** Lightweight material edit used by the Suggested Groups screen. */
+export async function updateSampleMaterial(sampleId: string, material: string): Promise<ActionResult> {
+  await assertRole("member");
+  await prisma.sample.update({ where: { id: sampleId }, data: { material: material.trim() || null } });
+  revalidatePath("/samples");
+  revalidatePath("/samples/groups");
+  return { ok: true };
+}

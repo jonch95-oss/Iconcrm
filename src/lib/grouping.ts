@@ -14,12 +14,14 @@ export interface GroupMember {
   id: string;
   sampleNumber: string;
   color: string;
+  material: string;
   status: string;
 }
 export interface GroupCluster {
   base: string;
   suggestedMaster: string;
   brand: string;
+  material: string; // the family's material (groups are material-consistent)
   members: GroupMember[];
   duplicateColors: string[]; // colors that appear on more than one member
 }
@@ -50,17 +52,21 @@ export function commonPrefix(nums: string[]): string {
 }
 
 export function suggestGroups(
-  samples: { id: string; sampleNumber: string; color: string; status: string; brand: string }[],
+  samples: { id: string; sampleNumber: string; color: string; material: string; status: string; brand: string }[],
 ): GroupCluster[] {
-  const byBase = new Map<string, typeof samples>();
+  // Cluster by base sample number AND material, so each suggested family is a
+  // single material (a style often comes in several materials + colors).
+  const byKey = new Map<string, typeof samples>();
   for (const s of samples) {
     const b = baseOf(s.sampleNumber, s.color);
-    if (!byBase.has(b)) byBase.set(b, []);
-    byBase.get(b)!.push(s);
+    const key = `${b}||${(s.material ?? "").trim().toUpperCase()}`;
+    if (!byKey.has(key)) byKey.set(key, []);
+    byKey.get(key)!.push(s);
   }
   const clusters: GroupCluster[] = [];
-  for (const [base, members] of byBase) {
+  for (const [key, members] of byKey) {
     if (members.length < 2) continue;
+    const base = key.split("||")[0];
     const nums = members.map((m) => m.sampleNumber);
     const prefix = commonPrefix(nums);
     const suggestedMaster = prefix.length >= 4 ? prefix : base;
@@ -74,7 +80,8 @@ export function suggestGroups(
       base,
       suggestedMaster,
       brand: members[0].brand ?? "",
-      members: members.map((m) => ({ id: m.id, sampleNumber: m.sampleNumber, color: m.color, status: m.status })),
+      material: (members[0].material ?? "").trim(),
+      members: members.map((m) => ({ id: m.id, sampleNumber: m.sampleNumber, color: m.color, material: m.material, status: m.status })),
       duplicateColors,
     });
   }

@@ -16,7 +16,7 @@ export default async function SuggestedGroupsPage() {
 
   const samples = await prisma.sample.findMany({
     where: { status: { notIn: ["dropped"] } },
-    select: { id: true, sampleNumber: true, color: true, status: true, brand: true },
+    select: { id: true, sampleNumber: true, color: true, material: true, status: true, brand: true },
     orderBy: { sampleNumber: "asc" },
     take: 5000,
   });
@@ -25,6 +25,7 @@ export default async function SuggestedGroupsPage() {
       id: s.id,
       sampleNumber: s.sampleNumber,
       color: s.color ?? "",
+      material: s.material ?? "",
       status: s.status,
       brand: s.brand ?? "",
     })),
