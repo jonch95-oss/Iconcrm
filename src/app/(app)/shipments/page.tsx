@@ -4,6 +4,7 @@ import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { EmptyState } from "@/components/empty-state";
 import { NewShipmentDialog } from "./new-shipment-dialog";
+import { BlUploadDialog } from "./bl-upload-dialog";
 import { ShipmentStatusBadge, RiskBadge } from "@/components/status-badge";
 import {
   Table,
@@ -51,6 +52,7 @@ export default async function ShipmentsPage() {
         title="Shipments"
         description="Every container, with its live ETA against each customer PO's delivery window. Red means it will miss a cancel date."
       >
+        {canEdit && <BlUploadDialog />}
         {canEdit && <NewShipmentDialog />}
       </PageHeader>
       {shipments.length === 0 ? (

@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // pdf-parse (pdfjs) must stay external so Next doesn't bundle its worker.
+  serverExternalPackages: ["pdf-parse"],
   experimental: {
     serverActions: {
       // Image uploads and Excel imports arrive through server actions.

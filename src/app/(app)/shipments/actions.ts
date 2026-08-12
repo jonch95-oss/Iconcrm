@@ -11,6 +11,7 @@ import { getTrackingProvider } from "@/lib/tracking/provider";
 import { applyTrackingUpdate } from "@/lib/tracking/alerts";
 import { recomputeShipmentRisks } from "@/lib/tracking/risk";
 import { getSettings } from "@/lib/settings";
+import { extractBlFields, type BlFields } from "@/lib/bl-parse";
 
 type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
 
@@ -171,4 +172,95 @@ export async function linkPackingListToShipment(
   await recomputeShipmentRisks(shipmentId);
   revalidatePath(`/shipments/${shipmentId}`);
   return { ok: true };
+}
+
+
+const BLOB_URL_RE = /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i;
+
+export type BlParseResult =
+  | { ok: true; fields: BlFields; textLength: number }
+  | { ok: false; error: string };
+
+/**
+ * Read an uploaded Bill of Lading (PDF) and extract shipment fields. Text-based
+ * PDFs auto-fill; scanned PDFs yield little text (textLength ~0) so the UI
+ * prompts for manual entry. Never creates anything — the caller confirms first.
+ */
+export async function parseBillOfLading(blobUrl: string): Promise<BlParseResult> {
+  await assertRole("member");
+  if (!BLOB_URL_RE.test(blobUrl)) return { ok: false, error: "Invalid upload URL." };
+  const res = await fetch(blobUrl);
+  if (!res.ok) return { ok: false, error: "Could not read the uploaded BL." };
+  const buf = Buffer.from(await res.arrayBuffer());
+  let text = "";
+  try {
+    const { PDFParse } = await import("pdf-parse");
+    const parser = new PDFParse({ data: new Uint8Array(buf) });
+    const out = await parser.getText();
+    text = out.text ?? "";
+    await parser.destroy?.();
+  } catch {
+    // Unreadable/scanned PDF: fall through with empty text for manual entry.
+  }
+  return { ok: true, fields: extractBlFields(text), textLength: text.trim().length };
+}
+
+const blCreateSchema = z.object({
+  containerNumber: z.string().trim().optional(),
+  mblNumber: z.string().trim().optional(),
+  bookingNumber: z.string().trim().optional(),
+  vesselName: z.string().trim().optional(),
+  voyage: z.string().trim().optional(),
+  pol: z.string().trim().optional(),
+  pod: z.string().trim().optional(),
+  finalDestination: z.string().trim().optional(),
+  originalEtd: z.string().optional(),
+  originalEta: z.string().optional(),
+  blobUrl: z.string().trim().optional(),
+  filename: z.string().trim().optional(),
+});
+
+/** Create a shipment from confirmed BL fields and attach the BL document. */
+export async function createShipmentFromBl(formData: FormData): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const d = blCreateSchema.parse(Object.fromEntries(formData));
+  if (!d.containerNumber && !d.mblNumber && !d.bookingNumber) {
+    return { ok: false, error: "Need a container, BOL, or booking number to create a shipment." };
+  }
+  const settings = await getSettings();
+  const originalEta = parseDateInput(d.originalEta ?? null);
+  const originalEtd = parseDateInput(d.originalEtd ?? null);
+
+  const shipment = await prisma.$transaction(async (tx) => {
+    const shipmentRef = await nextShipmentRef(tx);
+    const sh = await tx.shipment.create({
+      data: {
+        shipmentRef,
+        containerNumber: d.containerNumber || null,
+        mblNumber: d.mblNumber || null,
+        bookingNumber: d.bookingNumber || null,
+        vesselName: d.vesselName || null,
+        voyage: d.voyage || null,
+        pol: d.pol || null,
+        pod: d.pod || null,
+        finalDestination: d.finalDestination || null,
+        originalEtd,
+        currentEtd: originalEtd,
+        originalEta,
+        currentEta: originalEta,
+        inlandBufferDays: settings.inlandBufferDaysDefault,
+        trackingProvider: "manual",
+      },
+    });
+    if (d.blobUrl && BLOB_URL_RE.test(d.blobUrl)) {
+      await tx.attachment.create({
+        data: { parentType: "shipment", parentId: sh.id, blobUrl: d.blobUrl, filename: d.filename || "bill-of-lading.pdf", mimeType: "application/pdf", uploadedById: user.id },
+      });
+    }
+    return sh;
+  });
+
+  await logAudit({ entityType: "shipment", entityId: shipment.id, action: "created_from_bl", userId: user.id, after: { shipmentRef: shipment.shipmentRef, container: shipment.containerNumber } });
+  revalidatePath("/shipments");
+  return { ok: true, id: shipment.id };
 }
