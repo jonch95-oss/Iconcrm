@@ -100,6 +100,21 @@ for (const sql of STATEMENTS) {
   }
 }
 // ---------------------------------------------------------------------------
+// Status hygiene: a sample that has an ETA but is still "sample_requested"
+// should read "eta_set" (having an ETA is exactly what distinguishes them).
+// Only bumps requested -> eta_set; never touches received/on_hold/etc.
+// ---------------------------------------------------------------------------
+try {
+  const n = await prisma.$executeRawUnsafe(
+    `UPDATE "Sample" SET "status" = 'eta_set'
+       WHERE "status" = 'sample_requested' AND "sampleEta" IS NOT NULL`,
+  );
+  if (Number(n) > 0) console.log(`[ensure-columns] status eta_set backfilled: ${Number(n)}.`);
+} catch (e) {
+  console.warn("[ensure-columns] status backfill skipped:", (e?.message ?? String(e)).slice(0, 140));
+}
+
+// ---------------------------------------------------------------------------
 // SKU casing: SKUs are the sample # + color code, uppercased. Backfill any
 // legacy lowercase skuCodes so display is consistent (idempotent).
 // ---------------------------------------------------------------------------

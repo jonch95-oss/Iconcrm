@@ -198,7 +198,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             where: { id: existing.id },
             // Only set the 6-week ETA when one isn't already present, so a
             // manually-adjusted ETA survives a re-import.
-            data: { ...fields, ...(existing.sampleEta ? {} : { sampleEta: importEta }) },
+            data: {
+              ...fields,
+              ...(existing.sampleEta ? {} : { sampleEta: importEta }),
+              ...(!existing.sampleEta && !fields.status && existing.status === "sample_requested" ? { status: "eta_set" as SampleStatus } : {}),
+            },
           });
           currentSampleId = existing.id;
           summary.updated += 1;
@@ -208,7 +212,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
               sampleNumber,
               ...fields,
               sampleEta: importEta,
-              status: fields.fobCost ? "quoted" : "sample_requested",
+              // Imported samples always get the +6wk ETA, so the natural state is
+              // "ETA Set" (or "Quoted" if a FOB came in). A sheet Status wins.
+              status: fields.status ?? (fields.fobCost ? "quoted" : "eta_set"),
               requestedById: user.id,
             },
           });
