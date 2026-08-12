@@ -10,6 +10,7 @@ import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
 import { ageInDays, isOverdue } from "@/lib/date";
+import { variantSampleStatus, type BadgeTone } from "@/lib/status";
 import { getSettings } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
@@ -36,7 +37,7 @@ export default async function SamplesPage({
         factory: { select: { id: true, name: true } },
         requestedBy: { select: { name: true, email: true } },
         _count: { select: { skuVariants: true } },
-        skuVariants: { orderBy: [{ color: "asc" }], select: { id: true, color: true, skuCode: true } },
+        skuVariants: { orderBy: [{ color: "asc" }], select: { id: true, color: true, skuCode: true, sampleEta: true, received: true, revisionsRequestedAt: true } },
       },
     }),
     prisma.factory.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -71,7 +72,19 @@ export default async function SamplesPage({
       customerSellPrice: s.customerSellPrice ? s.customerSellPrice.toString() : null,
       marginPercent: margin ? margin.toFixed(1) : null,
       skuCount: s._count.skuVariants,
-      variants: s.skuVariants.map((v) => ({ id: v.id, color: v.color ?? "", skuCode: v.skuCode ?? "" })),
+      variants: s.skuVariants.map((v) => {
+        const vs = variantSampleStatus({ received: v.received, revisionsRequestedAt: v.revisionsRequestedAt, sampleEta: v.sampleEta });
+        return {
+          id: v.id,
+          color: v.color ?? "",
+          skuCode: v.skuCode ?? "",
+          sampleEta: v.sampleEta ? v.sampleEta.toISOString().slice(0, 10) : "",
+          received: v.received,
+          revisionsRequested: !!v.revisionsRequestedAt,
+          statusLabel: vs.label,
+          statusTone: vs.tone,
+        };
+      }),
       ageDays: ageInDays(s.requestedAt) ?? 0,
       overdue: !s.sampleReceivedDate && isOverdue(s.sampleEta),
       requestedBy: s.requestedBy?.name ?? s.requestedByExternal ?? "—",

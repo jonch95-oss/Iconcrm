@@ -56,11 +56,12 @@ import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
 import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
 import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
+import type { BadgeTone } from "@/lib/status";
 
 const SEASON_CHOICES = seasonChoices();
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
-import { updateSample, bulkReceiveSamples, bulkDeleteSamples } from "./actions";
+import { updateSample, bulkReceiveSamples, bulkDeleteSamples, editSkuVariant, toggleSkuReceived, requestVariantRevisions } from "./actions";
 import { CreateOrderFormButton } from "./create-order-form-dialog";
 import { toast } from "sonner";
 
@@ -85,7 +86,11 @@ export interface SampleRow {
   customerSellPrice: string | null;
   marginPercent: string | null;
   skuCount: number;
-  variants: { id: string; color: string; skuCode: string }[];
+  variants: {
+    id: string; color: string; skuCode: string;
+    sampleEta: string; received: boolean; revisionsRequested: boolean;
+    statusLabel: string; statusTone: BadgeTone;
+  }[];
   ageDays: number;
   overdue: boolean;
   requestedBy: string;
@@ -399,6 +404,56 @@ function InlineEdit({
     >
       {value || <span className="text-[var(--muted-foreground)]">—</span>}
     </button>
+  );
+}
+
+type ChildVariant = SampleRow["variants"][number];
+function SkuChildRow({ sampleId, v, canEdit }: { sampleId: string; v: ChildVariant; canEdit: boolean }) {
+  const router = useRouter();
+  const [pending, start] = React.useTransition();
+  const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
+    start(async () => {
+      const r = await fn();
+      if (r && r.ok === false) toast.error(r.error);
+      router.refresh();
+    });
+  return (
+    <div className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="text-[var(--muted-foreground)]">&#9492;</span>
+      <Link href={`/samples/${sampleId}`} className="w-40 shrink-0 font-mono text-[var(--primary)] hover:underline">
+        {v.skuCode || "(no SKU yet)"}
+      </Link>
+      <span className="w-28 shrink-0 text-[var(--muted-foreground)]">{v.color || "—"}</span>
+      <Badge variant={v.statusTone}>{v.statusLabel}</Badge>
+      {canEdit ? (
+        <input
+          type="date"
+          defaultValue={v.sampleEta}
+          disabled={pending}
+          className="h-6 rounded border border-[var(--border)] bg-transparent px-1 text-xs"
+          onChange={(e) => run(() => editSkuVariant(v.id, sampleId, "sampleEta", e.target.value))}
+        />
+      ) : (
+        <span className="text-[var(--muted-foreground)]">{v.sampleEta || "no ETA"}</span>
+      )}
+      {canEdit && (
+        <label className="flex items-center gap-1">
+          <Checkbox checked={v.received} disabled={pending} onCheckedChange={(c) => run(() => toggleSkuReceived(v.id, sampleId, !!c))} />
+          received
+        </label>
+      )}
+      {canEdit && (
+        <Button
+          size="sm"
+          variant="ghost"
+          className="h-6 px-2"
+          disabled={pending}
+          onClick={() => run(() => requestVariantRevisions(v.id, sampleId, !v.revisionsRequested))}
+        >
+          {v.revisionsRequested ? "Clear revisions" : "Request revisions"}
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -996,13 +1051,7 @@ export function SamplesTable({
                       <TableCell colSpan={row.getVisibleCells().length} className="py-1.5">
                         <div className="space-y-1 pl-16">
                           {row.original.variants.map((v) => (
-                            <div key={v.id} className="flex items-center gap-3 text-xs">
-                              <span className="text-[var(--muted-foreground)]">&#9492;</span>
-                              <Link href={`/samples/${row.original.id}`} className="font-mono text-[var(--primary)] hover:underline">
-                                {v.skuCode || "(no SKU yet)"}
-                              </Link>
-                              {v.color && <span className="text-[var(--muted-foreground)]">{v.color}</span>}
-                            </div>
+                            <SkuChildRow key={v.id} sampleId={row.original.id} v={v} canEdit={canEdit} />
                           ))}
                         </div>
                       </TableCell>

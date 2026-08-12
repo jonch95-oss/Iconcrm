@@ -771,6 +771,7 @@ export async function editSkuVariant(
   }
   await prisma.skuVariant.update({ where: { id }, data });
   revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
   return { ok: true };
 }
 
@@ -778,6 +779,7 @@ export async function editSkuVariant(
 export async function toggleSkuReceived(id: string, sampleId: string, received: boolean): Promise<ActionResult> {
   await assertRole("member");
   await prisma.skuVariant.update({ where: { id }, data: { received, sampleReceivedDate: received ? new Date() : null } });
+  revalidatePath("/samples");
   if (received) {
     const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
     if (sm) {
@@ -959,5 +961,21 @@ export async function setExcludeFromGrouping(sampleIds: string[], exclude = true
   if (sampleIds.length === 0) return { ok: false, error: "No samples." };
   await prisma.sample.updateMany({ where: { id: { in: sampleIds } }, data: { excludeFromGrouping: exclude } });
   revalidatePath("/samples/groups");
+  return { ok: true };
+}
+
+/** Request (or clear) revisions for a single color variant. */
+export async function requestVariantRevisions(
+  variantId: string,
+  sampleId: string,
+  requested = true,
+): Promise<ActionResult> {
+  await assertRole("member");
+  await prisma.skuVariant.update({
+    where: { id: variantId },
+    data: { revisionsRequestedAt: requested ? new Date() : null },
+  });
+  revalidatePath(`/samples/${sampleId}`);
+  revalidatePath("/samples");
   return { ok: true };
 }

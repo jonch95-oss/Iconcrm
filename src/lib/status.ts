@@ -192,3 +192,17 @@ export function worstRisk(statuses: RiskStatus[]): RiskStatus | null {
   if (statuses.length === 0) return null;
   return statuses.reduce((a, b) => (RISK_RANK[b] > RISK_RANK[a] ? b : a));
 }
+
+// ---------------------------------------------------------------------------
+// Per-color (SKU variant) sample state — derived, not a stored enum.
+// ---------------------------------------------------------------------------
+export function variantSampleStatus(v: {
+  received?: boolean;
+  revisionsRequestedAt?: Date | string | null;
+  sampleEta?: Date | string | null;
+}): { label: string; tone: BadgeTone } {
+  if (v.received) return { label: "Received", tone: "success" };
+  if (v.revisionsRequestedAt) return { label: "Revisions Requested", tone: "warning" };
+  if (v.sampleEta) return { label: "ETA Set", tone: "secondary" };
+  return { label: "Requested", tone: "secondary" };
+}

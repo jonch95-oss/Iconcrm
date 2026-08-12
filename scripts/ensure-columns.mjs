@@ -24,6 +24,7 @@ const STATEMENTS = [
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "imageHash" TEXT`,
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "sampleEta" TIMESTAMP(3)`,
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "sampleReceivedDate" TIMESTAMP(3)`,
+  `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "revisionsRequestedAt" TIMESTAMP(3)`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "InboundEmail_mailgunMessageKey_key" ON "InboundEmail"("mailgunMessageKey")`,
   `CREATE TABLE IF NOT EXISTS "CustomerPoLine" (

@@ -314,6 +314,7 @@ model SkuVariant {
   imageHash       String? // hash of the imported image bytes (skip re-uploads)
   sampleEta          DateTime? // per-color requested-sample ETA
   sampleReceivedDate DateTime? // when this color's physical sample arrived
+  revisionsRequestedAt DateTime? // revisions requested for this color
 
   orderFormLines   OrderFormLine[]
   piLines          PILine[]
