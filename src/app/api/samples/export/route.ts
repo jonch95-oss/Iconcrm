@@ -63,13 +63,19 @@ export async function GET(request: Request) {
     let firstRow = 0;
     if (s.skuVariants.length === 0) {
       firstRow = ws.addRow([...base, s.size ?? "", "", "", ""]).number;
+      if (withPhotos && s.imageUrl) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
     } else {
       s.skuVariants.forEach((v, i) => {
         const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.received ? "Y" : ""]).number;
         if (i === 0) firstRow = r;
+        // Embed each color's own image on its row (falls back to the sample
+        // photo on the first row) so per-color images round-trip on re-import.
+        if (withPhotos) {
+          const url = (v as { imageUrl?: string | null }).imageUrl ?? (i === 0 ? s.imageUrl : null);
+          if (url) imageJobs.push({ rowNumber: r, url });
+        }
       });
     }
-    if (withPhotos && s.imageUrl && firstRow) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
   }
 
   // Fetch + embed photos with bounded concurrency so a big catalog stays fast.

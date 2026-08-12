@@ -258,6 +258,7 @@ export default async function SampleDetailPage({
                     skuCode: s.skuCode,
                     unitsPerCarton: s.unitsPerCarton,
                     received: s.received,
+                    imageUrl: s.imageUrl ?? null,
                   }))}
                 />
               </TabsContent>

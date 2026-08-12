@@ -18,6 +18,8 @@ const STATEMENTS = [
   `ALTER TYPE "SampleStatus" ADD VALUE IF NOT EXISTS 'approved_by_image'`,
   `ALTER TABLE "SkuVariant" ALTER COLUMN "upc" DROP NOT NULL`,
   `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "received" BOOLEAN NOT NULL DEFAULT false`,
+  `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "imageUrl" TEXT`,
+  `ALTER TABLE "SkuVariant" ADD COLUMN IF NOT EXISTS "imageHash" TEXT`,
   `ALTER TABLE "InboundEmail" ADD COLUMN IF NOT EXISTS "mailgunMessageKey" TEXT`,
   `CREATE UNIQUE INDEX IF NOT EXISTS "InboundEmail_mailgunMessageKey_key" ON "InboundEmail"("mailgunMessageKey")`,
   `CREATE TABLE IF NOT EXISTS "CustomerPoLine" (

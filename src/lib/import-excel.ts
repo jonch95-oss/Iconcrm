@@ -296,7 +296,7 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
   // A small note so users know images go in column A, anchored to each row.
   const note = ws.addRow([]);
   ws.getCell(`A${note.number + 1}`).value =
-    "List several colors in the COLOR cell (e.g. 'Black, Blue, Denim') OR repeat the Sample # one row per color; either way a SKU is created per color, auto-built from the color code when UPC is blank. Paste a photo into column A. Headers are matched loosely; extra columns are ignored.";
+    "To give each color its OWN image, put one color per row (repeat the Sample #) and paste that color's photo into column A on its row. Or list several colors in one COLOR cell (e.g. 'Black, Blue, Denim') for a shared image. Either way a SKU is auto-built from the color code when UPC is blank. Headers are matched loosely; extra columns are ignored.";
   ws.getCell(`A${note.number + 1}`).font = { italic: true, size: 9, color: { argb: "FF888888" } };
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);

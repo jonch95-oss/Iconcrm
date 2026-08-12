@@ -97,6 +97,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   // Embedded pictures, keyed by the worksheet row they're anchored to.
   const imageByRow = new Map(parsed.images.map((img) => [img.rowNumber, img]));
   const rowToSample = new Map<number, string>(); // worksheet row -> sampleId
+  const rowToVariantId = new Map<number, string>(); // worksheet row -> single-color variant id (for per-color images)
   let currentSampleId: string | null = null;
   let currentSampleNumber = "";
 
@@ -238,6 +239,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         // only map to a single color, so it's skipped when several are listed.
         const colorsToAdd = colorList.length > 0 ? colorList : [""];
         const single = colorsToAdd.length === 1;
+        let rowVariantId: string | null = null;
         for (const color of colorsToAdd) {
           const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
           const autoSku = code ? `${base}${code.trim().toUpperCase()}` : null;
@@ -270,8 +272,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
                 ...(received ? { received: true } : {}),
               },
             });
+            rowVariantId = dup.id;
           } else {
-            await prisma.skuVariant.create({
+            const createdVar = await prisma.skuVariant.create({
               data: {
                 sampleId: currentSampleId,
                 upc: rowUpc || null,
@@ -282,9 +285,12 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
                 received,
               },
             });
+            rowVariantId = createdVar.id;
             summary.variantsAdded += 1;
           }
         }
+        // A row with exactly one color can carry that color's own image.
+        if (single && rowVariantId) rowToVariantId.set(row.rowNumber, rowVariantId);
         if (received) receivedSampleIds.add(currentSampleId);
       }
     } catch (err) {
@@ -355,40 +361,58 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     type ImageJob = {
       rowNumber: number;
       img: NonNullable<ReturnType<typeof imageByRow.get>>;
-      sampleId: string;
+      kind: "sample" | "variant";
+      targetId: string;
+      sampleId: string; // owning sample (for the first-color thumbnail default)
     };
+    const near = <T,>(m: Map<number, T>, r: number): T | undefined =>
+      m.get(r) ?? m.get(r + 1) ?? m.get(r - 1);
     const jobs: ImageJob[] = [];
     for (const [rowNumber, img] of imageByRow) {
-      const sampleId =
-        rowToSample.get(rowNumber) ??
-        // Images sometimes anchor a row above/below their data row.
-        rowToSample.get(rowNumber + 1) ??
-        rowToSample.get(rowNumber - 1);
-      if (sampleId) jobs.push({ rowNumber, img, sampleId });
+      // Prefer a specific color variant when the row maps to exactly one color
+      // (per-color images); otherwise attach to the sample.
+      const variantId = near(rowToVariantId, rowNumber);
+      const sampleId = near(rowToSample, rowNumber);
+      if (variantId) {
+        jobs.push({ rowNumber, img, kind: "variant", targetId: variantId, sampleId: sampleId ?? "" });
+      } else if (sampleId) {
+        jobs.push({ rowNumber, img, kind: "sample", targetId: sampleId, sampleId });
+      }
     }
 
     // Current photo hashes, so unchanged images are skipped entirely. Each
     // upload costs a Blob "advanced operation", and re-importing a sheet used
     // to re-upload every photo — this makes repeat imports nearly free.
-    const existingHashes = new Map<string, string | null>();
+    const existingHashes = new Map<string, string | null>(); // key: "sample:<id>" | "variant:<id>"
     if (jobs.length > 0) {
-      const rows = await prisma.sample
-        .findMany({ where: { id: { in: [...new Set(jobs.map((j) => j.sampleId))] } }, select: { id: true, imageHash: true } })
-        .catch(() => [] as { id: string; imageHash: string | null }[]);
-      for (const r of rows) existingHashes.set(r.id, r.imageHash);
+      const sIds = [...new Set(jobs.filter((j) => j.kind === "sample").map((j) => j.targetId))];
+      const vIds = [...new Set(jobs.filter((j) => j.kind === "variant").map((j) => j.targetId))];
+      const [srows, vrows] = await Promise.all([
+        prisma.sample.findMany({ where: { id: { in: sIds } }, select: { id: true, imageHash: true } }).catch(() => [] as { id: string; imageHash: string | null }[]),
+        prisma.skuVariant.findMany({ where: { id: { in: vIds } }, select: { id: true, imageHash: true } }).catch(() => [] as { id: string; imageHash: string | null }[]),
+      ]);
+      for (const r of srows) existingHashes.set(`sample:${r.id}`, r.imageHash);
+      for (const r of vrows) existingHashes.set(`variant:${r.id}`, r.imageHash);
     }
+    // Samples that received a per-color image, so we can default the sample
+    // thumbnail to the first color afterwards.
+    const variantImagedSamples = new Set<string>();
 
     // Bump when the image pipeline changes so already-stored photos are
     // reprocessed once on the next import. v2 = transparency-aware (keep PNG
     // alpha; flatten opaque onto white) — replaces v1's black-background JPEGs.
     const PIPELINE_VERSION = "v2";
-    const processImage = async ({ img, sampleId }: ImageJob) => {
+    const processImage = async ({ img, kind, targetId, sampleId }: ImageJob) => {
       try {
+        const key = `${kind}:${targetId}`;
         const hash = `${PIPELINE_VERSION}:${createHash("sha256").update(img.buffer).digest("hex")}`;
         // Skip only when the SAME bytes were already processed by the CURRENT
         // pipeline. Bare (unversioned) hashes from older imports won't match, so
         // their images regenerate with the transparency-aware pipeline.
-        if (existingHashes.get(sampleId) === hash) return; // unchanged — no upload
+        if (existingHashes.get(key) === hash) {
+          if (kind === "variant" && sampleId) variantImagedSamples.add(sampleId);
+          return; // unchanged — no upload
+        }
         let buffer: Buffer = img.buffer;
         let ext = img.extension;
         if (sharp) {
@@ -411,14 +435,15 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             // If sharp can't read it, fall back to the original bytes.
           }
         }
-        const url = await uploadBlob(
-          `samples/${sampleId}/photo.${ext}`,
-          buffer,
-          `image/${ext}`,
-          { addRandomSuffix: false },
-        );
-        await prisma.sample.update({ where: { id: sampleId }, data: { imageUrl: url, imageHash: hash } });
-        existingHashes.set(sampleId, hash);
+        const path = kind === "variant" ? `variants/${targetId}/photo.${ext}` : `samples/${targetId}/photo.${ext}`;
+        const url = await uploadBlob(path, buffer, `image/${ext}`, { addRandomSuffix: false });
+        if (kind === "variant") {
+          await prisma.skuVariant.update({ where: { id: targetId }, data: { imageUrl: url, imageHash: hash } });
+          if (sampleId) variantImagedSamples.add(sampleId);
+        } else {
+          await prisma.sample.update({ where: { id: targetId }, data: { imageUrl: url, imageHash: hash } });
+        }
+        existingHashes.set(key, hash);
         summary.photosAdded += 1;
       } catch {
         storageDown = true;
@@ -435,6 +460,20 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         }
       }),
     );
+
+    // Sample thumbnail: when a sample has no photo of its own but its colors do,
+    // show the first color (alphabetical) as the family thumbnail.
+    for (const sid of variantImagedSamples) {
+      const sm = await prisma.sample.findUnique({ where: { id: sid }, select: { imageUrl: true } }).catch(() => null);
+      if (sm && !sm.imageUrl) {
+        const firstVar = await prisma.skuVariant
+          .findFirst({ where: { sampleId: sid, imageUrl: { not: null } }, orderBy: { color: "asc" }, select: { imageUrl: true, imageHash: true } })
+          .catch(() => null);
+        if (firstVar?.imageUrl) {
+          await prisma.sample.update({ where: { id: sid }, data: { imageUrl: firstVar.imageUrl, imageHash: firstVar.imageHash } }).catch(() => {});
+        }
+      }
+    }
     if (storageDown) {
       summary.skipped.push({
         row: 0,

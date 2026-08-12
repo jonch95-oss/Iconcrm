@@ -25,6 +25,7 @@ export interface SkuRow {
   skuCode: string | null;
   unitsPerCarton: number | null;
   received: boolean;
+  imageUrl: string | null;
 }
 
 export function SkuManager({
@@ -41,8 +42,8 @@ export function SkuManager({
   const [form, setForm] = React.useState({ size: "", color: "", upc: "", skuCode: "", unitsPerCarton: "" });
 
   const add = () => {
-    if (!form.size || !form.color || !form.upc) {
-      toast.error("Size, color, and UPC are required");
+    if (!form.size || !form.color) {
+      toast.error("Size and color are required");
       return;
     }
     const fd = new FormData();
@@ -81,6 +82,7 @@ export function SkuManager({
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-14">Image</TableHead>
             <TableHead>Size</TableHead>
             <TableHead>Color</TableHead>
             <TableHead>UPC</TableHead>
@@ -93,13 +95,21 @@ export function SkuManager({
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 7 : 6} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 8 : 7} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
           ) : (
             skus.map((s) => (
               <TableRow key={s.id}>
+                <TableCell>
+                  {s.imageUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={s.imageUrl} alt={s.color} className="h-10 w-10 rounded object-contain bg-white" />
+                  ) : (
+                    <span className="text-[var(--muted-foreground)]">—</span>
+                  )}
+                </TableCell>
                 <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="size" value={s.size} canEdit={canEdit} /></TableCell>
                 <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="color" value={s.color} canEdit={canEdit} /></TableCell>
                 <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
