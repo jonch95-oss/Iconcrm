@@ -16,6 +16,7 @@ import {
   Warehouse,
   Ship,
   PackageCheck,
+  HelpCircle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -34,6 +35,7 @@ const NAV = [
   { href: "/needs-review", label: "Needs Review", icon: Inbox },
   { href: "/factories", label: "Factories", icon: Factory },
   { href: "/settings", label: "Admin Settings", icon: Settings },
+  { href: "/help", label: "Help & Guide", icon: HelpCircle },
 ];
 
 export function AppSidebar() {

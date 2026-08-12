@@ -28,6 +28,7 @@ const NAV = [
   { href: "/needs-review", label: "Needs Review" },
   { href: "/factories", label: "Factories" },
   { href: "/settings", label: "Admin Settings" },
+  { href: "/help", label: "Help & Guide" },
 ];
 
 export function MobileNav() {
