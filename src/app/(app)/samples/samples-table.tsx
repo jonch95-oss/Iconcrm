@@ -71,6 +71,7 @@ export interface SampleRow {
   imageUrl: string | null;
   brand: string;
   color: string;
+  material: string;
   category: string;
   season: string;
   styleName: string;
@@ -955,7 +956,7 @@ export function SamplesTable({
           )}
           {canEdit && (
             <GroupSamplesDialog
-              selected={selectedRows.map((r) => ({ id: r.id, sampleNumber: r.sampleNumber, color: r.color }))}
+              selected={selectedRows.map((r) => ({ id: r.id, sampleNumber: r.sampleNumber, color: r.color, material: r.material }))}
               onDone={() => setRowSelection({})}
             />
           )}

@@ -979,3 +979,24 @@ export async function requestVariantRevisions(
   revalidatePath("/samples");
   return { ok: true };
 }
+
+/** Suggest other ungrouped samples that share a base number + material with the
+ *  current selection (for the manual Group dialog). */
+export async function suggestRelatedSamples(
+  selectedIds: string[],
+): Promise<{ ok: true; suggestions: { id: string; sampleNumber: string; color: string; material: string }[] } | { ok: false; error: string }> {
+  await assertRole("member");
+  const { baseOf } = await import("@/lib/grouping");
+  const sel = await prisma.sample.findMany({ where: { id: { in: selectedIds } }, select: { sampleNumber: true, color: true, material: true } });
+  const keyOf = (n: string, col: string | null, mat: string | null) => `${baseOf(n, col ?? "")}||${(mat ?? "").trim().toUpperCase()}`;
+  const keys = new Set(sel.map((s) => keyOf(s.sampleNumber, s.color, s.material)));
+  const others = await prisma.sample.findMany({
+    where: { id: { notIn: selectedIds }, status: { notIn: ["dropped"] }, excludeFromGrouping: false },
+    select: { id: true, sampleNumber: true, color: true, material: true },
+    take: 3000,
+  });
+  const suggestions = others
+    .filter((o) => keys.has(keyOf(o.sampleNumber, o.color, o.material)))
+    .map((m) => ({ id: m.id, sampleNumber: m.sampleNumber, color: m.color ?? "", material: m.material ?? "" }));
+  return { ok: true, suggestions };
+}
