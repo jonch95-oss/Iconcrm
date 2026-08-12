@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
-import { advanceSampleStatus } from "@/lib/status";
+import { advanceSampleStatus, sampleRank } from "@/lib/status";
 import { sendEmail } from "@/lib/email";
 import { MissingInfoEmail } from "@/emails/missing-info";
 import { getSettings } from "@/lib/settings";
@@ -239,8 +239,36 @@ export async function deleteOrderForm(orderFormId: string): Promise<ActionResult
       error: `Can't delete — ${of._count.proformaInvoices} proforma invoice${of._count.proformaInvoices > 1 ? "s" : ""} reference this order form. Unlink those first.`,
     };
   }
+  // Samples currently ON this order form — so we can revert their status once
+  // it's gone (unless they sit on another order form too).
+  const affectedIds = [
+    ...new Set((await prisma.orderFormLine.findMany({ where: { orderFormId }, select: { sampleId: true } })).map((l) => l.sampleId)),
+  ];
+
   await prisma.orderForm.delete({ where: { id: orderFormId } }); // cascades order form lines
+
+  // Revert each affected sample to what it was BEFORE going on an order form.
+  // On-hold / revisions samples never advance onto an order form (they're
+  // guarded), so only "On Order Form" samples need reverting; their prior
+  // pipeline status is recomputed from their data (ETA / received / FOB).
+  for (const sid of affectedIds) {
+    const s = await prisma.sample.findUnique({
+      where: { id: sid },
+      select: { status: true, sampleEta: true, sampleReceivedDate: true, fobCost: true, _count: { select: { orderFormLines: true } } },
+    });
+    if (!s || s.status !== "on_order_form" || s._count.orderFormLines > 0) continue; // still on another order form, or moved on
+    const candidates: import("@prisma/client").SampleStatus[] = ["sample_requested"];
+    if (s.sampleEta) candidates.push("eta_set");
+    if (s.sampleReceivedDate) candidates.push("sample_received");
+    if (s.fobCost) candidates.push("quoted");
+    const reverted = candidates.reduce((a, b) => (sampleRank(b) > sampleRank(a) ? b : a));
+    if (reverted !== s.status) {
+      await prisma.sample.update({ where: { id: sid }, data: { status: reverted } });
+    }
+  }
+
   await logAudit({ entityType: "order_form", entityId: orderFormId, action: "deleted", userId: user.id });
   revalidatePath("/order-forms");
+  revalidatePath("/samples");
   return { ok: true };
 }
