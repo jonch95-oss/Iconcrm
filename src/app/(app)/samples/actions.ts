@@ -746,7 +746,7 @@ export async function bulkAddVariantsByColor(
 export async function editSkuVariant(
   id: string,
   sampleId: string,
-  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton",
+  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta",
   value: string,
 ): Promise<ActionResult> {
   await assertRole("member");
@@ -754,6 +754,8 @@ export async function editSkuVariant(
   let data: Prisma.SkuVariantUpdateInput;
   if (field === "unitsPerCarton") {
     data = { unitsPerCarton: v ? parseInt(v, 10) || null : null };
+  } else if (field === "sampleEta") {
+    data = { sampleEta: parseDateInput(v) };
   } else if (field === "upc") {
     if (v) {
       const dup = await prisma.skuVariant.findUnique({ where: { upc: v }, select: { id: true } });
@@ -775,7 +777,7 @@ export async function editSkuVariant(
 
 export async function toggleSkuReceived(id: string, sampleId: string, received: boolean): Promise<ActionResult> {
   await assertRole("member");
-  await prisma.skuVariant.update({ where: { id }, data: { received } });
+  await prisma.skuVariant.update({ where: { id }, data: { received, sampleReceivedDate: received ? new Date() : null } });
   if (received) {
     const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
     if (sm) {

@@ -259,6 +259,7 @@ export default async function SampleDetailPage({
                     unitsPerCarton: s.unitsPerCarton,
                     received: s.received,
                     imageUrl: s.imageUrl ?? null,
+                    sampleEta: s.sampleEta ? s.sampleEta.toISOString().slice(0, 10) : "",
                   }))}
                 />
               </TabsContent>

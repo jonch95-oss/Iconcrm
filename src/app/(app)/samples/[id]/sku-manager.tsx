@@ -26,6 +26,7 @@ export interface SkuRow {
   unitsPerCarton: number | null;
   received: boolean;
   imageUrl: string | null;
+  sampleEta: string; // yyyy-mm-dd or ""
 }
 
 export function SkuManager({
@@ -101,6 +102,7 @@ export function SkuManager({
             <TableHead>UPC</TableHead>
             <TableHead>SKU code</TableHead>
             <TableHead>Units/carton</TableHead>
+            <TableHead>Sample ETA</TableHead>
             <TableHead>Received</TableHead>
             {canEdit && <TableHead></TableHead>}
           </TableRow>
@@ -108,7 +110,7 @@ export function SkuManager({
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 8 : 7} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 9 : 8} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
@@ -128,6 +130,7 @@ export function SkuManager({
                 <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
                 <TableCell className="text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="skuCode" value={s.skuCode ?? ""} canEdit={canEdit} /></TableCell>
                 <TableCell className="tabular-nums"><EditableSkuCell id={s.id} sampleId={sampleId} field="unitsPerCarton" value={s.unitsPerCarton != null ? String(s.unitsPerCarton) : ""} canEdit={canEdit} numeric /></TableCell>
+                <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="sampleEta" value={s.sampleEta} canEdit={canEdit} date /></TableCell>
                 <TableCell>
                   <Checkbox checked={s.received} disabled={!canEdit || pending} onCheckedChange={(v) => toggleReceived(s.id, !!v)} />
                 </TableCell>
@@ -171,14 +174,16 @@ function EditableSkuCell({
   canEdit,
   mono,
   numeric,
+  date,
 }: {
   id: string;
   sampleId: string;
-  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton";
+  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta";
   value: string;
   canEdit: boolean;
   mono?: boolean;
   numeric?: boolean;
+  date?: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState(false);
@@ -207,9 +212,9 @@ function EditableSkuCell({
       <Input
         autoFocus
         defaultValue={value}
-        type={numeric ? "number" : "text"}
+        type={date ? "date" : numeric ? "number" : "text"}
         disabled={pending}
-        className="h-7 w-24 text-xs"
+        className="h-7 w-32 text-xs"
         onBlur={(e) => save(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
