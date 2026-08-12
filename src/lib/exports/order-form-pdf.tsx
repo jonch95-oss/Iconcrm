@@ -86,7 +86,7 @@ function Pdf({ data }: { data: OrderFormExportData }) {
                 </View>
                 <View style={[styles.cell, { width: W.desc }]}><Text style={styles.cellText}>{r.description}</Text></View>
                 <View style={[styles.cell, { width: W.tp }]}><Text style={styles.cellText}>{r.tpStyleNumber}</Text></View>
-                <View style={[styles.cell, { width: W.style }]}><Text style={styles.cellText}>{r.styleNumber}</Text></View>
+                <View style={[styles.cell, { width: W.style }]}><Text style={styles.cellText}>{r.skuCode || r.styleNumber}</Text></View>
                 <View style={[styles.cell, { width: W.color }]}><Text style={styles.cellText}>{r.color}</Text></View>
                 <View style={[styles.cell, { width: W.size }]}><Text style={styles.num}>{r.size}</Text></View>
                 <View style={[styles.cell, { width: W.pack }]}><Text style={styles.num}>{r.casePack ?? ""}</Text></View>

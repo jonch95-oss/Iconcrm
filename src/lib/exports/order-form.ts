@@ -19,6 +19,7 @@ export interface OrderFormExportData {
     description: string;
     tpStyleNumber: string; // our style number
     styleNumber: string; // factory/sample reference
+    skuCode: string; // per-color SKU number
     color: string;
     size: string;
     casePack: number | null; // units per carton
@@ -59,10 +60,12 @@ export async function getOrderFormExportData(
     customer: [...customers].join(", ") || null,
     customerPoNumbers: "",
     rows: of.lines.map((l) => ({
-      imageUrl: l.sample.imageUrl,
+      // Prefer the color's own image; fall back to the sample photo.
+      imageUrl: l.skuVariant?.imageUrl ?? l.sample.imageUrl,
       description: l.sample.styleName ?? l.sample.description ?? "",
       tpStyleNumber: l.sample.styleNumber ?? "",
       styleNumber: l.sample.sampleNumber,
+      skuCode: l.skuVariant?.skuCode ?? "",
       color: l.skuVariant?.color ?? "",
       size: l.skuVariant?.size ?? "",
       casePack: l.skuVariant?.unitsPerCarton ?? l.sample.casePackDefault ?? null,
@@ -164,6 +167,7 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
   ws.getRow(HEADER_ROW).height = 18.75;
 
   // Product photos, fetched in parallel; failures never block the export.
+  const sharp = await import("sharp").then((m) => m.default).catch(() => null);
   const imageBuffers = await Promise.all(
     data.rows.map(async (r) => {
       if (!r.imageUrl || !r.imageUrl.startsWith("http")) return null;
@@ -172,7 +176,12 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
         if (!res.ok) return null;
         const type = res.headers.get("content-type") ?? "";
         const ext = type.includes("png") ? "png" : type.includes("gif") ? "gif" : "jpeg";
-        return { buffer: Buffer.from(await res.arrayBuffer()), ext: ext as "png" | "gif" | "jpeg" };
+        const buffer = Buffer.from(await res.arrayBuffer());
+        let w = 0, h = 0;
+        if (sharp) {
+          try { const md = await sharp(buffer).metadata(); w = md.width ?? 0; h = md.height ?? 0; } catch { /* ignore */ }
+        }
+        return { buffer, ext: ext as "png" | "gif" | "jpeg", w, h };
       } catch {
         return null;
       }
@@ -204,15 +213,26 @@ export async function buildOrderFormWorkbook(data: OrderFormExportData): Promise
         buffer: img.buffer as unknown as ExcelJS.Buffer,
         extension: img.ext,
       });
+      // Fit within the cell box preserving aspect ratio (no distortion).
+      const BOX_W = 150, BOX_H = 145;
+      let w = BOX_W, h = BOX_H;
+      if (img.w > 0 && img.h > 0) {
+        const scale = Math.min(BOX_W / img.w, BOX_H / img.h);
+        w = Math.round(img.w * scale);
+        h = Math.round(img.h * scale);
+      }
+      // Center within the box.
+      const offCol = Math.max(0, (BOX_W - w) / 2 / 64); // ~64px per column unit
+      const offRow = Math.max(0, (BOX_H - h) / 2);
       ws.addImage(imageId, {
-        tl: { col: 1.08, row: rowNum - 1 + 0.05 },
-        ext: { width: 130, height: 130 },
+        tl: { col: 1.08 + offCol, row: rowNum - 1 + 0.03 + offRow / (row.height ?? 111.75) },
+        ext: { width: w, height: h },
       });
     }
 
     ws.getCell(rowNum, 3).value = r.description;
     ws.getCell(rowNum, 4).value = r.tpStyleNumber;
-    ws.getCell(rowNum, 5).value = r.styleNumber;
+    ws.getCell(rowNum, 5).value = r.skuCode || r.styleNumber;
     ws.getCell(rowNum, 6).value = r.color;
     ws.getCell(rowNum, 7).value = r.size;
     if (r.cbmPerCarton !== null) ws.getCell(rowNum, 8).value = r.cbmPerCarton;
