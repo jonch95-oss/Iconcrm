@@ -17,11 +17,20 @@ export async function updateLineQuantity(
   orderFormId: string,
   quantity: number,
 ): Promise<ActionResult> {
-  await assertRole("member");
-  await prisma.orderFormLine.update({
+  const user = await assertRole("member");
+  const q = Math.max(0, Math.floor(quantity));
+  const before = await prisma.orderFormLine.findUnique({
     where: { id: lineId },
-    data: { quantity: Math.max(0, Math.floor(quantity)) },
+    include: { sample: { select: { sampleNumber: true } }, skuVariant: { select: { color: true, size: true } } },
   });
+  await prisma.orderFormLine.update({ where: { id: lineId }, data: { quantity: q } });
+  if (before && before.quantity !== q) {
+    const label = `${before.sample.sampleNumber}${before.skuVariant?.color ? ` ${before.skuVariant.color}` : ""}`;
+    await logAudit({
+      entityType: "order_form", entityId: orderFormId, action: "line_qty_changed", userId: user.id,
+      before: { line: label, qty: before.quantity }, after: { line: label, qty: q },
+    });
+  }
   revalidatePath(`/order-forms/${orderFormId}`);
   return { ok: true };
 }
@@ -30,8 +39,66 @@ export async function deleteOrderFormLine(
   lineId: string,
   orderFormId: string,
 ): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
+  const before = await prisma.orderFormLine.findUnique({
+    where: { id: lineId },
+    include: { sample: { select: { sampleNumber: true } }, skuVariant: { select: { color: true } } },
+  });
   await prisma.orderFormLine.delete({ where: { id: lineId } });
+  if (before) {
+    const label = `${before.sample.sampleNumber}${before.skuVariant?.color ? ` ${before.skuVariant.color}` : ""}`;
+    await logAudit({
+      entityType: "order_form", entityId: orderFormId, action: "line_removed", userId: user.id,
+      before: { line: label, qty: before.quantity },
+    });
+  }
+  revalidatePath(`/order-forms/${orderFormId}`);
+  return { ok: true };
+}
+
+const BLOB_URL_RE = /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i;
+
+/** Upload (a new version of) the order-form document. Each upload is retained. */
+export async function uploadOrderFormFile(formData: FormData): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const orderFormId = String(formData.get("orderFormId") ?? "");
+  const blobUrl = String(formData.get("blobUrl") ?? "");
+  const filename = String(formData.get("filename") ?? "document").slice(0, 200);
+  const mimeType = String(formData.get("mimeType") ?? "") || null;
+  if (!orderFormId || !blobUrl) return { ok: false, error: "Missing file." };
+  if (!BLOB_URL_RE.test(blobUrl)) return { ok: false, error: "Invalid upload URL." };
+  const version = (await prisma.attachment.count({ where: { parentType: "order_form", parentId: orderFormId } })) + 1;
+  await prisma.attachment.create({
+    data: { parentType: "order_form", parentId: orderFormId, blobUrl, filename, mimeType, uploadedById: user.id },
+  });
+  await prisma.orderForm.update({ where: { id: orderFormId }, data: { updatedAt: new Date() } });
+  await logAudit({ entityType: "order_form", entityId: orderFormId, action: "file_uploaded", userId: user.id, after: { filename, version } });
+  revalidatePath(`/order-forms/${orderFormId}`);
+  return { ok: true };
+}
+
+/** Remove one uploaded order-form document version. */
+export async function deleteOrderFormFile(attachmentId: string, orderFormId: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const att = await prisma.attachment.findUnique({ where: { id: attachmentId } });
+  if (!att || att.parentId !== orderFormId) return { ok: false, error: "Not found." };
+  await prisma.attachment.delete({ where: { id: attachmentId } });
+  try {
+    const { del } = await import("@vercel/blob");
+    await del(att.blobUrl);
+  } catch { /* best-effort */ }
+  await logAudit({ entityType: "order_form", entityId: orderFormId, action: "file_removed", userId: user.id, before: { filename: att.filename } });
+  revalidatePath(`/order-forms/${orderFormId}`);
+  return { ok: true };
+}
+
+/** Add a note to the order form (appears in the change history). */
+export async function addOrderFormNote(formData: FormData): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const orderFormId = String(formData.get("orderFormId") ?? "");
+  const body = String(formData.get("body") ?? "").trim().slice(0, 4000);
+  if (!orderFormId || !body) return { ok: false, error: "Note cannot be empty." };
+  await logAudit({ entityType: "order_form", entityId: orderFormId, action: "note", userId: user.id, after: { note: body } });
   revalidatePath(`/order-forms/${orderFormId}`);
   return { ok: true };
 }
