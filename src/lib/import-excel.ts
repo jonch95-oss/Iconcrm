@@ -245,6 +245,10 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
   // costing + the Order Form container-fill calc.
   const columns: { header: string; width: number }[] = [
     { header: "IMAGE", width: 28 },
+    // Master Sample # sits up front (right after the photo) because it's the
+    // column that groups a family: leave it blank for a one-off sample, or
+    // repeat it down the color rows to fold them into one master.
+    { header: "Master Sample #", width: 18 },
     { header: "Sample #", width: 16 },
     { header: "Brand", width: 18 },
     { header: "Category", width: 16 },
@@ -269,27 +273,42 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
     { header: "UPC", width: 16 },
     { header: "SKU Code", width: 14 },
     { header: "Received", width: 10 },
-    { header: "Master Sample #", width: 18 },
     { header: "Color ETA", width: 12 },
   ];
   ws.addRow(columns.map((c) => c.header));
   ws.getRow(1).font = { bold: true };
-  const examples = [
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10002", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "CHERRY BLOSSOM CREAM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10004", "Assymetrical Hobo", "ASSYMETRICAL HOBO", "BLACK DENIM", "ss27", "OS", 45, 120, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", ""],
-    ["", "", "Off White L/AB", "Handbag", "LAB-HB-10005", "East West Satchel", "EAST WEST SATCHEL", "GRAFFITTI", "ss27", "OS", 48, 130, 17.5, 2.5, 0.75, 0.182, 12, "4202.21.9000", "Leather", "100% Leather", "", "", "", "", ""],
-    // ---- One sample family, three colors: repeat the Sample # per color. The
-    //      first row carries the sample details; the color rows just need
-    //      Sample # + Color (UPC optional -> SKU auto-builds from the color code).
-    // Several colors in ONE cell -> a variant per color, SKU auto-built from the
-    // color code. (You can also put one color per row, repeating the Sample #.)
-    ["", "TB26_ACC0052", "Ted Baker", "Duffel", "TB26_ACC0052", "Weekender Duffle", "WEEKENDER DUFFLE", "Black, Blue, Denim", "ss26", "OS", 22, 60, "", "", "", 0.06, 20, "", "Nylon", "100% Nylon", "", "", "", "", ""],
+  // Header cells for the two grouping columns get a tint so it's obvious at a
+  // glance which ones tie rows together.
+  for (const header of ["Master Sample #", "Sample #"]) {
+    const idx = columns.findIndex((c) => c.header === header);
+    if (idx >= 0) ws.getRow(1).getCell(idx + 1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFFFF2CC" } };
+  }
+  // Examples are keyed by header, not by position, so reordering the columns
+  // above can never shift a value into the wrong one.
+  const examples: Record<string, string | number>[] = [
+    { "Brand": "Off White L/AB", "Category": "Handbag", "STYLE #": "LAB-HB-10002", "Style Name": "Assymetrical Hobo", "DESCRIPTION": "ASSYMETRICAL HOBO", "COLOR": "CHERRY BLOSSOM CREAM", "Season": "ss27", "Size": "OS", "FOB": 45, "Sell Price": 120, "Duty %": 17.5, "Freight/Unit": 2.5, "Inland/Unit": 0.75, "CBM": 0.182, "Case Pack": 12, "HTS Code": "4202.21.9000", "Material": "Leather", "Composition": "100% Leather" },
+    { "Brand": "Off White L/AB", "Category": "Handbag", "STYLE #": "LAB-HB-10004", "Style Name": "Assymetrical Hobo", "DESCRIPTION": "ASSYMETRICAL HOBO", "COLOR": "BLACK DENIM", "Season": "ss27", "Size": "OS", "FOB": 45, "Sell Price": 120, "Duty %": 17.5, "Freight/Unit": 2.5, "Inland/Unit": 0.75, "CBM": 0.182, "Case Pack": 12, "HTS Code": "4202.21.9000", "Material": "Leather", "Composition": "100% Leather" },
+    { "Brand": "Off White L/AB", "Category": "Handbag", "STYLE #": "LAB-HB-10005", "Style Name": "East West Satchel", "DESCRIPTION": "EAST WEST SATCHEL", "COLOR": "GRAFFITTI", "Season": "ss27", "Size": "OS", "FOB": 48, "Sell Price": 130, "Duty %": 17.5, "Freight/Unit": 2.5, "Inland/Unit": 0.75, "CBM": 0.182, "Case Pack": 12, "HTS Code": "4202.21.9000", "Material": "Leather", "Composition": "100% Leather" },
+    // ---- One sample family, three colors in ONE cell -> a variant per color,
+    //      SKU auto-built from the color code (UPC optional). You can also put
+    //      one color per row, repeating the Sample #.
+    { "Sample #": "TB26_ACC0052", "Brand": "Ted Baker", "Category": "Duffel", "STYLE #": "TB26_ACC0052", "Style Name": "Weekender Duffle", "DESCRIPTION": "WEEKENDER DUFFLE", "COLOR": "Black, Blue, Denim", "Season": "ss26", "Size": "OS", "FOB": 22, "Sell Price": 60, "CBM": 0.06, "Case Pack": 20, "Material": "Nylon", "Composition": "100% Nylon" },
+    // ---- Same family the other way: each color keeps its own Sample # and
+    //      they share a Master Sample #, so the two rows fold into one master
+    //      (paste each color's own photo into column A on its row).
+    { "Master Sample #": "LAB-HB-10079", "Sample #": "LAB-HB-10079BLK", "Brand": "Off White L/AB", "Category": "Handbag", "STYLE #": "LAB-HB-10079", "Style Name": "Vegan Leather Messenger", "DESCRIPTION": "VEGAN LEATHER ZIPPERED MESSENGER", "COLOR": "BLACK", "Season": "fw27", "Size": "OS", "FOB": 26, "Sell Price": 70, "Material": "Vegan Leather" },
+    { "Master Sample #": "LAB-HB-10079", "Sample #": "LAB-HB-10079TAN", "COLOR": "TAN" },
   ];
-  for (const r of examples) ws.addRow(r);
+  for (const ex of examples) ws.addRow(columns.map((c) => ex[c.header] ?? ""));
   columns.forEach((c, i) => (ws.getColumn(i + 1).width = c.width));
 
   // Dropdowns (data validation) for Brand + Category on their data-row cells.
-  const colLetter = (i: number) => String.fromCharCode(65 + i);
+  // 0-based column index -> Excel letter (handles past Z, e.g. 26 -> AA).
+  const colLetter = (i: number) => {
+    let n = i, out = "";
+    do { out = String.fromCharCode(65 + (n % 26)) + out; n = Math.floor(n / 26) - 1; } while (n >= 0);
+    return out;
+  };
   const applyList = (header: string, values: readonly string[], title: string) => {
     const idx = columns.findIndex((c) => c.header === header);
     if (idx < 0) return;
@@ -315,7 +334,7 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
   // A small note so users know images go in column A, anchored to each row.
   const note = ws.addRow([]);
   ws.getCell(`A${note.number + 1}`).value =
-    "To give each color its OWN image, put one color per row (repeat the Sample #) and paste that color's photo into column A on its row. Or list several colors in one COLOR cell (e.g. 'Black, Blue, Denim') for a shared image. Either way a SKU is auto-built from the color code when UPC is blank. Headers are matched loosely; extra columns are ignored.";
+    "Master Sample # (column B) is optional \u2014 leave it blank for a one-off sample, or put the same value on several rows to fold them into one master family. To give each color its OWN image, put one color per row (repeat the Sample #, or share a Master Sample #) and paste that color's photo into column A on its row. Or list several colors in one COLOR cell (e.g. 'Black, Blue, Denim') for a shared image. Either way a SKU is auto-built from the color code when UPC is blank. Headers are matched loosely; extra columns are ignored.";
   ws.getCell(`A${note.number + 1}`).font = { italic: true, size: 9, color: { argb: "FF888888" } };
   const buffer = await wb.xlsx.writeBuffer();
   return Buffer.from(buffer);
