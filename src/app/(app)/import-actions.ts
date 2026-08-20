@@ -6,7 +6,7 @@ import { del } from "@vercel/blob";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
-import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook } from "@/lib/import-excel";
+import { parseSamplesWorkbook, parsePiLinesWorkbook, parseCustomerPoWorkbook, parseInventoryWorkbook, parseSkuWorkbook, parseColorCodeWorkbook, rowSampleKey } from "@/lib/import-excel";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason, normalizeBrand } from "@/lib/catalog";
 import { autoSkuCode, skuBase } from "@/lib/sku";
@@ -127,7 +127,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     // sample-request sheets (IMAGE / Brand / STYLE # / DESCRIPTION / COLOR /
     // Season) import one sample per style row, same as the emailed sheets.
     // A Master Sample # groups rows (with distinct Sample #s) into one family.
-    const sampleNumber = ((v.masterNumber ?? v.sampleNumber ?? v.styleNumber) ?? "").trim();
+    const sampleNumber = rowSampleKey(v);
 
     try {
       if (sampleNumber && sampleNumber !== currentSampleNumber) {

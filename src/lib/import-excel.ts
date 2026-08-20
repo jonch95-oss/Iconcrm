@@ -195,6 +195,22 @@ const INVENTORY_ALIASES: Record<string, string[]> = {
   quantity: ["qty", "quantity", "onhand", "onhandqty", "stock", "units", "count", "available", "oh"],
 };
 
+/**
+ * The row key for a sample sheet: Master Sample # groups several rows into one
+ * family, otherwise Sample #, otherwise STYLE # (sample-request sheets that
+ * only carry a style). Every mapped column is present on every parsed row —
+ * blank cells come through as "" — so this picks the first *non-empty* value
+ * rather than the first defined one (an empty Master Sample # column used to
+ * swallow the Sample # and skip the whole sheet).
+ */
+export function rowSampleKey(values: Record<string, string>): string {
+  for (const field of ["masterNumber", "sampleNumber", "styleNumber"] as const) {
+    const v = (values[field] ?? "").trim();
+    if (v) return v;
+  }
+  return "";
+}
+
 export const parseSamplesWorkbook = (b: Buffer) => parseWorkbook(b, SAMPLE_ALIASES);
 export const parsePiLinesWorkbook = (b: Buffer) => parseWorkbook(b, PI_LINE_ALIASES);
 export const parseCustomerPoWorkbook = (b: Buffer) => parseWorkbook(b, CUSTOMER_PO_LINE_ALIASES);
