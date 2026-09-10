@@ -3,7 +3,7 @@
  * Run with: npx tsx tests/sample-receipt.test.ts
  */
 import assert from "node:assert";
-import { sampleReceipt, sampleStatusDisplay } from "../src/lib/status";
+import { sampleReceipt, sampleStatusDisplay, sampleDisplayStatus, PARTIAL_RECEIPT } from "../src/lib/status";
 
 const v = (...received: boolean[]) => received.map((r) => ({ received: r }));
 
@@ -41,5 +41,18 @@ assert.equal(sampleStatusDisplay("dropped", v(true, true)).label, "Dropped");
 assert.equal(sampleStatusDisplay("on_hold", v(true, false)).label, "On Hold");
 // Revisions asked for on a color keeps the warning it earned.
 assert.equal(sampleStatusDisplay("revisions_requested", v(true, false)).label, "Revisions Requested");
+
+// --- what the status filter matches on --------------------------------------
+// Filtering has to follow the badge, or picking "Partial" in the dropdown
+// would miss the rows that visibly say Partial.
+assert.equal(sampleDisplayStatus("sample_requested", v(true, false)), PARTIAL_RECEIPT);
+assert.equal(sampleDisplayStatus("sample_received", v(true, false)), PARTIAL_RECEIPT);
+// All colors in -> found under "Sample Received" whatever the stored status.
+assert.equal(sampleDisplayStatus("sample_requested", v(true, true)), "sample_received");
+assert.equal(sampleDisplayStatus("eta_set", v(true, true)), "sample_received");
+// Untouched otherwise.
+assert.equal(sampleDisplayStatus("eta_set", v(false, false)), "eta_set");
+assert.equal(sampleDisplayStatus("sample_requested", []), "sample_requested");
+assert.equal(sampleDisplayStatus("on_order_form", v(true, false)), "on_order_form");
 
 console.log("sample-receipt: all tests passed");

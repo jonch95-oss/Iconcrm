@@ -68,7 +68,7 @@ const SECTIONS: Section[] = [
               ["Sample Requested", "Requested, no ETA yet."],
               ["ETA Set", "An ETA date is on it (setting an ETA bumps it here automatically)."],
               ["Sample Received", "The physical sample arrived — on a multi-color sample, every color is in."],
-              ["Partial \u00b7 2 of 5", "Some colors arrived, the rest are still coming. Shows automatically once you tick colors off one by one."],
+              ["Partial \u00b7 2 of 5", "Some colors arrived, the rest are still coming. Shows automatically once you tick colors off one by one \u2014 find them all with the Partial (some colors in) option in the status filter."],
               ["Quoted (FOB)", "A FOB cost was entered."],
               ["On Hold", "Paused by hand; won't auto-advance."],
               ["Revisions Requested", "You asked the factory for changes."],

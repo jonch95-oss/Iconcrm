@@ -54,11 +54,30 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SampleStatusBadge } from "@/components/status-badge";
 import { Badge } from "@/components/ui/badge";
-import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL } from "@/lib/status";
+import {
+  SAMPLE_PIPELINE,
+  SAMPLE_STATUS_LABEL,
+  PARTIAL_RECEIPT,
+  PARTIAL_RECEIPT_LABEL,
+  sampleDisplayStatus,
+} from "@/lib/status";
 import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
 import type { BadgeTone } from "@/lib/status";
 
 const SEASON_CHOICES = seasonChoices();
+
+// Status filter options, in pipeline order. Partial sits next to Sample
+// Received because that's where you go looking for it: "what's half here?"
+const STATUS_FILTER_OPTIONS: [string, string][] = [
+  ...SAMPLE_PIPELINE.flatMap((s): [string, string][] =>
+    s === "sample_received"
+      ? [[s, SAMPLE_STATUS_LABEL[s]], [PARTIAL_RECEIPT, PARTIAL_RECEIPT_LABEL]]
+      : [[s, SAMPLE_STATUS_LABEL[s]]],
+  ),
+  ...(["revisions_requested", "on_hold", "produced_without_sample", "approved_by_image", "dropped"] as const).map(
+    (s): [string, string] => [s, SAMPLE_STATUS_LABEL[s]],
+  ),
+];
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
 import { updateSample, bulkReceiveSamples, bulkDeleteSamples, editSkuVariant, toggleSkuReceived, requestVariantRevisions } from "./actions";
@@ -506,7 +525,10 @@ export function SamplesTable({
 
   const filtered = React.useMemo(() => {
     return rows.filter((r) => {
-      if (statusFilter && r.status !== statusFilter) return false;
+      // Match what the badge shows, not the stored value: a sample whose
+      // colors are all in reads (and filters as) Sample Received, and one
+      // that's part-way in filters as Partial.
+      if (statusFilter && sampleDisplayStatus(r.status, r.variants) !== statusFilter) return false;
       if (factoryFilter && r.factoryId !== factoryFilter) return false;
       if (brandFilter && r.brand !== brandFilter) return false;
       if (seasonFilter && r.season !== seasonFilter) return false;
@@ -799,9 +821,9 @@ export function SamplesTable({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All statuses</SelectItem>
-            {[...SAMPLE_PIPELINE, "revisions_requested", "on_hold", "produced_without_sample", "approved_by_image", "dropped"].map((s) => (
-              <SelectItem key={s} value={s}>
-                {SAMPLE_STATUS_LABEL[s as keyof typeof SAMPLE_STATUS_LABEL]}
+            {STATUS_FILTER_OPTIONS.map(([value, label]) => (
+              <SelectItem key={value} value={value}>
+                {label}
               </SelectItem>
             ))}
           </SelectContent>

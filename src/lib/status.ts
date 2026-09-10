@@ -213,35 +213,53 @@ export function sampleReceipt(variants: readonly { received: boolean }[]): Sampl
 }
 
 /**
- * What a sample's status badge should actually say. A master sample is only
- * as received as its colors: with 2 of 5 in the stored status would either
- * claim "Sample Received" (it isn't — three are still coming) or sit at
- * "Sample Requested" (also wrong — two are on the desk). So while the sample
- * is still in the receiving stretch of the pipeline, the colors decide the
- * label; past that (quoted, on order form, dropped, on hold...) the stored
- * status is the real state and wins.
+ * A sample whose colors are only part-way in. Not a stored SampleStatus — it's
+ * derived from the colors — but it reads as one in the status column and the
+ * Samples status filter, so it needs a value of its own.
  */
+export const PARTIAL_RECEIPT = "partial_receipt";
+export const PARTIAL_RECEIPT_LABEL = "Partial (some colors in)";
+
+export type SampleDisplayStatus = SampleStatus | typeof PARTIAL_RECEIPT;
+
+/**
+ * The status a sample *reads as*, colors included. A master sample is only as
+ * received as its colors: with 2 of 5 in, the stored status would either claim
+ * "Sample Received" (it isn't — three are still coming) or sit at "Sample
+ * Requested" (also wrong — two are on the desk). So while the sample is in the
+ * receiving stretch of the pipeline, the colors decide; past that (quoted, on
+ * order form, dropped, on hold...) the stored status is the real state and wins.
+ */
+export function sampleDisplayStatus(
+  status: SampleStatus,
+  variants: readonly { received: boolean }[] = [],
+): SampleDisplayStatus {
+  const receiving = status === "sample_requested" || status === "eta_set" || status === "sample_received";
+  if (!receiving) return status;
+  const { state } = sampleReceipt(variants);
+  if (state === "partial") return PARTIAL_RECEIPT;
+  if (state === "all") return "sample_received";
+  return status;
+}
+
+/** Label + tone for the status badge, following sampleDisplayStatus. */
 export function sampleStatusDisplay(
   status: SampleStatus,
   variants: readonly { received: boolean }[] = [],
 ): { label: string; tone: BadgeTone; hint?: string } {
-  const stored = { label: SAMPLE_STATUS_LABEL[status], tone: SAMPLE_STATUS_TONE[status] };
-  const receiving = status === "sample_requested" || status === "eta_set" || status === "sample_received";
-  if (!receiving) return stored;
+  const shown = sampleDisplayStatus(status, variants);
   const { state, received, total } = sampleReceipt(variants);
-  if (state === "partial")
+  if (shown === PARTIAL_RECEIPT)
     return {
-      label: `Partial · ${received} of ${total}`,
+      label: `Partial \u00b7 ${received} of ${total}`,
       tone: "warning",
-      hint: `${received} of ${total} colors received — waiting on the rest to come in.`,
+      hint: `${received} of ${total} colors received \u2014 waiting on the rest to come in.`,
     };
-  if (state === "all")
-    return {
-      label: SAMPLE_STATUS_LABEL.sample_received,
-      tone: SAMPLE_STATUS_TONE.sample_received,
-      hint: `All ${total} color${total === 1 ? "" : "s"} received.`,
-    };
-  return stored;
+  return {
+    label: SAMPLE_STATUS_LABEL[shown],
+    tone: SAMPLE_STATUS_TONE[shown],
+    hint: state === "all" ? `All ${total} color${total === 1 ? "" : "s"} received.` : undefined,
+  };
 }
 
 // ---------------------------------------------------------------------------
