@@ -1,8 +1,7 @@
 import { Badge } from "@/components/ui/badge";
 import type { SampleStatus, POStatus, PIStatus, PackingMatchStatus, ShipmentStatus, RiskStatus } from "@prisma/client";
 import {
-  SAMPLE_STATUS_LABEL,
-  SAMPLE_STATUS_TONE,
+  sampleStatusDisplay,
   PO_STATUS_LABEL,
   PO_STATUS_TONE,
   SHIPMENT_STATUS_LABEL,
@@ -12,10 +11,20 @@ import {
   type BadgeTone,
 } from "@/lib/status";
 
-export function SampleStatusBadge({ status }: { status: SampleStatus }) {
-  return (
-    <Badge variant={SAMPLE_STATUS_TONE[status]}>{SAMPLE_STATUS_LABEL[status]}</Badge>
-  );
+/**
+ * Sample status. Pass the sample's colors (SKU variants) and the badge tells
+ * the truth about a part-shipment: all colors in reads "Sample Received",
+ * some in reads "Partial - 2 of 5" so it's clear the rest is still coming.
+ */
+export function SampleStatusBadge({
+  status,
+  variants,
+}: {
+  status: SampleStatus;
+  variants?: readonly { received: boolean }[];
+}) {
+  const { label, tone, hint } = sampleStatusDisplay(status, variants);
+  return <Badge variant={tone} title={hint}>{label}</Badge>;
 }
 
 export function PoStatusBadge({ status }: { status: POStatus }) {

@@ -139,7 +139,7 @@ export default async function SampleDetailPage({
         title={sample.sampleNumber}
         description={[sample.brand, sample.category, sample.styleName].filter(Boolean).join(" · ")}
       >
-        <SampleStatusBadge status={sample.status} />
+        <SampleStatusBadge status={sample.status} variants={sample.skuVariants} />
         {overdue && (
           <Badge variant="destructive" className="gap-1">
             <AlertTriangle className="h-3 w-3" /> OVERDUE

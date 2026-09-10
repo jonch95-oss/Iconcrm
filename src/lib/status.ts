@@ -194,6 +194,57 @@ export function worstRisk(statuses: RiskStatus[]): RiskStatus | null {
 }
 
 // ---------------------------------------------------------------------------
+// Receipt rollup across a sample's colors (SKU variants).
+// ---------------------------------------------------------------------------
+
+export type SampleReceipt = {
+  /** none = nothing in yet, partial = some colors in, all = every color in. */
+  state: "none" | "partial" | "all";
+  received: number;
+  total: number;
+};
+
+/** Count how many of a sample's colors have physically arrived. */
+export function sampleReceipt(variants: readonly { received: boolean }[]): SampleReceipt {
+  const total = variants.length;
+  const received = variants.reduce((n, v) => n + (v.received ? 1 : 0), 0);
+  const state = total === 0 || received === 0 ? "none" : received === total ? "all" : "partial";
+  return { state, received, total };
+}
+
+/**
+ * What a sample's status badge should actually say. A master sample is only
+ * as received as its colors: with 2 of 5 in the stored status would either
+ * claim "Sample Received" (it isn't — three are still coming) or sit at
+ * "Sample Requested" (also wrong — two are on the desk). So while the sample
+ * is still in the receiving stretch of the pipeline, the colors decide the
+ * label; past that (quoted, on order form, dropped, on hold...) the stored
+ * status is the real state and wins.
+ */
+export function sampleStatusDisplay(
+  status: SampleStatus,
+  variants: readonly { received: boolean }[] = [],
+): { label: string; tone: BadgeTone; hint?: string } {
+  const stored = { label: SAMPLE_STATUS_LABEL[status], tone: SAMPLE_STATUS_TONE[status] };
+  const receiving = status === "sample_requested" || status === "eta_set" || status === "sample_received";
+  if (!receiving) return stored;
+  const { state, received, total } = sampleReceipt(variants);
+  if (state === "partial")
+    return {
+      label: `Partial · ${received} of ${total}`,
+      tone: "warning",
+      hint: `${received} of ${total} colors received — waiting on the rest to come in.`,
+    };
+  if (state === "all")
+    return {
+      label: SAMPLE_STATUS_LABEL.sample_received,
+      tone: SAMPLE_STATUS_TONE.sample_received,
+      hint: `All ${total} color${total === 1 ? "" : "s"} received.`,
+    };
+  return stored;
+}
+
+// ---------------------------------------------------------------------------
 // Per-color (SKU variant) sample state — derived, not a stored enum.
 // ---------------------------------------------------------------------------
 export function variantSampleStatus(v: {

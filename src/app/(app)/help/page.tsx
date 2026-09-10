@@ -59,7 +59,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "statuses", title: "3. Statuses & ETAs",
-    keywords: "status eta set requested received quoted on hold revisions produced without sample approved by image dropped x1 revision badge",
+    keywords: "status eta set requested received partial partially some colors waiting rest quoted on hold revisions produced without sample approved by image dropped x1 revision badge",
     body: (
       <>
         <table className="my-3 w-full border-collapse text-sm">
@@ -67,7 +67,8 @@ const SECTIONS: Section[] = [
             {[
               ["Sample Requested", "Requested, no ETA yet."],
               ["ETA Set", "An ETA date is on it (setting an ETA bumps it here automatically)."],
-              ["Sample Received", "The physical sample arrived."],
+              ["Sample Received", "The physical sample arrived — on a multi-color sample, every color is in."],
+              ["Partial \u00b7 2 of 5", "Some colors arrived, the rest are still coming. Shows automatically once you tick colors off one by one."],
               ["Quoted (FOB)", "A FOB cost was entered."],
               ["On Hold", "Paused by hand; won't auto-advance."],
               ["Revisions Requested", "You asked the factory for changes."],

@@ -12,7 +12,7 @@ import { normalizeSeason, normalizeBrand } from "@/lib/catalog";
 import { autoSkuCode, skuBase } from "@/lib/sku";
 import { getSettings } from "@/lib/settings";
 import { createHash } from "crypto";
-import { advanceSampleStatus } from "@/lib/status";
+import { syncSampleReceipt } from "@/lib/sample-receipt";
 import { computeFobLine } from "@/lib/match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
@@ -308,18 +308,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     }
   }
 
-  // Any sample with a color marked received advances to Sample Received.
-  for (const sid of receivedSampleIds) {
-    const sm = await prisma.sample.findUnique({ where: { id: sid }, select: { status: true, sampleReceivedDate: true } });
-    if (!sm) continue;
-    await prisma.sample.update({
-      where: { id: sid },
-      data: {
-        status: advanceSampleStatus(sm.status, "sample_received"),
-        sampleReceivedDate: sm.sampleReceivedDate ?? new Date(),
-      },
-    });
-  }
+  // A sample whose colors are ALL marked received in the sheet advances to
+  // Sample Received; one with only some of them in stays put, so the status
+  // badge can show that the rest is still coming.
+  for (const sid of receivedSampleIds) await syncSampleReceipt(sid);
 
   // Live ETAs for any tracking numbers in the file (best-effort, parallel,
   // capped so a big sheet can't stall the import).
@@ -776,15 +768,8 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
       summary.created += 1;
     }
   }
-  if (anyReceived) {
-    const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
-    if (sm) {
-      await prisma.sample.update({
-        where: { id: sampleId },
-        data: { status: advanceSampleStatus(sm.status, "sample_received"), sampleReceivedDate: sm.sampleReceivedDate ?? new Date() },
-      });
-    }
-  }
+  // Advances the sample only if every color came back received.
+  if (anyReceived) await syncSampleReceipt(sampleId);
   revalidatePath(`/samples/${sampleId}`);
   return summary;
 }

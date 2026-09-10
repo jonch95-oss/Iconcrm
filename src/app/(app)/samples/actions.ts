@@ -6,6 +6,7 @@ import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
+import { syncSampleReceipt, markAllVariantsReceived } from "@/lib/sample-receipt";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
 import { autoSkuCode, skuBase, deriveColorCode } from "@/lib/sku";
@@ -496,6 +497,9 @@ export async function bulkReceiveSamples(sampleIds: string[]): Promise<ActionRes
         status: ["sample_requested", "eta_set"].includes(s.status) ? "sample_received" : undefined,
       },
     });
+    // Receiving the sample receives all of its colors, so the per-color
+    // rollup doesn't come back as "Partial" straight after.
+    await markAllVariantsReceived(s.id, now);
   }
   await logAudit({
     entityType: "sample",
@@ -780,15 +784,9 @@ export async function toggleSkuReceived(id: string, sampleId: string, received: 
   await assertRole("member");
   await prisma.skuVariant.update({ where: { id }, data: { received, sampleReceivedDate: received ? new Date() : null } });
   revalidatePath("/samples");
-  if (received) {
-    const sm = await prisma.sample.findUnique({ where: { id: sampleId }, select: { status: true, sampleReceivedDate: true } });
-    if (sm) {
-      await prisma.sample.update({
-        where: { id: sampleId },
-        data: { status: advanceSampleStatus(sm.status, "sample_received"), sampleReceivedDate: sm.sampleReceivedDate ?? new Date() },
-      });
-    }
-  }
+  // The sample only counts as received once every color is in; until then it
+  // stays put and the status badge shows how many of them landed.
+  if (received) await syncSampleReceipt(sampleId);
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true };
 }

@@ -31,7 +31,12 @@ export default async function FactoryDetailPage({
   const factory = await prisma.factory.findUnique({
     where: { id },
     include: {
-      samples: { orderBy: { requestedAt: "desc" }, take: 50 },
+      // skuVariants.received feeds the status badge's part-shipment rollup.
+      samples: {
+        orderBy: { requestedAt: "desc" },
+        take: 50,
+        include: { skuVariants: { select: { received: true } } },
+      },
       proformaInvoices: {
         orderBy: { createdAt: "desc" },
         include: { _count: { select: { lines: true, purchaseOrders: true } } },
@@ -121,7 +126,7 @@ export default async function FactoryDetailPage({
                       <TableCell>
                         <Link href={`/samples/${s.id}`} className="text-[var(--primary)] hover:underline">{s.sampleNumber}</Link>
                       </TableCell>
-                      <TableCell><SampleStatusBadge status={s.status} /></TableCell>
+                      <TableCell><SampleStatusBadge status={s.status} variants={s.skuVariants} /></TableCell>
                       <TableCell className="tabular-nums">{formatMoney(s.fobCost, s.currency)}</TableCell>
                       <TableCell>{formatDate(s.sampleEta)}</TableCell>
                     </TableRow>

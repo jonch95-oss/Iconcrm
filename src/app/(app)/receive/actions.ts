@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { advanceSampleStatus } from "@/lib/status";
+import { markAllVariantsReceived } from "@/lib/sample-receipt";
 
 type Result =
   | { ok: true; sample: { id: string; sampleNumber: string; brand: string | null; styleName: string | null; status: string; received: boolean } }
@@ -42,13 +43,17 @@ export async function markReceived(sampleId: string, note?: string): Promise<{ o
   if (!before) return { ok: false, error: "Sample not found." };
   if (before.sampleReceivedDate) return { ok: false, error: "Already marked received." };
 
+  const now = new Date();
   await prisma.sample.update({
     where: { id: sampleId },
     data: {
-      sampleReceivedDate: new Date(),
+      sampleReceivedDate: now,
       status: advanceSampleStatus(before.status, "sample_received"),
     },
   });
+  // The physical box is in, so every color in it is too — otherwise the
+  // per-color rollup would still read "Partial" on the samples table.
+  await markAllVariantsReceived(sampleId, now);
   if (note?.trim()) {
     await prisma.comment.create({
       data: { sampleId, userId: user.id, body: `Received: ${note.trim()}` },

@@ -100,17 +100,19 @@ export interface SampleRow {
 function InlineStatusSelect({
   id,
   status,
+  variants,
   canEdit,
 }: {
   id: string;
   status: SampleRow["status"];
+  variants: SampleRow["variants"];
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
-  if (!canEdit) return <SampleStatusBadge status={status} />;
+  if (!canEdit) return <SampleStatusBadge status={status} variants={variants} />;
 
   const save = (next: string) => {
     setEditing(false);
@@ -154,7 +156,7 @@ function InlineStatusSelect({
 
   return (
     <button type="button" onClick={() => setEditing(true)} disabled={pending} title="Change status (Requested / On Hold)">
-      <SampleStatusBadge status={status} />
+      <SampleStatusBadge status={status} variants={variants} />
     </button>
   );
 }
@@ -618,7 +620,7 @@ export function SamplesTable({
         header: ({ column }) => <SortBtn column={column} label="Status" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <InlineStatusSelect id={row.original.id} status={row.original.status} canEdit={canEdit} />
+            <InlineStatusSelect id={row.original.id} status={row.original.status} variants={row.original.variants} canEdit={canEdit} />
             {row.original.overdue && (
               <Badge variant="destructive" className="gap-1">
                 <AlertTriangle className="h-3 w-3" /> OVERDUE
