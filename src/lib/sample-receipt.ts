@@ -121,7 +121,9 @@ export async function bumpVersionIfRevised(
         sampleId,
         userId: userId ?? null,
         body: `Revised sample received — renamed ${sample.sampleNumber} \u2192 ${next}.`,
-        tags: ["revision"],
+        // "version" marks this as the round closing, not a new request — the
+        // revision recap buckets it separately.
+        tags: ["revision", "version"],
       },
     }),
   ]);

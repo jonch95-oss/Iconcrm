@@ -25,6 +25,7 @@ const NAV = [
   { href: "/packing-lists", label: "Packing Lists" },
   { href: "/shipments", label: "Shipments" },
   { href: "/receive", label: "Receive Samples" },
+  { href: "/revisions", label: "Revisions & Comments" },
   { href: "/needs-review", label: "Needs Review" },
   { href: "/factories", label: "Factories" },
   { href: "/settings", label: "Admin Settings" },

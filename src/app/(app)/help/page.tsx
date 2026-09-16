@@ -179,7 +179,22 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "export", title: "10. Exporting to Excel",
+    id: "revisions", title: "10. Revisions & Comments recap",
+    keywords: "revision recap comment dashboard factory summary email excel track changes awaiting revised sample",
+    body: (
+      <>
+        <p><B>Revisions &amp; Comments</B> in the sidebar collects everything said about your samples — revision requests, comments (per color too), ETA changes and revised samples coming back in — grouped by factory.</p>
+        <Steps items={[
+          <>Filter by <B>factory</B>, <B>brand</B> and date range, or tick <B>Open revisions only</B> for what a factory still owes you.</>,
+          <><B>Excel</B> pulls that factory&apos;s recap with each style&apos;s photo; <B>Copy text</B> gives you the same thing to paste into your own email.</>,
+          <><B>Email factory</B> shows you exactly what will be sent — recipient, subject and every note — before it goes.</>,
+        ]} />
+        <Tip>The tiles track what&apos;s outstanding: how many styles are awaiting a revised sample, and the longest anyone has been waiting. Dropped styles are left out of recaps.</Tip>
+      </>
+    ),
+  },
+  {
+    id: "export", title: "11. Exporting to Excel",
     keywords: "export excel data only comments csv color eta photos",
     body: (
       <>
@@ -194,7 +209,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "orderforms", title: "11. Order forms",
+    id: "orderforms", title: "12. Order forms",
     keywords: "order form create documents versions change history notes export xlsx pdf sku number delete revert",
     body: (
       <>
@@ -209,7 +224,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "shipments", title: "12. Shipments & Bills of Lading",
+    id: "shipments", title: "13. Shipments & Bills of Lading",
     keywords: "shipment bill of lading bl container vessel eta confirm upload pdf",
     body: (
       <Steps items={[
@@ -220,7 +235,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "settings", title: "13. Settings (admin)",
+    id: "settings", title: "14. Settings (admin)",
     keywords: "settings brands color codes hts users roles",
     body: (
       <ul className="ml-5 list-disc space-y-1">
@@ -232,7 +247,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "faq", title: "14. FAQ",
+    id: "faq", title: "15. FAQ",
     keywords: "faq sku blank black background too large group blocked color track x1 members not a group per color comments material",
     body: (
       <div className="space-y-2">

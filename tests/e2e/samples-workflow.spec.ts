@@ -12,6 +12,9 @@ const ADMIN_EMAIL = "admin@ourdomain.com";
 
 async function login(page: import("@playwright/test").Page) {
   await page.goto("/login");
+  // Wait for the form to hydrate: clicking before its JS attaches submits the
+  // plain form and bounces back to /login.
+  await page.waitForLoadState("networkidle");
   await page.getByLabel("Dev login (email only)").fill(ADMIN_EMAIL);
   await page.getByRole("button", { name: "Continue" }).click();
   await page.waitForURL("/");
