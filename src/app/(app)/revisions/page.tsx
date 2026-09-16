@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { requireUser } from "@/lib/session";
+import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import {
 } from "@/lib/revisions";
 import { RecapFilterBar } from "./recap-filters";
 import { RecapActions } from "./recap-actions";
+import { EntryActions, AcknowledgeAll, type Person } from "./entry-actions";
 import { Download } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -57,16 +58,21 @@ export default async function RevisionsPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
-  await requireUser();
+  const user = await requireUser();
   const sp = await searchParams;
-  const filters = recapFiltersFromQuery(sp);
-  const query = recapFiltersToQuery(filters);
+  const raw = recapFiltersFromQuery(sp);
+  // "me" in the URL keeps the filter shareable without hard-coding an id.
+  const filters = { ...raw, assignee: raw.assignee === "me" ? user.id : raw.assignee };
+  const query = recapFiltersToQuery(raw);
+  const canEdit = hasRole(user.role, "member");
 
-  const [recap, factories, settings] = await Promise.all([
-    getRevisionRecap(filters),
+  const [recap, factories, settings, users] = await Promise.all([
+    getRevisionRecap(filters, user.id),
     prisma.factory.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
     getSettings(),
+    prisma.user.findMany({ where: { isActive: true }, orderBy: { name: "asc" }, select: { id: true, name: true, email: true } }),
   ]);
+  const people: Person[] = users.map((u) => ({ id: u.id, name: u.name ?? u.email }));
 
   return (
     <div>
@@ -81,10 +87,15 @@ export default async function RevisionsPage({
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
+        <Tile
+          label="New — not acknowledged"
+          value={recap.totals.unacknowledged}
+          tone={recap.totals.unacknowledged > 0 ? "warning" : "default"}
+        />
+        <Tile label="Assigned to me" value={recap.totals.assignedToMe} />
         <Tile label="Awaiting revised samples" value={recap.totals.openRevisions} tone={recap.totals.openRevisions > 0 ? "warning" : "default"} />
         <Tile label="Styles with activity" value={recap.totals.samples} />
-        <Tile label="Notes in range" value={recap.totals.entries} />
         <Tile
           label="Longest wait"
           value={recap.totals.oldestOpenDays == null ? "—" : `${recap.totals.oldestOpenDays}d`}
@@ -93,7 +104,7 @@ export default async function RevisionsPage({
       </div>
 
       <div className="mt-4">
-        <RecapFilterBar filters={filters} factories={factories} brands={settings.brands} />
+        <RecapFilterBar filters={raw} factories={factories} brands={settings.brands} people={people} />
       </div>
 
       {recap.factories.length === 0 && (
@@ -117,7 +128,15 @@ export default async function RevisionsPage({
                   {f.contactEmail ? ` · ${f.contactEmail}` : ""}
                 </p>
               </div>
-              <RecapActions
+              <div className="flex flex-wrap items-center gap-2">
+                {canEdit && (
+                  <AcknowledgeAll
+                    commentIds={f.samples.flatMap((s) =>
+                      s.entries.filter((e) => e.commentId && !e.acknowledgedAt && !e.dismissedAt).map((e) => e.commentId!),
+                    )}
+                  />
+                )}
+                <RecapActions
                 factoryId={f.id}
                 factoryName={f.name}
                 contactEmail={f.contactEmail}
@@ -125,7 +144,8 @@ export default async function RevisionsPage({
                 query={query}
                 text={recapText(f, recap.since)}
                 subject={recapSubject(f.samples.length, recap.since)}
-              />
+                />
+              </div>
             </div>
 
             <div className="divide-y divide-[var(--border)]">
@@ -162,22 +182,42 @@ export default async function RevisionsPage({
                       </p>
                     )}
                     <ul className="mt-1.5 space-y-1.5">
-                      {s.entries.map((e) => (
-                        <li key={e.id} className="flex flex-wrap items-start gap-2 text-sm">
-                          <Badge variant={ENTRY_TONE[e.kind]} className="mt-0.5 shrink-0">
-                            {RECAP_ENTRY_LABEL[e.kind]}
-                          </Badge>
-                          {e.color && <span className="text-xs text-[var(--muted-foreground)]">{e.color}</span>}
-                          <span className="min-w-0 flex-1">{e.body}</span>
-                          {e.imageUrl && (
-                            // eslint-disable-next-line @next/next/no-img-element
-                            <img src={e.imageUrl} alt="" className="h-10 w-10 rounded border border-[var(--border)] bg-white object-contain" />
-                          )}
-                          <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
-                            {formatDate(e.at)} · {e.author}
-                          </span>
-                        </li>
-                      ))}
+                      {s.entries.map((e) => {
+                        const isNew = !!e.commentId && !e.acknowledgedAt && !e.dismissedAt;
+                        return (
+                          <li
+                            key={e.id}
+                            className={`flex flex-wrap items-start gap-2 rounded px-1.5 py-1 text-sm ${
+                              isNew ? "border-l-2 border-[var(--warning)] bg-[var(--accent)]" : ""
+                            } ${e.dismissedAt ? "opacity-55" : ""}`}
+                          >
+                            <Badge variant={ENTRY_TONE[e.kind]} className="mt-0.5 shrink-0">
+                              {RECAP_ENTRY_LABEL[e.kind]}
+                            </Badge>
+                            {e.color && <span className="text-xs text-[var(--muted-foreground)]">{e.color}</span>}
+                            <span className="min-w-0 flex-1">{e.body}</span>
+                            {e.imageUrl && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={e.imageUrl} alt="" className="h-10 w-10 rounded border border-[var(--border)] bg-white object-contain" />
+                            )}
+                            <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
+                              {formatDate(e.at)} · {e.author}
+                            </span>
+                            {e.commentId && (
+                              <EntryActions
+                                commentId={e.commentId}
+                                acknowledgedAt={e.acknowledgedAt ? e.acknowledgedAt.toISOString() : null}
+                                acknowledgedBy={e.acknowledgedBy}
+                                dismissedAt={e.dismissedAt ? e.dismissedAt.toISOString() : null}
+                                dismissedBy={e.dismissedBy}
+                                assignee={e.assignee}
+                                people={people}
+                                canEdit={canEdit}
+                              />
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 </div>

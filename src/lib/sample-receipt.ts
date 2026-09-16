@@ -44,10 +44,10 @@ export async function syncSampleReceipt(sampleId: string, userId?: string): Prom
  * too. Keeps the per-color rollup from reading "Partial" right after someone
  * marked the sample received.
  */
-export async function markAllVariantsReceived(sampleId: string, at: Date): Promise<void> {
+export async function markAllVariantsReceived(sampleId: string, at: Date, userId?: string): Promise<void> {
   await prisma.skuVariant.updateMany({
     where: { sampleId, received: false },
-    data: { received: true, sampleReceivedDate: at },
+    data: { received: true, sampleReceivedDate: at, receivedById: userId ?? null },
   });
 }
 

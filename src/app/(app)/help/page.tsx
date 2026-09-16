@@ -189,7 +189,14 @@ const SECTIONS: Section[] = [
           <><B>Excel</B> pulls that factory&apos;s recap with each style&apos;s photo; <B>Copy text</B> gives you the same thing to paste into your own email.</>,
           <><B>Email factory</B> shows you exactly what will be sent — recipient, subject and every note — before it goes.</>,
         ]} />
-        <Tip>The tiles track what&apos;s outstanding: how many styles are awaiting a revised sample, and the longest anyone has been waiting. Dropped styles are left out of recaps.</Tip>
+        <h3 className="mt-4 font-semibold">Triage: new, assigned, dismissed</h3>
+        <p>Every comment lands on the board as <B>new</B> (amber bar) until someone acknowledges it — the tile at the top is your unread count.</p>
+        <ul className="ml-5 list-disc space-y-1">
+          <li><B>Acknowledge</B> — &ldquo;seen&rdquo;. Stamps your name on it; <B>Acknowledge N</B> in a factory&apos;s header clears that factory at once.</li>
+          <li><B>Assign</B> — put a name against it. <B>Assigned to me</B> in the filter bar shows your own list.</li>
+          <li><B>×</B> dismisses a note: off the board, never deleted. <B>Show dismissed</B> brings it back, with an Undo.</li>
+        </ul>
+        <Tip>The tiles track what&apos;s outstanding: unacknowledged notes, what&apos;s assigned to you, styles awaiting a revised sample, and the longest anyone has been waiting. Dropped styles are left out of recaps. Exports carry the photo attached to each note alongside the style photo.</Tip>
       </>
     ),
   },
@@ -236,13 +243,13 @@ const SECTIONS: Section[] = [
   },
   {
     id: "settings", title: "14. Settings (admin)",
-    keywords: "settings brands color codes hts users roles",
+    keywords: "settings brands color codes hts users roles rename user name edit",
     body: (
       <ul className="ml-5 list-disc space-y-1">
         <li><B>General → Allowed brands</B> — drives every Brand dropdown &amp; import (one per line).</li>
         <li><B>Color Codes</B> — color → code map for SKUs (Black → BLK); Export/Import as Excel.</li>
         <li><B>HTS Codes</B> — category + material → HTS &amp; duty; auto-fills samples.</li>
-        <li><B>Users &amp; Roles</B> — Admin / Can edit / Viewer.</li>
+        <li><B>Users &amp; Roles</B> — Admin / Can edit / Viewer. Click someone&apos;s name to rename them; that name is what shows on every comment, receipt and revision request.</li>
       </ul>
     ),
   },

@@ -14,10 +14,12 @@ export function RecapFilterBar({
   filters,
   factories,
   brands,
+  people,
 }: {
   filters: RecapFilters;
   factories: { id: string; name: string }[];
   brands: string[];
+  people: { id: string; name: string }[];
 }) {
   const router = useRouter();
   const go = (next: Partial<RecapFilters>) => {
@@ -50,12 +52,38 @@ export function RecapFilterBar({
         </SelectContent>
       </Select>
 
+      <Select
+        value={filters.assignee || "all"}
+        onValueChange={(v) => go({ assignee: v === "all" ? "" : v })}
+      >
+        <SelectTrigger className="h-9 w-44"><SelectValue placeholder="Anyone" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">Assigned to anyone</SelectItem>
+          <SelectItem value="me">Assigned to me</SelectItem>
+          {people.map((p) => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+        </SelectContent>
+      </Select>
+
+      <Button
+        variant={filters.newOnly ? "default" : "outline"}
+        size="sm"
+        onClick={() => go({ newOnly: !filters.newOnly })}
+      >
+        New only
+      </Button>
       <Button
         variant={filters.openOnly ? "default" : "outline"}
         size="sm"
         onClick={() => go({ openOnly: !filters.openOnly })}
       >
         Open revisions only
+      </Button>
+      <Button
+        variant={filters.showDismissed ? "default" : "outline"}
+        size="sm"
+        onClick={() => go({ showDismissed: !filters.showDismissed })}
+      >
+        Show dismissed
       </Button>
     </div>
   );

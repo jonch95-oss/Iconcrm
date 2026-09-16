@@ -150,6 +150,15 @@ model User {
 
   requestedSamples Sample[]        @relation("RequestedSamples")
   comments         Comment[]
+  // Triage on the Revisions & Comments board.
+  acknowledgedComments Comment[]   @relation("AcknowledgedComments")
+  dismissedComments    Comment[]   @relation("DismissedComments")
+  assignedComments     Comment[]   @relation("AssignedComments")
+  commentsAssignedOut  Comment[]   @relation("CommentAssigners")
+  // Who physically handled a sample / a color.
+  receivedSamples      Sample[]     @relation("ReceivedSamples")
+  receivedVariants     SkuVariant[] @relation("ReceivedVariants")
+  revisionRequests     SkuVariant[] @relation("VariantRevisionRequests")
   createdOrderForms OrderForm[]    @relation("CreatedOrderForms")
   issuedPOs        PurchaseOrder[] @relation("IssuedPOs")
   auditLogs        AuditLog[]
@@ -241,6 +250,8 @@ model Sample {
 
   sampleEta          DateTime?
   sampleReceivedDate DateTime?
+  receivedById       String?   // who marked it received
+  receivedBy         User?     @relation("ReceivedSamples", fields: [receivedById], references: [id])
   // Which of the factory's sample rooms the physical sample came out of,
   // captured when it's received (free text — rooms vary by factory).
   sampleRoom         String?
@@ -317,7 +328,11 @@ model SkuVariant {
   imageHash       String? // hash of the imported image bytes (skip re-uploads)
   sampleEta          DateTime? // per-color requested-sample ETA
   sampleReceivedDate DateTime? // when this color's physical sample arrived
+  receivedById       String?   // who ticked it off
+  receivedBy         User?     @relation("ReceivedVariants", fields: [receivedById], references: [id])
   revisionsRequestedAt DateTime? // revisions requested for this color
+  revisionsRequestedById String? // ...and by whom
+  revisionsRequestedBy   User?   @relation("VariantRevisionRequests", fields: [revisionsRequestedById], references: [id])
 
   orderFormLines   OrderFormLine[]
   piLines          PILine[]
@@ -344,8 +359,24 @@ model Comment {
   tags      String[] @default([]) // e.g. "duplicate-email"
   createdAt DateTime @default(now())
 
+  // Triage on the Revisions & Comments board: a note arrives unacknowledged,
+  // someone says they've seen it, someone owns it, or it's waved off.
+  acknowledgedAt   DateTime?
+  acknowledgedById String?
+  acknowledgedBy   User?     @relation("AcknowledgedComments", fields: [acknowledgedById], references: [id])
+  dismissedAt      DateTime?
+  dismissedById    String?
+  dismissedBy      User?     @relation("DismissedComments", fields: [dismissedById], references: [id])
+  assigneeId       String?
+  assignee         User?     @relation("AssignedComments", fields: [assigneeId], references: [id])
+  assignedAt       DateTime?
+  assignedById     String?
+  assignedBy       User?     @relation("CommentAssigners", fields: [assignedById], references: [id])
+
   @@index([sampleId])
   @@index([skuVariantId])
+  @@index([assigneeId])
+  @@index([acknowledgedAt])
 }
 
 // Never overwrite ETAs — log every change.

@@ -46,6 +46,25 @@ const roleSchema = z.object({
   role: z.enum(["admin", "member", "viewer"]),
 });
 
+/** Rename a user (people join with an email and no name, or change theirs). */
+export async function updateUserName(userId: string, name: string): Promise<ActionResult> {
+  const admin = await assertRole("admin");
+  const clean = name.trim().slice(0, 120);
+  const before = await prisma.user.findUnique({ where: { id: userId }, select: { name: true } });
+  if (!before) return { ok: false, error: "User not found." };
+  await prisma.user.update({ where: { id: userId }, data: { name: clean || null } });
+  await logAudit({
+    entityType: "user",
+    entityId: userId,
+    action: "name_changed",
+    userId: admin.id,
+    before: { name: before.name },
+    after: { name: clean || null },
+  });
+  revalidatePath("/settings");
+  return { ok: true };
+}
+
 export async function updateUserRole(userId: string, role: Role): Promise<ActionResult> {
   {
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });

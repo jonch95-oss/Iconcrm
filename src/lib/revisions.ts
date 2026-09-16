@@ -19,6 +19,17 @@ export type RecapEntry = {
   /** Set when the entry is about one color rather than the whole sample. */
   color: string | null;
   imageUrl: string | null;
+  /**
+   * Triage. Only comment-backed entries can be acted on — an ETA change or a
+   * color flag is a fact about the sample, not an item in someone's inbox — so
+   * `commentId` is null for those and the board renders them read-only.
+   */
+  commentId: string | null;
+  acknowledgedAt: Date | null;
+  acknowledgedBy: string | null;
+  dismissedAt: Date | null;
+  dismissedBy: string | null;
+  assignee: { id: string; name: string } | null;
 };
 
 export type RecapSample = {
@@ -57,13 +68,27 @@ export type RecapFilters = {
   /** Days of history; 0 means everything. */
   days: number;
   openOnly: boolean;
+  /** Only notes nobody has acknowledged yet — the inbox view. */
+  newOnly: boolean;
+  /** Assigned to this user id ("me" is resolved by the page). */
+  assignee: string;
+  /** Dismissed notes are hidden unless this is on. */
+  showDismissed: boolean;
 };
 
 export type Recap = {
   filters: RecapFilters;
   since: Date | null;
   factories: RecapFactory[];
-  totals: { openRevisions: number; entries: number; samples: number; oldestOpenDays: number | null };
+  totals: {
+    openRevisions: number;
+    entries: number;
+    samples: number;
+    oldestOpenDays: number | null;
+    /** Comment-backed notes nobody has acknowledged (the notification count). */
+    unacknowledged: number;
+    assignedToMe: number;
+  };
 };
 
 export const RECAP_RANGES = [
@@ -73,7 +98,15 @@ export const RECAP_RANGES = [
   { value: "0", label: "All time" },
 ];
 
-export const EMPTY_RECAP_FILTERS: RecapFilters = { factoryId: "", brand: "", days: 30, openOnly: false };
+export const EMPTY_RECAP_FILTERS: RecapFilters = {
+  factoryId: "",
+  brand: "",
+  days: 30,
+  openOnly: false,
+  newOnly: false,
+  assignee: "",
+  showDismissed: false,
+};
 
 type Param = string | string[] | undefined;
 const one = (v: Param) => (Array.isArray(v) ? (v[0] ?? "") : (v ?? "")).trim();
@@ -85,6 +118,9 @@ export function recapFiltersFromQuery(sp: Record<string, Param>): RecapFilters {
     brand: one(sp.brand),
     days: Number.isFinite(days) && one(sp.days) !== "" ? Math.max(0, days) : 30,
     openOnly: one(sp.open) === "1",
+    newOnly: one(sp.new) === "1",
+    assignee: one(sp.assignee),
+    showDismissed: one(sp.dismissed) === "1",
   };
 }
 
@@ -94,6 +130,9 @@ export function recapFiltersToQuery(f: RecapFilters): string {
   if (f.brand) p.set("brand", f.brand);
   if (f.days !== 30) p.set("days", String(f.days));
   if (f.openOnly) p.set("open", "1");
+  if (f.newOnly) p.set("new", "1");
+  if (f.assignee) p.set("assignee", f.assignee);
+  if (f.showDismissed) p.set("dismissed", "1");
   return p.toString();
 }
 
@@ -106,7 +145,7 @@ function entryKind(tags: string[]): RecapEntryKind {
   return "comment";
 }
 
-export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
+export async function getRevisionRecap(filters: RecapFilters, viewerId?: string): Promise<Recap> {
   const now = new Date();
   const since = filters.days > 0 ? new Date(now.getTime() - filters.days * 86_400_000) : null;
 
@@ -116,7 +155,13 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
     ...(filters.factoryId ? { factoryId: filters.factoryId } : {}),
     ...(filters.brand ? { brand: filters.brand } : {}),
   };
-  const commentWhere: Prisma.CommentWhereInput = since ? { createdAt: { gte: since } } : {};
+  const commentWhere: Prisma.CommentWhereInput = {
+    ...(since ? { createdAt: { gte: since } } : {}),
+    // Dismissed notes are waved off, not deleted — they come back with the toggle.
+    ...(filters.showDismissed ? {} : { dismissedAt: null }),
+    ...(filters.newOnly ? { acknowledgedAt: null } : {}),
+    ...(filters.assignee ? { assigneeId: filters.assignee } : {}),
+  };
   // "Open" = the factory still owes us a revised sample, at sample or color level.
   const openWhere: Prisma.SampleWhereInput = {
     OR: [{ status: "revisions_requested" }, { skuVariants: { some: { revisionsRequestedAt: { not: null } } } }],
@@ -149,10 +194,22 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
     },
     include: {
       factory: { select: { id: true, name: true, contactName: true, contactEmail: true } },
-      skuVariants: { select: { color: true, revisionsRequestedAt: true } },
+      skuVariants: {
+        select: {
+          color: true,
+          revisionsRequestedAt: true,
+          revisionsRequestedBy: { select: { name: true } },
+        },
+      },
       comments: {
         where: commentWhere,
-        include: { user: { select: { name: true } }, skuVariant: { select: { color: true } } },
+        include: {
+          user: { select: { name: true } },
+          skuVariant: { select: { color: true } },
+          acknowledgedBy: { select: { name: true } },
+          dismissedBy: { select: { name: true } },
+          assignee: { select: { id: true, name: true } },
+        },
         orderBy: { createdAt: "desc" },
       },
     },
@@ -167,7 +224,11 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
     .map((s) => s.id);
   const olderRevisionNotes = missingContext.length
     ? await prisma.comment.findMany({
-        where: { sampleId: { in: missingContext }, tags: { has: "revision" } },
+        where: {
+          sampleId: { in: missingContext },
+          tags: { has: "revision" },
+          ...(filters.showDismissed ? {} : { dismissedAt: null }),
+        },
         include: { user: { select: { name: true } }, skuVariant: { select: { color: true } } },
         orderBy: { createdAt: "desc" },
         take: 500,
@@ -195,6 +256,12 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
       author: c.user?.name ?? c.authorLabel ?? "—",
       color: c.skuVariant?.color ?? null,
       imageUrl: c.imageUrl,
+      commentId: c.id,
+      acknowledgedAt: c.acknowledgedAt,
+      acknowledgedBy: c.acknowledgedBy?.name ?? null,
+      dismissedAt: c.dismissedAt,
+      dismissedBy: c.dismissedBy?.name ?? null,
+      assignee: c.assignee ? { id: c.assignee.id, name: c.assignee.name ?? "—" } : null,
     }));
     const older = olderBySample.get(s.id);
     if (older)
@@ -206,6 +273,12 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
         author: older.user?.name ?? older.authorLabel ?? "—",
         color: older.skuVariant?.color ?? null,
         imageUrl: older.imageUrl,
+        commentId: older.id,
+        acknowledgedAt: older.acknowledgedAt,
+        acknowledgedBy: null,
+        dismissedAt: older.dismissedAt,
+        dismissedBy: null,
+        assignee: null,
       });
     // Flagging a color for revision writes a timestamp, not a comment — without
     // this the recap would show the style with nothing asked for on it.
@@ -219,9 +292,15 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
         kind: "revision",
         at: v.revisionsRequestedAt,
         body: `Revisions requested for ${v.color}`,
-        author: "—",
+        author: v.revisionsRequestedBy?.name ?? "—",
         color: v.color,
         imageUrl: null,
+        commentId: null,
+        acknowledgedAt: null,
+        acknowledgedBy: null,
+        dismissedAt: null,
+        dismissedBy: null,
+        assignee: null,
       });
     }
     for (const e of etaBySample.get(s.id) ?? [])
@@ -236,6 +315,12 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
         author: e.changedBy?.name ?? "—",
         color: null,
         imageUrl: null,
+        commentId: null,
+        acknowledgedAt: null,
+        acknowledgedBy: null,
+        dismissedAt: null,
+        dismissedBy: null,
+        assignee: null,
       });
 
     const open = isOpen(s);
@@ -299,8 +384,16 @@ export async function getRevisionRecap(filters: RecapFilters): Promise<Recap> {
       entries: factories.reduce((n, f) => n + f.entryCount, 0),
       samples: factories.reduce((n, f) => n + f.samples.length, 0),
       oldestOpenDays,
+      unacknowledged: countEntries(factories, (e) => !!e.commentId && !e.acknowledgedAt && !e.dismissedAt),
+      assignedToMe: viewerId
+        ? countEntries(factories, (e) => e.assignee?.id === viewerId && !e.dismissedAt)
+        : 0,
     },
   };
+}
+
+function countEntries(factories: RecapFactory[], match: (e: RecapEntry) => boolean): number {
+  return factories.reduce((n, f) => n + f.samples.reduce((m, s) => m + s.entries.filter(match).length, 0), 0);
 }
 
 function isOpen(s: { status: SampleStatus; skuVariants: { revisionsRequestedAt: Date | null }[] }): boolean {

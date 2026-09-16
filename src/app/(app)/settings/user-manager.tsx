@@ -13,7 +13,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { updateUserRole, toggleUserActive, inviteUser } from "./actions";
+import { updateUserRole, updateUserName, toggleUserActive, inviteUser } from "./actions";
 import { toast } from "sonner";
 import type { Role } from "@prisma/client";
 
@@ -23,6 +23,64 @@ export interface UserRow {
   name: string | null;
   role: Role;
   isActive: boolean;
+}
+
+/** Click the name to rename someone — it's the name that shows up on every
+ *  comment, receipt and revision request, so it needs to be fixable. */
+function EditableName({ id, name }: { id: string; name: string | null }) {
+  const router = useRouter();
+  const [editing, setEditing] = React.useState(false);
+  const [value, setValue] = React.useState(name ?? "");
+  const [pending, startTransition] = React.useTransition();
+
+  React.useEffect(() => setValue(name ?? ""), [name]);
+
+  const save = () => {
+    setEditing(false);
+    if (value.trim() === (name ?? "")) return;
+    startTransition(async () => {
+      const res = await updateUserName(id, value);
+      if (res.ok) {
+        toast.success("Name updated");
+        router.refresh();
+      } else {
+        toast.error(res.error);
+        setValue(name ?? "");
+      }
+    });
+  };
+
+  if (editing)
+    return (
+      <Input
+        autoFocus
+        value={value}
+        disabled={pending}
+        placeholder="Full name"
+        className="h-8 w-48"
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={save}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") save();
+          if (e.key === "Escape") {
+            setValue(name ?? "");
+            setEditing(false);
+          }
+        }}
+      />
+    );
+
+  return (
+    <button
+      type="button"
+      onClick={() => setEditing(true)}
+      disabled={pending}
+      title="Rename"
+      className="rounded px-1 text-left font-medium hover:bg-[var(--accent)]"
+    >
+      {name ?? "— add a name"}
+    </button>
+  );
 }
 
 export function UserManager({ users }: { users: UserRow[] }) {
@@ -69,7 +127,7 @@ export function UserManager({ users }: { users: UserRow[] }) {
             {users.map((u) => (
               <TableRow key={u.id}>
                 <TableCell>
-                  <div className="font-medium">{u.name ?? "—"}</div>
+                  <EditableName id={u.id} name={u.name} />
                   <div className="text-xs text-[var(--muted-foreground)]">{u.email}</div>
                 </TableCell>
                 <TableCell>

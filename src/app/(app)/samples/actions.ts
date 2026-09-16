@@ -265,10 +265,18 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   const body = (parsed.data.body ?? "").trim();
   const imageUrl = parsed.data.imageUrl?.trim() || null;
   if (!body && !imageUrl) return { ok: false, error: "Add a comment or an image." };
-  await prisma.comment.create({
+  const comment = await prisma.comment.create({
     data: { sampleId: parsed.data.sampleId, skuVariantId: parsed.data.skuVariantId || null, userId: user.id, body, imageUrl },
   });
+  await logAudit({
+    entityType: "comment",
+    entityId: comment.id,
+    action: "comment_added",
+    userId: user.id,
+    after: { sampleId: parsed.data.sampleId, skuVariantId: comment.skuVariantId, body: body.slice(0, 200), hasImage: !!imageUrl },
+  });
   revalidatePath(`/samples/${parsed.data.sampleId}`);
+  revalidatePath("/revisions");
   return { ok: true };
 }
 
@@ -313,8 +321,15 @@ export async function addSkuVariant(formData: FormData): Promise<ActionResult> {
 }
 
 export async function deleteSkuVariant(id: string, sampleId: string): Promise<ActionResult> {
-  await assertRole("member");
-  await prisma.skuVariant.delete({ where: { id } });
+  const user = await assertRole("member");
+  const deleted = await prisma.skuVariant.delete({ where: { id } });
+  await logAudit({
+    entityType: "sku_variant",
+    entityId: id,
+    action: "variant_deleted",
+    userId: user.id,
+    before: { sampleId, size: deleted.size, color: deleted.color, upc: deleted.upc, skuCode: deleted.skuCode },
+  });
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true };
 }
@@ -507,6 +522,7 @@ export async function bulkReceiveSamples(
       where: { id: s.id },
       data: {
         sampleReceivedDate: now,
+        receivedById: user.id,
         trackingStatus: "delivered",
         status: ["sample_requested", "eta_set"].includes(s.status) ? "sample_received" : undefined,
         ...(room ? { sampleRoom: room } : {}),
@@ -514,7 +530,7 @@ export async function bulkReceiveSamples(
     });
     // Receiving the sample receives all of its colors, so the per-color
     // rollup doesn't come back as "Partial" straight after.
-    await markAllVariantsReceived(s.id, now);
+    await markAllVariantsReceived(s.id, now, user.id);
     // Anything that was out for revisions comes back as its next round.
     const renamed = await bumpVersionIfRevised(s.id, user.id, s.status);
     if (renamed) renames.push(renamed);
@@ -540,7 +556,7 @@ export async function bulkReceiveSamples(
 
 /** Set/refresh tracking on one sample (manual entry from the detail page). */
 export async function updateSampleTracking(formData: FormData): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   const sampleId = String(formData.get("sampleId") ?? "");
   const trackingNumber = String(formData.get("trackingNumber") ?? "").trim();
   if (!sampleId) return { ok: false, error: "Missing sample." };
@@ -564,6 +580,13 @@ export async function updateSampleTracking(formData: FormData): Promise<ActionRe
       },
     });
   }
+  await logAudit({
+    entityType: "sample",
+    entityId: sampleId,
+    action: trackingNumber ? "tracking_set" : "tracking_cleared",
+    userId: user.id,
+    after: { trackingNumber: trackingNumber || null },
+  });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
   revalidatePath("/receive");
@@ -781,7 +804,7 @@ export async function editSkuVariant(
   field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta",
   value: string,
 ): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   const v = value.trim();
   let data: Prisma.SkuVariantUpdateInput;
   if (field === "unitsPerCarton") {
@@ -801,7 +824,16 @@ export async function editSkuVariant(
   } else {
     data = { color: v || "—" };
   }
+  const before = await prisma.skuVariant.findUnique({ where: { id } });
   await prisma.skuVariant.update({ where: { id }, data });
+  await logAudit({
+    entityType: "sku_variant",
+    entityId: id,
+    action: "variant_edited",
+    userId: user.id,
+    before: { sampleId, [field]: before?.[field] ?? null },
+    after: { [field]: v },
+  });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
   return { ok: true };
@@ -810,7 +842,21 @@ export async function editSkuVariant(
 
 export async function toggleSkuReceived(id: string, sampleId: string, received: boolean): Promise<ActionResult> {
   const user = await assertRole("member");
-  await prisma.skuVariant.update({ where: { id }, data: { received, sampleReceivedDate: received ? new Date() : null } });
+  const variant = await prisma.skuVariant.update({
+    where: { id },
+    data: {
+      received,
+      sampleReceivedDate: received ? new Date() : null,
+      receivedById: received ? user.id : null,
+    },
+  });
+  await logAudit({
+    entityType: "sku_variant",
+    entityId: id,
+    action: received ? "variant_received" : "variant_unreceived",
+    userId: user.id,
+    after: { sampleId, color: variant.color },
+  });
   revalidatePath("/samples");
   // The sample only counts as received once every color is in; until then it
   // stays put and the status badge shows how many of them landed.
@@ -827,7 +873,7 @@ export async function toggleSkuReceived(id: string, sampleId: string, received: 
 export async function fillSkuCodesForSample(
   sampleId: string,
 ): Promise<ActionResult & { filled?: number; created?: { color: string; code: string }[] }> {
-  await assertRole("member");
+  const user = await assertRole("member");
   const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { sampleNumber: true } });
   if (!sample) return { ok: false, error: "Sample not found" };
   const codeRows = await prisma.colorCode.findMany();
@@ -853,6 +899,14 @@ export async function fillSkuCodesForSample(
     await prisma.skuVariant.update({ where: { id: v.id }, data: { skuCode: autoSkuCode(sample.sampleNumber, code) } });
     filled += 1;
   }
+  if (filled)
+    await logAudit({
+      entityType: "sample",
+      entityId: sampleId,
+      action: "sku_codes_filled",
+      userId: user.id,
+      after: { filled, created },
+    });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/settings");
   return { ok: true, filled, created };
@@ -964,8 +1018,9 @@ export async function groupSamplesIntoMaster(
 
 /** Lightweight color edit used by the Suggested Groups screen. */
 export async function updateSampleColor(sampleId: string, color: string): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   await prisma.sample.update({ where: { id: sampleId }, data: { color: color.trim() || null } });
+  await logAudit({ entityType: "sample", entityId: sampleId, action: "color_changed", userId: user.id, after: { color: color.trim() || null } });
   revalidatePath("/samples");
   revalidatePath("/samples/groups");
   return { ok: true };
@@ -973,8 +1028,9 @@ export async function updateSampleColor(sampleId: string, color: string): Promis
 
 /** Lightweight material edit used by the Suggested Groups screen. */
 export async function updateSampleMaterial(sampleId: string, material: string): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   await prisma.sample.update({ where: { id: sampleId }, data: { material: material.trim() || null } });
+  await logAudit({ entityType: "sample", entityId: sampleId, action: "material_changed", userId: user.id, after: { material: material.trim() || null } });
   revalidatePath("/samples");
   revalidatePath("/samples/groups");
   return { ok: true };
@@ -983,9 +1039,11 @@ export async function updateSampleMaterial(sampleId: string, material: string): 
 /** Mark samples "keep separate" (or clear it) so they stop appearing as a
  *  suggested group. */
 export async function setExcludeFromGrouping(sampleIds: string[], exclude = true): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   if (sampleIds.length === 0) return { ok: false, error: "No samples." };
   await prisma.sample.updateMany({ where: { id: { in: sampleIds } }, data: { excludeFromGrouping: exclude } });
+  for (const id of sampleIds)
+    await logAudit({ entityType: "sample", entityId: id, action: exclude ? "grouping_excluded" : "grouping_included", userId: user.id });
   revalidatePath("/samples/groups");
   return { ok: true };
 }
@@ -996,15 +1054,28 @@ export async function requestVariantRevisions(
   sampleId: string,
   requested = true,
 ): Promise<ActionResult> {
-  await assertRole("member");
-  await prisma.skuVariant.update({
+  const user = await assertRole("member");
+  const variant = await prisma.skuVariant.update({
     where: { id: variantId },
     // Asking for revisions on a color puts it back on the waiting list: the
     // one on the desk is superseded, and receiving its replacement is what
     // rolls the sample to its next round.
     data: requested
-      ? { revisionsRequestedAt: new Date(), received: false, sampleReceivedDate: null }
-      : { revisionsRequestedAt: null },
+      ? {
+          revisionsRequestedAt: new Date(),
+          revisionsRequestedById: user.id,
+          received: false,
+          sampleReceivedDate: null,
+          receivedById: null,
+        }
+      : { revisionsRequestedAt: null, revisionsRequestedById: null },
+  });
+  await logAudit({
+    entityType: "sku_variant",
+    entityId: variantId,
+    action: requested ? "variant_revisions_requested" : "variant_revisions_cleared",
+    userId: user.id,
+    after: { sampleId, color: variant.color },
   });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");
@@ -1034,7 +1105,7 @@ export async function suggestRelatedSamples(
 
 /** Set (or clear) a single color variant's image from a Blob URL. */
 export async function uploadSkuVariantImage(formData: FormData): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   const variantId = String(formData.get("variantId") ?? "");
   const sampleId = String(formData.get("sampleId") ?? "");
   const blobUrl = String(formData.get("blobUrl") ?? "");
@@ -1043,6 +1114,7 @@ export async function uploadSkuVariantImage(formData: FormData): Promise<ActionR
     return { ok: false, error: "Invalid upload URL." };
   }
   await prisma.skuVariant.update({ where: { id: variantId }, data: { imageUrl: blobUrl, imageHash: null } });
+  await logAudit({ entityType: "sku_variant", entityId: variantId, action: "variant_image_uploaded", userId: user.id, after: { sampleId } });
   // If the sample has no photo yet, use this color as its thumbnail.
   const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { imageUrl: true } });
   if (sample && !sample.imageUrl) {

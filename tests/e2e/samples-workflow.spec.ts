@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { nextSampleVersionNumber } from "../../src/lib/sample-receipt";
 
 /**
  * Samples workflow: filter persistence, receiving into a sample room, the
@@ -64,6 +65,7 @@ test("receiving asks which sample room the samples came from", async ({ page }) 
 });
 
 test("a style with comments is marked in the list", async ({ page }) => {
+  const note = `Strap length needs work #${Date.now()}`;
   await login(page);
   await page.goto("/samples");
   const link = page.locator(SAMPLE_LINK).first();
@@ -72,16 +74,16 @@ test("a style with comments is marked in the list", async ({ page }) => {
   await page.waitForURL(/\/samples\/[^/?]+/);
 
   await page.getByRole("tab", { name: /Comments/ }).click();
-  await page.getByPlaceholder(/comment/i).first().fill("Strap length needs work");
+  await page.getByPlaceholder(/comment/i).first().fill(note);
   await page.getByRole("button", { name: /Post|Add comment|Comment/ }).first().click();
-  await expect(page.getByText("Strap length needs work")).toBeVisible();
+  await expect(page.getByText(note).first()).toBeVisible();
 
   await page.goto("/samples");
   const marker = page.locator("tbody tr", { hasText: sampleNumber }).first().locator('a[href*="tab=comments"]');
   await expect(marker).toBeVisible();
   // ...and it opens straight on the comments.
   await marker.click();
-  await expect(page.getByText("Strap length needs work")).toBeVisible();
+  await expect(page.getByText(note).first()).toBeVisible();
 });
 
 test("a revised sample is renamed to - v2 when it comes back in", async ({ page }) => {
@@ -108,7 +110,9 @@ test("a revised sample is renamed to - v2 when it comes back in", async ({ page 
   await expect(page.getByRole("link", { name: /Open sample/i })).toBeVisible();
 
   await page.goto(sampleUrl);
-  expect((await page.locator("h1").first().textContent())?.trim()).toBe(`${original} - v2`);
+  // A sample already carrying a round (a re-run) moves to the next one, so the
+  // expectation follows the same rule the app does.
+  expect((await page.locator("h1").first().textContent())?.trim()).toBe(nextSampleVersionNumber(original));
   await page.getByRole("tab", { name: /Comments/ }).click();
-  await expect(page.getByText(/renamed .* → .* - v2/i).first()).toBeVisible();
+  await expect(page.getByText(/renamed .* → .* - v\d+/i).first()).toBeVisible();
 });

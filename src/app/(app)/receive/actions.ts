@@ -56,13 +56,14 @@ export async function markReceived(
     where: { id: sampleId },
     data: {
       sampleReceivedDate: now,
+      receivedById: user.id,
       status: advanceSampleStatus(before.status, "sample_received"),
       ...(room?.trim() ? { sampleRoom: room.trim() } : {}),
     },
   });
   // The physical box is in, so every color in it is too — otherwise the
   // per-color rollup would still read "Partial" on the samples table.
-  await markAllVariantsReceived(sampleId, now);
+  await markAllVariantsReceived(sampleId, now, user.id);
   // If this was the revised sample we were waiting on, it becomes - v2.
   const renamedTo = await bumpVersionIfRevised(sampleId, user.id, before.status);
   if (note?.trim()) {

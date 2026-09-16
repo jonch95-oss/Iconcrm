@@ -8,7 +8,8 @@ export const maxDuration = 60;
 
 /**
  * The revision recap as Excel — one row per note, with the sample's photo on
- * its first row, ready to send to a factory. Takes the same query params as the
+ * its first row and the photo attached to a note on that note's own row (the
+ * picture is usually the point of the note). Takes the same query params as the
  * dashboard, so the file matches what's on screen.
  */
 export async function GET(request: Request) {
@@ -26,14 +27,15 @@ export async function GET(request: Request) {
   ws.addRow([
     "Image", "Factory", "Sample #", "Style Name", "Brand", "Color",
     "Status", "Awaiting revised", "Days waiting", "Sample ETA",
-    "Date", "Type", "Color (note)", "Note", "By",
+    "Date", "Type", "Color (note)", "Note", "By", "Note image",
   ]);
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
   ws.views = [{ state: "frozen", ySplit: 1 }];
 
   const day = (d: Date | null) => (d ? new Date(d).toISOString().slice(0, 10) : "");
-  const imageJobs: { rowNumber: number; url: string }[] = [];
+  // col is 0-based: 0 = the style photo, 15 = the note's own image.
+  const imageJobs: { rowNumber: number; col: number; url: string }[] = [];
 
   for (const f of recap.factories) {
     for (const s of f.samples) {
@@ -41,7 +43,7 @@ export async function GET(request: Request) {
       // belongs in the recap, as a row with empty note columns.
       const entries = s.entries.length
         ? s.entries
-        : [{ id: s.id, kind: "revision" as const, at: null, body: "", author: "", color: null }];
+        : [{ id: s.id, kind: "revision" as const, at: null, body: "", author: "", color: null, imageUrl: null }];
       entries.forEach((e, i) => {
         const row = ws.addRow([
           "",
@@ -59,20 +61,23 @@ export async function GET(request: Request) {
           e.color ?? "",
           e.body,
           e.author,
+          "",
         ]);
         // The photo goes on the style's first note row only — repeating it down
         // every note would bloat the file for no gain.
-        if (i === 0 && s.imageUrl) imageJobs.push({ rowNumber: row.number, url: s.imageUrl });
+        if (i === 0 && s.imageUrl) imageJobs.push({ rowNumber: row.number, col: 0, url: s.imageUrl });
+        // What was attached to the note itself — the detail shot of the fault.
+        if (e.imageUrl) imageJobs.push({ rowNumber: row.number, col: 15, url: e.imageUrl });
         if (s.open) row.getCell(8).font = { bold: true, color: { argb: "FFB45309" } };
       });
     }
   }
 
-  const widths = [16, 20, 18, 22, 16, 14, 16, 14, 12, 12, 12, 22, 14, 60, 16];
+  const widths = [16, 20, 18, 22, 16, 14, 16, 14, 12, 12, 12, 22, 14, 60, 16, 16];
   widths.forEach((w, i) => (ws.getColumn(i + 1).width = w));
   ws.getColumn(14).alignment = { wrapText: true, vertical: "top" };
 
-  const embed = async ({ rowNumber, url }: { rowNumber: number; url: string }) => {
+  const embed = async ({ rowNumber, col, url }: { rowNumber: number; col: number; url: string }) => {
     try {
       const res = await fetch(url);
       if (!res.ok) return;
@@ -81,7 +86,7 @@ export async function GET(request: Request) {
       const base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
       const imageId = wb.addImage({ base64, extension });
       if ((ws.getRow(rowNumber).height ?? 0) < 76) ws.getRow(rowNumber).height = 76;
-      ws.addImage(imageId, { tl: { col: 0, row: rowNumber - 1 }, ext: { width: 92, height: 92 } });
+      ws.addImage(imageId, { tl: { col, row: rowNumber - 1 }, ext: { width: 92, height: 92 } });
     } catch {
       // best-effort; skip unreadable images
     }
