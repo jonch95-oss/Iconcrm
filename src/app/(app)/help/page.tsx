@@ -180,7 +180,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "revisions", title: "10. Revisions & Comments recap",
-    keywords: "revision recap comment dashboard factory summary email excel track changes awaiting revised sample",
+    keywords: "revision recap comment dashboard factory summary email excel track changes awaiting revised sample undo dismiss mistake restore acknowledge assign",
     body: (
       <>
         <p><B>Revisions &amp; Comments</B> in the sidebar collects everything said about your samples — revision requests, comments (per color too), ETA changes and revised samples coming back in — grouped by factory.</p>
@@ -194,7 +194,8 @@ const SECTIONS: Section[] = [
         <ul className="ml-5 list-disc space-y-1">
           <li><B>Acknowledge</B> — &ldquo;seen&rdquo;. Stamps your name on it; <B>Acknowledge N</B> in a factory&apos;s header clears that factory at once.</li>
           <li><B>Assign</B> — put a name against it. <B>Assigned to me</B> in the filter bar shows your own list.</li>
-          <li><B>×</B> dismisses a note: off the board, never deleted. <B>Show dismissed</B> brings it back, with an Undo.</li>
+          <li><B>×</B> dismisses a note: off the board, never deleted.</li>
+          <li><B>Undo</B> — every one of these confirms with an Undo button, so a mis-click is one click back. Missed it? <B>Show dismissed (n)</B> counts what&apos;s waiting and each row there has its own Undo.</li>
         </ul>
         <Tip>The tiles track what&apos;s outstanding: unacknowledged notes, what&apos;s assigned to you, styles awaiting a revised sample, and the longest anyone has been waiting. Dropped styles are left out of recaps. Exports carry the photo attached to each note alongside the style photo.</Tip>
       </>

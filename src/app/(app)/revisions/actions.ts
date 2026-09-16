@@ -87,18 +87,49 @@ export async function assignComment(commentId: string, assigneeId: string): Prom
   return { ok: true };
 }
 
-/** Acknowledge everything currently on the board for one factory. */
-export async function acknowledgeAllForFactory(commentIds: string[]): Promise<Result> {
+/**
+ * Acknowledge everything currently on the board for one factory. Returns the
+ * ids it actually changed so Undo puts back only those — notes someone else
+ * had already acknowledged stay acknowledged.
+ */
+export async function acknowledgeAllForFactory(
+  commentIds: string[],
+): Promise<({ ok: true; changed: string[] }) | { ok: false; error: string }> {
   const user = await assertRole("member");
   if (!commentIds.length) return { ok: false, error: "Nothing to acknowledge." };
-  await prisma.comment.updateMany({
+  const targets = await prisma.comment.findMany({
     where: { id: { in: commentIds }, acknowledgedAt: null },
+    select: { id: true },
+  });
+  const changed = targets.map((c) => c.id);
+  if (!changed.length) return { ok: true, changed };
+  await prisma.comment.updateMany({
+    where: { id: { in: changed } },
     data: { acknowledgedAt: new Date(), acknowledgedById: user.id },
   });
   await logAudit({
     entityType: "comment",
     entityId: "bulk_acknowledge",
     action: "comments_acknowledged",
+    userId: user.id,
+    after: { count: changed.length },
+  });
+  revalidatePath("/revisions");
+  return { ok: true, changed };
+}
+
+/** Undo for the above: put a specific set back to unacknowledged. */
+export async function unacknowledgeMany(commentIds: string[]): Promise<Result> {
+  const user = await assertRole("member");
+  if (!commentIds.length) return { ok: false, error: "Nothing to undo." };
+  await prisma.comment.updateMany({
+    where: { id: { in: commentIds } },
+    data: { acknowledgedAt: null, acknowledgedById: null },
+  });
+  await logAudit({
+    entityType: "comment",
+    entityId: "bulk_acknowledge",
+    action: "comments_unacknowledged",
     userId: user.id,
     after: { count: commentIds.length },
   });

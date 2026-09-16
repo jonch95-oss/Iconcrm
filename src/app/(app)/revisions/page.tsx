@@ -104,7 +104,13 @@ export default async function RevisionsPage({
       </div>
 
       <div className="mt-4">
-        <RecapFilterBar filters={raw} factories={factories} brands={settings.brands} people={people} />
+        <RecapFilterBar
+          filters={raw}
+          factories={factories}
+          brands={settings.brands}
+          people={people}
+          dismissedCount={recap.totals.dismissed}
+        />
       </div>
 
       {recap.factories.length === 0 && (

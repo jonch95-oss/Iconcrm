@@ -15,11 +15,14 @@ export function RecapFilterBar({
   factories,
   brands,
   people,
+  dismissedCount,
 }: {
   filters: RecapFilters;
   factories: { id: string; name: string }[];
   brands: string[];
   people: { id: string; name: string }[];
+  /** How many dismissed notes are sitting in range. */
+  dismissedCount: number;
 }) {
   const router = useRouter();
   const go = (next: Partial<RecapFilters>) => {
@@ -83,7 +86,9 @@ export function RecapFilterBar({
         size="sm"
         onClick={() => go({ showDismissed: !filters.showDismissed })}
       >
-        Show dismissed
+        {/* The count is the point: dismissed by mistake and the toast gone,
+            this is how you find it again. */}
+        Show dismissed{dismissedCount > 0 ? ` (${dismissedCount})` : ""}
       </Button>
     </div>
   );

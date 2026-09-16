@@ -9,7 +9,13 @@ import {
 } from "@/components/ui/select";
 import { Check, X, Undo2, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { acknowledgeComment, dismissComment, assignComment, acknowledgeAllForFactory } from "./actions";
+import {
+  acknowledgeComment,
+  dismissComment,
+  assignComment,
+  acknowledgeAllForFactory,
+  unacknowledgeMany,
+} from "./actions";
 
 export type Person = { id: string; name: string };
 
@@ -40,13 +46,39 @@ export function EntryActions({
   const router = useRouter();
   const [pending, start] = React.useTransition();
 
-  const run = (fn: () => Promise<{ ok: boolean; error?: string }>, done: string) =>
+  /**
+   * Every triage action comes back with an Undo in its confirmation. Dismiss
+   * especially: it takes the note off the board, so without this the way back
+   * is to know that "Show dismissed" exists.
+   */
+  const run = (
+    fn: () => Promise<{ ok: boolean; error?: string }>,
+    done: string,
+    undo?: () => Promise<{ ok: boolean; error?: string }>,
+  ) =>
     start(async () => {
       const res = await fn();
-      if (res.ok) {
-        toast.success(done);
-        router.refresh();
-      } else toast.error(res.error ?? "Something went wrong");
+      if (!res.ok) {
+        toast.error(res.error ?? "Something went wrong");
+        return;
+      }
+      router.refresh();
+      toast.success(done, {
+        duration: 8000,
+        action: undo
+          ? {
+              label: "Undo",
+              onClick: () =>
+                start(async () => {
+                  const back = await undo();
+                  if (back.ok) {
+                    toast.success("Undone");
+                    router.refresh();
+                  } else toast.error(back.error ?? "Couldn't undo");
+                }),
+            }
+          : undefined,
+      });
     });
 
   if (!canEdit) {
@@ -67,7 +99,7 @@ export function EntryActions({
           variant="ghost"
           className="h-7 px-2"
           disabled={pending}
-          onClick={() => run(() => dismissComment(commentId, false), "Back on the board")}
+          onClick={() => run(() => dismissComment(commentId, false), "Back on the board", () => dismissComment(commentId, true))}
         >
           <Undo2 className="h-3.5 w-3.5" /> Undo
         </Button>
@@ -79,7 +111,15 @@ export function EntryActions({
     <div className="flex shrink-0 flex-wrap items-center gap-1">
       <Select
         value={assignee?.id ?? "none"}
-        onValueChange={(v) => run(() => assignComment(commentId, v === "none" ? "" : v), v === "none" ? "Unassigned" : "Assigned")}
+        onValueChange={(v) => {
+          const previous = assignee?.id ?? "";
+          const next = v === "none" ? "" : v;
+          run(
+            () => assignComment(commentId, next),
+            next ? `Assigned to ${people.find((p) => p.id === next)?.name ?? "them"}` : "Unassigned",
+            () => assignComment(commentId, previous),
+          );
+        }}
       >
         <SelectTrigger className="h-7 w-36 text-xs">
           <SelectValue placeholder="Assign">
@@ -103,7 +143,7 @@ export function EntryActions({
           variant="success"
           title={`Acknowledged${acknowledgedBy ? ` by ${acknowledgedBy}` : ""} — click to undo`}
           className="cursor-pointer"
-          onClick={() => run(() => acknowledgeComment(commentId, false), "Marked unread")}
+          onClick={() => run(() => acknowledgeComment(commentId, false), "Marked unread", () => acknowledgeComment(commentId, true))}
         >
           <Check className="mr-1 h-3 w-3" /> {acknowledgedBy ?? "Acknowledged"}
         </Badge>
@@ -113,7 +153,7 @@ export function EntryActions({
           variant="outline"
           className="h-7 px-2 text-xs"
           disabled={pending}
-          onClick={() => run(() => acknowledgeComment(commentId, true), "Acknowledged")}
+          onClick={() => run(() => acknowledgeComment(commentId, true), "Acknowledged", () => acknowledgeComment(commentId, false))}
         >
           <Check className="h-3.5 w-3.5" /> Acknowledge
         </Button>
@@ -125,7 +165,7 @@ export function EntryActions({
         className="h-7 px-2 text-xs"
         title="Dismiss — hides it from the board, kept under Show dismissed"
         disabled={pending}
-        onClick={() => run(() => dismissComment(commentId, true), "Dismissed")}
+        onClick={() => run(() => dismissComment(commentId, true), "Dismissed", () => dismissComment(commentId, false))}
       >
         <X className="h-3.5 w-3.5" />
       </Button>
@@ -146,10 +186,28 @@ export function AcknowledgeAll({ commentIds }: { commentIds: string[] }) {
       onClick={() =>
         start(async () => {
           const res = await acknowledgeAllForFactory(commentIds);
-          if (res.ok) {
-            toast.success(`${commentIds.length} acknowledged`);
-            router.refresh();
-          } else toast.error(res.error);
+          if (!res.ok) {
+            toast.error(res.error);
+            return;
+          }
+          router.refresh();
+          const changed = res.changed;
+          toast.success(`${changed.length} acknowledged`, {
+            duration: 8000,
+            action: changed.length
+              ? {
+                  label: "Undo",
+                  onClick: () =>
+                    start(async () => {
+                      const back = await unacknowledgeMany(changed);
+                      if (back.ok) {
+                        toast.success("Undone");
+                        router.refresh();
+                      } else toast.error(back.error ?? "Couldn't undo");
+                    }),
+                }
+              : undefined,
+          });
         })
       }
     >

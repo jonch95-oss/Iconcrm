@@ -88,6 +88,8 @@ export type Recap = {
     /** Comment-backed notes nobody has acknowledged (the notification count). */
     unacknowledged: number;
     assignedToMe: number;
+    /** Dismissed notes in range — surfaced so a mistaken dismiss is findable. */
+    dismissed: number;
   };
 };
 
@@ -176,6 +178,16 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
     take: 2000,
   });
   const etaSampleIds = [...new Set(etaRevisions.map((e) => e.parentId))];
+
+  // Counted separately: dismissed notes are filtered out of the query below,
+  // but the board still shows how many are waiting under "Show dismissed".
+  const dismissedCount = await prisma.comment.count({
+    where: {
+      ...(since ? { createdAt: { gte: since } } : {}),
+      dismissedAt: { not: null },
+      sample: sampleWhere,
+    },
+  });
 
   const samples = await prisma.sample.findMany({
     where: {
@@ -388,6 +400,7 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
       assignedToMe: viewerId
         ? countEntries(factories, (e) => e.assignee?.id === viewerId && !e.dismissedAt)
         : 0,
+      dismissed: dismissedCount,
     },
   };
 }
