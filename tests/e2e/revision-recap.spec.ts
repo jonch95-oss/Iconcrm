@@ -21,6 +21,8 @@ async function login(page: import("@playwright/test").Page) {
 
 test("revision recap collects what was asked for, per factory", async ({ page }) => {
   await login(page);
+  const REVISION = `Hardware finish is too warm #${Date.now()}`;
+  const COMMENT = `Lining color reads pink in daylight #${Date.now()}`;
 
   // Seed some activity: ask for revisions on one sample, comment on another.
   await page.goto("/samples");
@@ -28,7 +30,7 @@ test("revision recap collects what was asked for, per factory", async ({ page })
   await links.nth(0).click();
   await page.waitForURL(/\/samples\/[^/?]+/);
   await page.getByRole("button", { name: /Request revisions/i }).first().click();
-  await page.getByRole("textbox").last().fill("Hardware finish is too warm — match the spec sample");
+  await page.getByRole("textbox").last().fill(REVISION);
   await page.getByRole("button", { name: /Request revisions|Send|Confirm/i }).last().click();
   await expect(page.getByText(/Revisions Requested/i).first()).toBeVisible();
 
@@ -36,22 +38,36 @@ test("revision recap collects what was asked for, per factory", async ({ page })
   await links.nth(1).click();
   await page.waitForURL(/\/samples\/[^/?]+/);
   await page.getByRole("tab", { name: /Comments/ }).click();
-  await page.getByPlaceholder(/comment/i).first().fill("Lining color reads pink in daylight");
+  await page.getByPlaceholder(/comment/i).first().fill(COMMENT);
   await page.getByRole("button", { name: /Post|Add comment|Comment/ }).first().click();
-  await expect(page.getByText("Lining color reads pink in daylight").first()).toBeVisible();
+  await expect(page.getByText(COMMENT).first()).toBeVisible();
 
   // The dashboard picks both up.
   await page.goto("/revisions");
   await expect(page.getByRole("heading", { name: "Revisions & Comments" })).toBeVisible();
-  await expect(page.getByText("Hardware finish is too warm — match the spec sample").first()).toBeVisible();
-  await expect(page.getByText("Lining color reads pink in daylight").first()).toBeVisible();
+  await expect(page.getByText(REVISION).first()).toBeVisible();
+  await expect(page.getByText(COMMENT).first()).toBeVisible();
   await expect(page.locator("body")).toContainText("Awaiting revised sample");
 
   // Open-only narrows to what the factory still owes us.
   await page.getByRole("button", { name: "Open revisions only" }).click();
   await page.waitForURL(/open=1/);
-  await expect(page.getByText("Hardware finish is too warm — match the spec sample").first()).toBeVisible();
-  await expect(page.getByText("Lining color reads pink in daylight")).toHaveCount(0);
+  await expect(page.getByText(REVISION).first()).toBeVisible();
+  // Every style left on the board is one the factory still owes us — asserting
+  // the filter's property rather than the absence of one particular comment,
+  // which depends on whatever else happens to be flagged.
+  const styles = page.locator('a[href*="?tab=comments"]');
+  // Anchored so it counts the per-style badges only — the "Awaiting revised
+  // samples" tile at the top of the page says almost the same thing.
+  const awaiting = page.getByText(/^Awaiting revised sample( · \d+d)?$/);
+  // Polled: the filtered render lands a moment after the URL changes, and
+  // counting mid-transition mixes the two.
+  await expect
+    .poll(async () => {
+      const [open, listed] = await Promise.all([awaiting.count(), styles.count()]);
+      return listed > 0 && open === listed;
+    })
+    .toBe(true);
 
   // Excel recap downloads.
   const [download] = await Promise.all([

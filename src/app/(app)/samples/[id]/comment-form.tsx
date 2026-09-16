@@ -24,7 +24,7 @@ export function CommentForm({ sampleId }: { sampleId: string }) {
 
   const submit = () => {
     if (!body.trim() && !file) {
-      toast.error("Add a comment or an image.");
+      toast.error("Add a comment for production, or an image.");
       return;
     }
     startTransition(async () => {
@@ -62,7 +62,7 @@ export function CommentForm({ sampleId }: { sampleId: string }) {
       <Textarea
         value={body}
         onChange={(e) => setBody(e.target.value)}
-        placeholder="Add a comment…"
+        placeholder="Add a comment for production…"
         rows={2}
       />
       {preview && (

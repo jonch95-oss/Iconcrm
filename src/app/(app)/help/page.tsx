@@ -115,7 +115,7 @@ const SECTIONS: Section[] = [
           <li><B>Image</B> — click the image cell to upload that color&apos;s photo.</li>
           <li><B>UPC / SKU code / Size</B> — click the cell to edit.</li>
           <li><B>Sample ETA</B> &amp; <B>Received</B> — track each color separately.</li>
-          <li><B>Comments</B> — the speech-bubble button opens comments for just that color (with images).</li>
+          <li><B>Comments for production</B> — the speech-bubble button opens that color&apos;s production comments (with images).</li>
         </ul>
       </>
     ),
@@ -152,13 +152,13 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "comments", title: "8. Comments & photos",
+    id: "comments", title: "8. Comments for production & photos",
     keywords: "comments image photo per color export",
     body: (
       <>
-        <p><B>Sample-level:</B> open a sample → <B>Comments</B> tab → type a note, optionally <B>Attach image</B>, → <B>Comment</B>.</p>
+        <p><B>Sample-level:</B> open a sample → <B>Comments for production</B> tab → type a note, optionally <B>Attach image</B>, → <B>Comment for production</B>.</p>
         <p><B>Per-color:</B> in the SKU grid, click the <B>speech-bubble</B> on a color to add/read comments for that color only.</p>
-        <Tip>The <B>Comments</B> button on the Samples toolbar exports an Excel with paired <em>Comment N Image</em> / <em>Comment N</em> columns per sample.</Tip>
+        <Tip>The <B>Comments</B> button on the Samples toolbar exports an Excel with paired <em>Comment for production N Image</em> / <em>Comment for production N</em> columns per sample, each row led by the sample&apos;s photo.</Tip>
       </>
     ),
   },
@@ -208,7 +208,7 @@ const SECTIONS: Section[] = [
       <>
         <p>On the Samples toolbar (tick rows first, or none for all):</p>
         <ul className="ml-5 list-disc space-y-1">
-          <li><B>Export Excel</B> — full, with each color&apos;s photo embedded, Color ETA + Comments columns. Round-trips into the importer.</li>
+          <li><B>Export Excel</B> — full, with each color&apos;s photo embedded, Color ETA + Comments for production columns. Round-trips into the importer.</li>
           <li><B>Export (data only)</B> — same columns, no photos; tiny and fast to re-import.</li>
           <li><B>Comments</B> — comments-with-images export.</li>
           <li><B>CSV</B> — the visible columns.</li>
@@ -270,7 +270,7 @@ const SECTIONS: Section[] = [
           ["Import file too large.", "Up to ~250 MB is accepted; use Export (data only) for bulk edits."],
           ["What is \"×1\" by an ETA?", "The number of times that ETA has been revised."],
           ["Can members group samples?", "Yes — anyone with Can edit. Only Suggested groups is admin-only."],
-          ["Add a comment to just one color?", "In the SKU grid, click the speech-bubble on that color."],
+          ["Add a comment for production to just one color?", "In the SKU grid, click the speech-bubble on that color."],
         ].map(([q, a]) => (
           <details key={q} className="rounded-lg border border-[var(--border)] px-4 py-1">
             <summary className="cursor-pointer py-2 font-semibold">{q}</summary>

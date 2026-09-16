@@ -244,7 +244,7 @@ export default async function SampleDetailPage({
             <Tabs defaultValue={tab === "comments" ? "comments" : "skus"}>
               <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="skus">SKUs ({sample.skuVariants.length})</TabsTrigger>
-                <TabsTrigger value="comments">Comments ({sample.comments.length})</TabsTrigger>
+                <TabsTrigger value="comments">Comments for production ({sample.comments.length})</TabsTrigger>
                 <TabsTrigger value="emails">Emails ({emails.length})</TabsTrigger>
                 <TabsTrigger value="eta">ETA history ({etaRevisions.length})</TabsTrigger>
                 <TabsTrigger value="audit">Audit ({auditLogs.length})</TabsTrigger>

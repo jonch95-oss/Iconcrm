@@ -65,6 +65,30 @@ export async function updateUserName(userId: string, name: string): Promise<Acti
   return { ok: true };
 }
 
+/**
+ * Opt someone in or out of the outstanding-revisions badge in the nav. Stored
+ * on the user's notificationPrefs so it needs no schema change.
+ */
+export async function setRevisionBadgeVisible(userId: string, visible: boolean): Promise<ActionResult> {
+  const admin = await assertRole("admin");
+  const target = await prisma.user.findUnique({ where: { id: userId }, select: { notificationPrefs: true } });
+  if (!target) return { ok: false, error: "User not found." };
+  const prefs = (target.notificationPrefs ?? {}) as Record<string, unknown>;
+  await prisma.user.update({
+    where: { id: userId },
+    data: { notificationPrefs: { ...prefs, revisionBadge: visible } },
+  });
+  await logAudit({
+    entityType: "user",
+    entityId: userId,
+    action: visible ? "revision_badge_enabled" : "revision_badge_disabled",
+    userId: admin.id,
+  });
+  revalidatePath("/settings");
+  revalidatePath("/", "layout");
+  return { ok: true };
+}
+
 export async function updateUserRole(userId: string, role: Role): Promise<ActionResult> {
   {
     const target = await prisma.user.findUnique({ where: { id: userId }, select: { email: true } });

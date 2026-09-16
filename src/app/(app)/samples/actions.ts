@@ -264,7 +264,7 @@ export async function addComment(formData: FormData): Promise<ActionResult> {
   if (!parsed.success) return { ok: false, error: "Invalid comment" };
   const body = (parsed.data.body ?? "").trim();
   const imageUrl = parsed.data.imageUrl?.trim() || null;
-  if (!body && !imageUrl) return { ok: false, error: "Add a comment or an image." };
+  if (!body && !imageUrl) return { ok: false, error: "Add a comment for production, or an image." };
   const comment = await prisma.comment.create({
     data: { sampleId: parsed.data.sampleId, skuVariantId: parsed.data.skuVariantId || null, userId: user.id, body, imageUrl },
   });

@@ -40,10 +40,10 @@ export async function GET(request: Request) {
 
   const wb = new ExcelJS.Workbook();
   wb.creator = "ICON LUXURY GROUP";
-  const ws = wb.addWorksheet("Comments");
+  const ws = wb.addWorksheet("Comments for production");
 
   const header: string[] = ["Image", "Sample #", "Style Name"];
-  for (let i = 1; i <= maxComments; i++) header.push(`Comment ${i} Image`, `Comment ${i}`);
+  for (let i = 1; i <= maxComments; i++) header.push(`Comment for production ${i} Image`, `Comment for production ${i}`);
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };

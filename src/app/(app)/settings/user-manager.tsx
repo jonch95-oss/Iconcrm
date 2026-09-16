@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Table,
   TableBody,
@@ -13,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { updateUserRole, updateUserName, toggleUserActive, inviteUser } from "./actions";
+import { updateUserRole, updateUserName, toggleUserActive, inviteUser, setRevisionBadgeVisible } from "./actions";
 import { toast } from "sonner";
 import type { Role } from "@prisma/client";
 
@@ -23,6 +24,8 @@ export interface UserRow {
   name: string | null;
   role: Role;
   isActive: boolean;
+  /** Sees the outstanding-revisions count in the nav. */
+  revisionBadge: boolean;
 }
 
 /** Click the name to rename someone — it's the name that shows up on every
@@ -94,6 +97,13 @@ export function UserManager({ users }: { users: UserRow[] }) {
       else toast.error(res.error);
     });
   };
+  const setBadge = (userId: string, visible: boolean) => {
+    startTransition(async () => {
+      const res = await setRevisionBadgeVisible(userId, visible);
+      if (res.ok) { toast.success(visible ? "Badge on" : "Badge off"); router.refresh(); }
+      else toast.error(res.error);
+    });
+  };
   const toggle = (userId: string, isActive: boolean) => {
     startTransition(async () => {
       await toggleUserActive(userId, isActive);
@@ -120,6 +130,7 @@ export function UserManager({ users }: { users: UserRow[] }) {
               <TableHead>User</TableHead>
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead title="Shows the outstanding-revisions count in the sidebar">Revision badge</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -147,6 +158,16 @@ export function UserManager({ users }: { users: UserRow[] }) {
                 </TableCell>
                 <TableCell>
                   <Badge variant={u.isActive ? "success" : "secondary"}>{u.isActive ? "active" : "inactive"}</Badge>
+                </TableCell>
+                <TableCell>
+                  <label className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                    <Checkbox
+                      checked={u.revisionBadge}
+                      disabled={pending}
+                      onCheckedChange={(v) => setBadge(u.id, !!v)}
+                    />
+                    {u.revisionBadge ? "shown" : "hidden"}
+                  </label>
                 </TableCell>
                 <TableCell>
                   {u.role !== "admin" && (

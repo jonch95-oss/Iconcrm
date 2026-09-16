@@ -40,7 +40,7 @@ const NAV = [
   { href: "/help", label: "Help & Guide", icon: HelpCircle },
 ];
 
-export function AppSidebar() {
+export function AppSidebar({ revisionBadge = 0 }: { revisionBadge?: number }) {
   const pathname = usePathname();
   return (
     <aside className="hidden md:flex md:w-60 md:flex-col bg-[hsl(30_8%_10%)] text-[hsl(40_25%_92%)]">
@@ -69,6 +69,16 @@ export function AppSidebar() {
             >
               <Icon className="h-4 w-4 shrink-0" />
               {item.label}
+              {item.href === "/revisions" && revisionBadge > 0 && (
+                // Outstanding revision requests, and they stay until someone
+                // acknowledges them.
+                <span
+                  title={`${revisionBadge} revision${revisionBadge === 1 ? "" : "s"} not acknowledged`}
+                  className="ml-auto min-w-5 rounded-full bg-[var(--bronze)] px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-[hsl(30_8%_10%)] tabular-nums"
+                >
+                  {revisionBadge}
+                </span>
+              )}
             </Link>
           );
         })}

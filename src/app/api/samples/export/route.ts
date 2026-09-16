@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "Image", "Sample #", "Brand", "Category", "Season", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Sample Room", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments",
+    "Factory", "Target Customer", "Status", "Sample Room", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments for production",
   ];
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };

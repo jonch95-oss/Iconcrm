@@ -32,7 +32,7 @@ const NAV = [
   { href: "/help", label: "Help & Guide" },
 ];
 
-export function MobileNav() {
+export function MobileNav({ revisionBadge = 0 }: { revisionBadge?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
   return (
@@ -53,13 +53,18 @@ export function MobileNav() {
                 href={item.href}
                 onClick={() => setOpen(false)}
                 className={cn(
-                  "rounded-md px-3 py-2 text-sm font-medium",
+                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium",
                   active
                     ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
                     : "hover:bg-[var(--accent)]",
                 )}
               >
                 {item.label}
+                {item.href === "/revisions" && revisionBadge > 0 && (
+                  <span className="ml-auto min-w-5 rounded-full bg-[var(--bronze)] px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-[hsl(30_8%_10%)] tabular-nums">
+                    {revisionBadge}
+                  </span>
+                )}
               </Link>
             );
           })}

@@ -423,7 +423,34 @@ export function recapSubject(sampleCount: number, since: Date | null): string {
 
 export const RECAP_ENTRY_LABEL: Record<RecapEntryKind, string> = {
   revision: "Revision requested",
-  comment: "Comment",
+  // Notes on a sample are instructions for the factory's production team, and
+  // the label says so wherever one appears — board, exports, email.
+  comment: "Comment for production",
   eta: "ETA change",
   version: "Revised sample received",
 };
+
+// ---------------------------------------------------------------------------
+// The nav badge: revision requests nobody has signed off on.
+// ---------------------------------------------------------------------------
+
+/**
+ * Open revision requests that haven't been acknowledged — the number that sits
+ * next to Revisions & Comments in the nav until someone clears it. Counts the
+ * requests themselves (not every comment), whatever their age: a revision from
+ * two months ago is still outstanding, and a badge that quietly forgets it
+ * would be worse than no badge.
+ */
+export async function outstandingRevisionCount(): Promise<number> {
+  return prisma.comment.count({
+    where: {
+      tags: { has: "revision" },
+      // The auto note written when a revised sample lands closes a round out;
+      // it isn't a request for anything.
+      NOT: { tags: { has: "version" } },
+      acknowledgedAt: null,
+      dismissedAt: null,
+      sample: { status: { not: "dropped" } },
+    },
+  });
+}

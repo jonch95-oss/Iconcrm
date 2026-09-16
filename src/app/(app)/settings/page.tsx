@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getSettings } from "@/lib/settings";
 import { SettingsForm } from "./settings-form";
 import { UserManager, type UserRow } from "./user-manager";
+import { canSeeRevisionBadge } from "@/lib/revision-badge";
 import { ColorCodeManager, type ColorCodeRow } from "./color-code-manager";
 import { HtsMappingManager, type HtsRow } from "./hts-mapping-manager";
 import { buildHtsResolver } from "@/lib/hts";
@@ -66,6 +67,7 @@ export default async function SettingsPage() {
     name: u.name,
     role: u.role,
     isActive: u.isActive,
+    revisionBadge: canSeeRevisionBadge(u, u.notificationPrefs),
   }));
 
   return (

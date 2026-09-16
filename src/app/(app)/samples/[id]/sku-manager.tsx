@@ -110,7 +110,7 @@ export function SkuManager({
             <TableHead>Units/carton</TableHead>
             <TableHead>Sample ETA</TableHead>
             <TableHead>Received</TableHead>
-            <TableHead>Comments</TableHead>
+            <TableHead>Comments for production</TableHead>
             {canEdit && <TableHead></TableHead>}
           </TableRow>
         </TableHeader>
@@ -175,7 +175,7 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
   const [pending, start] = React.useTransition();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const submit = () => {
-    if (!body.trim() && !file) { toast.error("Add a comment or image."); return; }
+    if (!body.trim() && !file) { toast.error("Add a comment for production, or an image."); return; }
     start(async () => {
       try {
         const fd = new FormData();
@@ -187,7 +187,7 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
         const res = await addComment(fd);
         if (!res.ok) { toast.error(res.error); return; }
         setBody(""); setFile(null); if (inputRef.current) inputRef.current.value = "";
-        toast.success("Comment added"); router.refresh();
+        toast.success("Comment for production added"); router.refresh();
       } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     });
   };
@@ -199,7 +199,7 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
         </Button>
       </DialogTrigger>
       <DialogContent>
-        <DialogHeader><DialogTitle>Comments — {color || "color"}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Comments for production — {color || "color"}</DialogTitle></DialogHeader>
         <div className="max-h-72 space-y-2 overflow-auto">
           {comments.length === 0 && <p className="text-sm text-[var(--muted-foreground)]">No comments for this color yet.</p>}
           {comments.map((c) => (
@@ -223,7 +223,7 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
                 <ImagePlus className="h-4 w-4" /> {file ? file.name.slice(0, 16) : "Image"}
               </Button>
               <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              <Button size="sm" onClick={submit} disabled={pending || (!body.trim() && !file)}>{pending ? "Posting…" : "Comment"}</Button>
+              <Button size="sm" onClick={submit} disabled={pending || (!body.trim() && !file)}>{pending ? "Posting…" : "Comment for production"}</Button>
             </div>
           </div>
         )}

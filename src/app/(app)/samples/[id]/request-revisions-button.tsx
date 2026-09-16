@@ -52,7 +52,7 @@ export function RequestRevisionsButton({ sampleId }: { sampleId: string }) {
         </DialogHeader>
         <p className="text-sm text-[var(--muted-foreground)]">
           Describe what needs revising. The sample moves to “Revisions Requested”, its ETA resets to
-          6 weeks from today, and your note is saved to Comments.
+          6 weeks from today, and your note is saved to Comments for production.
         </p>
         <Textarea
           value={comment}
