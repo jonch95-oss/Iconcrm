@@ -1,0 +1,1 @@
+ALTER TABLE "Sample" ADD COLUMN IF NOT EXISTS "sampleRoom" TEXT;

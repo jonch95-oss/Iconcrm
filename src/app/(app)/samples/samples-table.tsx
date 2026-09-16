@@ -21,10 +21,11 @@ import {
   Columns3,
   AlertTriangle,
   Save,
-  PackageCheck,
   Trash2,
   ChevronRight,
   ChevronDown,
+  MessageSquare,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -62,6 +63,14 @@ import {
   sampleDisplayStatus,
 } from "@/lib/status";
 import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
+import {
+  EMPTY_SAMPLE_FILTERS,
+  SAMPLE_FILTERS_KEY,
+  hasActiveFilters,
+  sampleFiltersFromQuery,
+  sampleFiltersToQuery,
+  type SampleFilters,
+} from "@/lib/sample-filters";
 import type { BadgeTone } from "@/lib/status";
 
 const SEASON_CHOICES = seasonChoices();
@@ -80,8 +89,9 @@ const STATUS_FILTER_OPTIONS: [string, string][] = [
 ];
 import { formatMoney } from "@/lib/money";
 import { toDateInputValue } from "@/lib/date";
-import { updateSample, bulkReceiveSamples, bulkDeleteSamples, editSkuVariant, toggleSkuReceived, requestVariantRevisions } from "./actions";
+import { updateSample, bulkDeleteSamples, editSkuVariant, toggleSkuReceived, requestVariantRevisions } from "./actions";
 import { CreateOrderFormButton } from "./create-order-form-dialog";
+import { ReceiveSamplesDialog } from "./receive-samples-dialog";
 import { toast } from "sonner";
 
 export interface SampleRow {
@@ -106,6 +116,8 @@ export interface SampleRow {
   customerSellPrice: string | null;
   marginPercent: string | null;
   skuCount: number;
+  commentCount: number;
+  sampleRoom: string;
   variants: {
     id: string; color: string; skuCode: string;
     sampleEta: string; received: boolean; revisionsRequested: boolean;
@@ -363,9 +375,9 @@ function InlineEdit({
   canEdit,
 }: {
   id: string;
-  field: "sampleEta" | "sampleReceivedDate" | "fobCost";
+  field: "sampleEta" | "sampleReceivedDate" | "fobCost" | "sampleRoom";
   value: string;
-  type: "date" | "number";
+  type: "date" | "number" | "text";
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -404,6 +416,7 @@ function InlineEdit({
         autoFocus
         type={type}
         step={type === "number" ? "0.01" : undefined}
+        list={field === "sampleRoom" ? "sample-rooms-inline" : undefined}
         value={val}
         disabled={pending}
         onChange={(e) => setVal(e.target.value)}
@@ -485,30 +498,91 @@ export function SamplesTable({
   brands,
   canEdit,
   isAdmin,
-  initialOverdue,
-  initialStatus,
-  initialFactory,
+  initialFilters,
 }: {
   rows: SampleRow[];
   factories: { id: string; name: string }[];
   brands: string[];
   canEdit: boolean;
   isAdmin?: boolean;
-  initialOverdue: boolean;
-  initialStatus: string;
-  initialFactory: string;
+  initialFilters: SampleFilters;
 }) {
   const router = useRouter();
   const [sorting, setSorting] = React.useState<SortingState>([]);
-  const [globalFilter, setGlobalFilter] = React.useState("");
-  const [statusFilter, setStatusFilter] = React.useState(initialStatus);
-  const [factoryFilter, setFactoryFilter] = React.useState(initialFactory);
-  const [brandFilter, setBrandFilter] = React.useState("");
-  const [seasonFilter, setSeasonFilter] = React.useState("");
-  const [categoryFilter, setCategoryFilter] = React.useState("");
-  const [colorFilter, setColorFilter] = React.useState("");
-  const [overdueOnly, setOverdueOnly] = React.useState(initialOverdue);
+  const [globalFilter, setGlobalFilter] = React.useState(initialFilters.q);
+  const [statusFilter, setStatusFilter] = React.useState(initialFilters.status);
+  const [factoryFilter, setFactoryFilter] = React.useState(initialFilters.factory);
+  const [brandFilter, setBrandFilter] = React.useState(initialFilters.brand);
+  const [seasonFilter, setSeasonFilter] = React.useState(initialFilters.season);
+  const [categoryFilter, setCategoryFilter] = React.useState(initialFilters.category);
+  const [colorFilter, setColorFilter] = React.useState(initialFilters.color);
+  const [overdueOnly, setOverdueOnly] = React.useState(initialFilters.overdue);
   const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const applyFilters = React.useCallback((f: SampleFilters) => {
+    setGlobalFilter(f.q);
+    setStatusFilter(f.status);
+    setFactoryFilter(f.factory);
+    setBrandFilter(f.brand);
+    setSeasonFilter(f.season);
+    setCategoryFilter(f.category);
+    setColorFilter(f.color);
+    setOverdueOnly(f.overdue);
+  }, []);
+
+  // Restore the filters you left the page with. Coming back from a sample, the
+  // router hands this component back with the props of the *first* render
+  // (unfiltered) and a URL stripped of its query, so neither survives the round
+  // trip — the last filter set is kept in sessionStorage instead, and a URL
+  // that does carry params (a deep link like /samples?overdue=1) wins over it.
+  React.useEffect(() => {
+    const adopt = () => {
+      const fromUrl = sampleFiltersFromQuery(Object.fromEntries(new URLSearchParams(window.location.search)));
+      if (hasActiveFilters(fromUrl)) {
+        applyFilters(fromUrl);
+        return;
+      }
+      const saved = sessionStorage.getItem(SAMPLE_FILTERS_KEY);
+      if (saved === null) return;
+      applyFilters(sampleFiltersFromQuery(Object.fromEntries(new URLSearchParams(saved))));
+    };
+    adopt();
+    window.addEventListener("popstate", adopt);
+    return () => window.removeEventListener("popstate", adopt);
+  }, [applyFilters]);
+
+  const filters = React.useMemo<SampleFilters>(
+    () => ({
+      q: globalFilter,
+      status: statusFilter,
+      factory: factoryFilter,
+      brand: brandFilter,
+      season: seasonFilter,
+      category: categoryFilter,
+      color: colorFilter,
+      overdue: overdueOnly,
+    }),
+    [globalFilter, statusFilter, factoryFilter, brandFilter, seasonFilter, categoryFilter, colorFilter, overdueOnly],
+  );
+
+  // Remember them for the trip back, and keep the URL in step so the view stays
+  // shareable while you're on it.
+  //
+  // The first pass is skipped on purpose: on a restored mount this component
+  // starts unfiltered, and writing that would wipe the very filters the effect
+  // above is about to restore.
+  const settled = React.useRef(false);
+  React.useEffect(() => {
+    if (!settled.current) {
+      settled.current = true;
+      return;
+    }
+    const qs = sampleFiltersToQuery(filters);
+    sessionStorage.setItem(SAMPLE_FILTERS_KEY, qs);
+    const next = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    if (next !== `${window.location.pathname}${window.location.search}`)
+      window.history.replaceState(null, "", next);
+  }, [filters]);
 
   // Keep the checked-row selection in sync with what's visible: changing any
   // filter or the search clears the selection, so exports (line sheet, Excel)
@@ -548,6 +622,11 @@ export function SamplesTable({
   const categoryOptions = React.useMemo(() => [...new Set(rows.map((r) => r.category).filter(Boolean))].sort(), [rows]);
   const colorOptions = React.useMemo(
     () => [...new Set(rows.flatMap((r) => [r.color, ...r.variants.map((v) => v.color)]).filter(Boolean))].sort(),
+    [rows],
+  );
+  // Rooms already recorded, offered as suggestions when receiving.
+  const roomOptions = React.useMemo(
+    () => [...new Set(rows.map((r) => r.sampleRoom).filter(Boolean))].sort(),
     [rows],
   );
 
@@ -611,6 +690,18 @@ export function SamplesTable({
               >
                 {row.original.sampleNumber}
               </Link>
+              {row.original.commentCount > 0 && (
+                // Flags styles with feedback on them so you can spot them
+                // without opening every row.
+                <Link
+                  href={`/samples/${row.original.id}?tab=comments`}
+                  className="flex shrink-0 items-center gap-0.5 text-[var(--warning)]"
+                  title={`${row.original.commentCount} comment${row.original.commentCount === 1 ? "" : "s"}`}
+                >
+                  <MessageSquare className="h-3.5 w-3.5" />
+                  <span className="text-[11px] font-medium tabular-nums">{row.original.commentCount}</span>
+                </Link>
+              )}
             </span>
           );
         },
@@ -693,6 +784,19 @@ export function SamplesTable({
             field="sampleReceivedDate"
             value={toDateInputValue(row.original.sampleReceivedDate)}
             type="date"
+            canEdit={canEdit}
+          />
+        ),
+      },
+      {
+        accessorKey: "sampleRoom",
+        header: ({ column }) => <SortBtn column={column} label="Sample room" />,
+        cell: ({ row }) => (
+          <InlineEdit
+            id={row.original.id}
+            field="sampleRoom"
+            value={row.original.sampleRoom}
+            type="text"
             canEdit={canEdit}
           />
         ),
@@ -808,6 +912,11 @@ export function SamplesTable({
 
   return (
     <div className="space-y-3">
+      {/* Suggestions for the inline Sample room cells (the receive dialog has
+          its own copy of this list). */}
+      <datalist id="sample-rooms-inline">
+        {roomOptions.map((r) => <option key={r} value={r} />)}
+      </datalist>
       <div className="flex flex-wrap items-center gap-2">
         <Input
           placeholder="Search all columns…"
@@ -876,6 +985,13 @@ export function SamplesTable({
         >
           <AlertTriangle className="h-4 w-4" /> Overdue
         </Button>
+        {hasActiveFilters(filters) && (
+          // Filters stick for the rest of the session, so there has to be one
+          // obvious way back to the full list.
+          <Button variant="ghost" size="sm" onClick={() => applyFilters(EMPTY_SAMPLE_FILTERS)}>
+            <X className="h-4 w-4" /> Clear filters
+          </Button>
+        )}
 
         <div className="ml-auto flex items-center gap-2">
           {savedViews.length > 0 && (
@@ -985,23 +1101,11 @@ export function SamplesTable({
             />
           )}
           {canEdit && (
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={pending}
-              onClick={() =>
-                startTransition(async () => {
-                  const res = await bulkReceiveSamples(selectedIds);
-                  if (res.ok) {
-                    toast.success(`${selectedIds.length} marked received`);
-                    setRowSelection({});
-                    router.refresh();
-                  } else toast.error(res.error);
-                })
-              }
-            >
-              <PackageCheck className="h-4 w-4" /> Mark received
-            </Button>
+            <ReceiveSamplesDialog
+              selected={selectedRows.map((r) => ({ id: r.id, sampleNumber: r.sampleNumber, styleName: r.styleName }))}
+              rooms={roomOptions}
+              onDone={() => setRowSelection({})}
+            />
           )}
           {isAdmin && (
             <Button

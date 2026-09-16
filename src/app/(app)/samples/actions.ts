@@ -6,7 +6,7 @@ import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
-import { syncSampleReceipt, markAllVariantsReceived } from "@/lib/sample-receipt";
+import { syncSampleReceipt, markAllVariantsReceived, bumpVersionIfRevised } from "@/lib/sample-receipt";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
 import { autoSkuCode, skuBase, deriveColorCode } from "@/lib/sku";
@@ -20,7 +20,7 @@ import {
   commentSchema,
 } from "@/lib/validation";
 
-type ActionResult = { ok: true; id?: string } | { ok: false; error: string };
+type ActionResult = { ok: true; id?: string; renamed?: string[]; received?: number } | { ok: false; error: string };
 
 async function htsForSample(
   category?: string | null,
@@ -186,6 +186,9 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
       // the old one (zod turns "" into undefined).
       factoryId: formData.has("factoryId") ? (d.factoryId ?? null) : before.factoryId,
       targetCustomer: d.targetCustomer ?? before.targetCustomer,
+      // Sent-but-empty clears the room (zod maps "" to undefined, so ask the
+      // form data itself).
+      sampleRoom: formData.has("sampleRoom") ? (d.sampleRoom ?? null) : before.sampleRoom,
       fobCost: fob,
       currency: d.currency ?? before.currency,
       fobPort: d.fobPort ?? before.fobPort,
@@ -480,7 +483,16 @@ export async function removeSampleImage(sampleId: string): Promise<ActionResult>
 // Bulk receive + parcel tracking
 // ---------------------------------------------------------------------------
 
-export async function bulkReceiveSamples(sampleIds: string[]): Promise<ActionResult> {
+/**
+ * Mark samples received. `rooms` maps sample id -> the factory sample room the
+ * physical sample came out of (asked for at receiving time, since that's the
+ * only moment anyone knows it); ids missing from the map keep whatever room
+ * they already had.
+ */
+export async function bulkReceiveSamples(
+  sampleIds: string[],
+  rooms: Record<string, string> = {},
+): Promise<ActionResult> {
   const user = await assertRole("member");
   if (!sampleIds.length) return { ok: false, error: "No samples selected." };
   const now = new Date();
@@ -488,18 +500,31 @@ export async function bulkReceiveSamples(sampleIds: string[]): Promise<ActionRes
     where: { id: { in: sampleIds }, sampleReceivedDate: null },
     select: { id: true, status: true },
   });
+  const renames: string[] = [];
   for (const s of samples) {
+    const room = (rooms[s.id] ?? "").trim();
     await prisma.sample.update({
       where: { id: s.id },
       data: {
         sampleReceivedDate: now,
         trackingStatus: "delivered",
         status: ["sample_requested", "eta_set"].includes(s.status) ? "sample_received" : undefined,
+        ...(room ? { sampleRoom: room } : {}),
       },
     });
     // Receiving the sample receives all of its colors, so the per-color
     // rollup doesn't come back as "Partial" straight after.
     await markAllVariantsReceived(s.id, now);
+    // Anything that was out for revisions comes back as its next round.
+    const renamed = await bumpVersionIfRevised(s.id, user.id, s.status);
+    if (renamed) renames.push(renamed);
+  }
+  // Samples in the selection that were already received aren't re-received,
+  // but a room typed for one is still worth recording.
+  const receiving = new Set(samples.map((s) => s.id));
+  for (const [id, room] of Object.entries(rooms)) {
+    if (!room.trim() || receiving.has(id) || !sampleIds.includes(id)) continue;
+    await prisma.sample.update({ where: { id }, data: { sampleRoom: room.trim() } });
   }
   await logAudit({
     entityType: "sample",
@@ -510,7 +535,7 @@ export async function bulkReceiveSamples(sampleIds: string[]): Promise<ActionRes
   });
   revalidatePath("/samples");
   revalidatePath("/receive");
-  return { ok: true };
+  return { ok: true, renamed: renames, received: samples.length };
 }
 
 /** Set/refresh tracking on one sample (manual entry from the detail page). */
@@ -635,7 +660,10 @@ export async function requestRevisions(sampleId: string, comment: string): Promi
   await prisma.$transaction([
     prisma.sample.update({
       where: { id: sampleId },
-      data: { status: "revisions_requested", sampleEta: newEta },
+      // Clearing the received date matters: we're waiting on a *new* physical
+      // sample, so it has to be receivable again (that receipt is what renames
+      // it to the next round).
+      data: { status: "revisions_requested", sampleEta: newEta, sampleReceivedDate: null },
     }),
     prisma.comment.create({
       data: { sampleId, userId: user.id, body: `Revisions requested: ${note}`, tags: ["revision"] },
@@ -781,12 +809,12 @@ export async function editSkuVariant(
 
 
 export async function toggleSkuReceived(id: string, sampleId: string, received: boolean): Promise<ActionResult> {
-  await assertRole("member");
+  const user = await assertRole("member");
   await prisma.skuVariant.update({ where: { id }, data: { received, sampleReceivedDate: received ? new Date() : null } });
   revalidatePath("/samples");
   // The sample only counts as received once every color is in; until then it
   // stays put and the status badge shows how many of them landed.
-  if (received) await syncSampleReceipt(sampleId);
+  if (received) await syncSampleReceipt(sampleId, user.id);
   revalidatePath(`/samples/${sampleId}`);
   return { ok: true };
 }
@@ -971,7 +999,12 @@ export async function requestVariantRevisions(
   await assertRole("member");
   await prisma.skuVariant.update({
     where: { id: variantId },
-    data: { revisionsRequestedAt: requested ? new Date() : null },
+    // Asking for revisions on a color puts it back on the waiting list: the
+    // one on the desk is superseded, and receiving its replacement is what
+    // rolls the sample to its next round.
+    data: requested
+      ? { revisionsRequestedAt: new Date(), received: false, sampleReceivedDate: null }
+      : { revisionsRequestedAt: null },
   });
   revalidatePath(`/samples/${sampleId}`);
   revalidatePath("/samples");

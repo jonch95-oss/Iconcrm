@@ -74,6 +74,7 @@ export const sampleCreateSchema = z.object({
   trackingNumber: z.string().optional(),
   sampleEta: optionalDate,
   sampleReceivedDate: optionalDate,
+  sampleRoom: optionalString,
 });
 
 export const sampleUpdateSchema = sampleCreateSchema.partial().extend({

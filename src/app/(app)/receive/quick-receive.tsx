@@ -20,10 +20,11 @@ type Found = {
   received: boolean;
 };
 
-export function QuickReceive() {
+export function QuickReceive({ rooms }: { rooms: string[] }) {
   const [query, setQuery] = React.useState("");
   const [found, setFound] = React.useState<Found | null>(null);
   const [note, setNote] = React.useState("");
+  const [room, setRoom] = React.useState("");
   const [done, setDone] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
@@ -43,11 +44,16 @@ export function QuickReceive() {
   const receive = () => {
     if (!found) return;
     startTransition(async () => {
-      const res = await markReceived(found.id, note);
+      const res = await markReceived(found.id, note, room);
       if (res.ok) {
         setDone(true);
         setNote("");
-        toast.success(`${found.sampleNumber} marked received`);
+        // A sample that was out for revisions comes back as its next round,
+        // so show the name it now carries.
+        if (res.renamedTo) {
+          setFound({ ...found, sampleNumber: res.renamedTo });
+          toast.success(`Received — renamed ${found.sampleNumber} → ${res.renamedTo}`);
+        } else toast.success(`${found.sampleNumber} marked received`);
       } else toast.error(res.error ?? "Something went wrong");
     });
   };
@@ -56,6 +62,8 @@ export function QuickReceive() {
     setQuery("");
     setFound(null);
     setDone(false);
+    // Deliberately keeps `room`: a batch being scanned in almost always comes
+    // out of the same sample room.
   };
 
   return (
@@ -97,6 +105,16 @@ export function QuickReceive() {
               </p>
             ) : (
               <>
+                <Input
+                  value={room}
+                  list="known-sample-rooms"
+                  onChange={(e) => setRoom(e.target.value)}
+                  placeholder="Sample room it came from"
+                  className="h-12"
+                />
+                <datalist id="known-sample-rooms">
+                  {rooms.map((r) => <option key={r} value={r} />)}
+                </datalist>
                 <Input
                   value={note}
                   onChange={(e) => setNote(e.target.value)}

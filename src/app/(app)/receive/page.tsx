@@ -34,6 +34,19 @@ export default async function ReceivePage() {
     take: 100,
   });
 
+  // Rooms already in use, offered as suggestions when receiving.
+  const rooms = (
+    await prisma.sample.findMany({
+      where: { sampleRoom: { not: null } },
+      select: { sampleRoom: true },
+      distinct: ["sampleRoom"],
+      orderBy: { sampleRoom: "asc" },
+      take: 100,
+    })
+  )
+    .map((s) => s.sampleRoom)
+    .filter((r): r is string => !!r);
+
   const rows: IncomingRow[] = incoming.map((s) => ({
     id: s.id,
     sampleNumber: s.sampleNumber,
@@ -53,8 +66,8 @@ export default async function ReceivePage() {
         title="Receive samples"
         description="A box just arrived? Type the sample number and tap once — or tick everything in the box below."
       />
-      <QuickReceive />
-      <IncomingList rows={rows} />
+      <QuickReceive rooms={rooms} />
+      <IncomingList rows={rows} rooms={rooms} />
     </div>
   );
 }

@@ -5,10 +5,8 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import { useRouter } from "next/navigation";
-import { bulkReceiveSamples } from "@/app/(app)/samples/actions";
-import { ExternalLink, PackageCheck } from "lucide-react";
+import { ReceiveSamplesDialog } from "@/app/(app)/samples/receive-samples-dialog";
+import { ExternalLink } from "lucide-react";
 
 export interface IncomingRow {
   id: string;
@@ -22,22 +20,12 @@ export interface IncomingRow {
 }
 
 /** Samples on their way in — tick the ones in the box, receive them all at once. */
-export function IncomingList({ rows }: { rows: IncomingRow[] }) {
-  const router = useRouter();
+export function IncomingList({ rows, rooms }: { rows: IncomingRow[]; rooms: string[] }) {
   const [checked, setChecked] = React.useState<Record<string, boolean>>({});
-  const [pending, startTransition] = React.useTransition();
   const ids = Object.keys(checked).filter((k) => checked[k]);
-
-  const receive = () => {
-    startTransition(async () => {
-      const res = await bulkReceiveSamples(ids);
-      if (res.ok) {
-        toast.success(`${ids.length} sample${ids.length > 1 ? "s" : ""} received`);
-        setChecked({});
-        router.refresh();
-      } else toast.error(res.error);
-    });
-  };
+  const selected = rows
+    .filter((r) => checked[r.id])
+    .map((r) => ({ id: r.id, sampleNumber: r.sampleNumber, styleName: r.styleName ?? "" }));
 
   if (rows.length === 0) return null;
 
@@ -57,10 +45,13 @@ export function IncomingList({ rows }: { rows: IncomingRow[] }) {
           >
             {ids.length === rows.length ? "Clear" : "Select all"}
           </Button>
-          <Button size="sm" disabled={!ids.length || pending} onClick={receive}>
-            <PackageCheck className="h-4 w-4" />
-            {pending ? "Receiving…" : `Receive ${ids.length || ""}`}
-          </Button>
+          <ReceiveSamplesDialog
+            selected={selected}
+            rooms={rooms}
+            disabled={!ids.length}
+            label={`Receive ${ids.length || ""}`.trim()}
+            onDone={() => setChecked({})}
+          />
         </div>
       </CardHeader>
       <CardContent className="space-y-1 p-3 pt-0">

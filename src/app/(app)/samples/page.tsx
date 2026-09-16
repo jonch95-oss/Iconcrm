@@ -12,6 +12,7 @@ import { marginPercent } from "@/lib/money";
 import { ageInDays, isOverdue } from "@/lib/date";
 import { variantSampleStatus, type BadgeTone } from "@/lib/status";
 import { getSettings } from "@/lib/settings";
+import { sampleFiltersFromQuery } from "@/lib/sample-filters";
 
 export const dynamic = "force-dynamic";
 // Excel import (parse + compress/upload embedded photos) can take a while;
@@ -21,7 +22,7 @@ export const maxDuration = 60;
 export default async function SamplesPage({
   searchParams,
 }: {
-  searchParams: Promise<{ overdue?: string; status?: string; factory?: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const user = await requireUser();
   const sp = await searchParams;
@@ -36,7 +37,7 @@ export default async function SamplesPage({
       include: {
         factory: { select: { id: true, name: true } },
         requestedBy: { select: { name: true, email: true } },
-        _count: { select: { skuVariants: true } },
+        _count: { select: { skuVariants: true, comments: true } },
         skuVariants: { orderBy: [{ color: "asc" }], select: { id: true, color: true, skuCode: true, sampleEta: true, received: true, revisionsRequestedAt: true } },
       },
     }),
@@ -68,11 +69,13 @@ export default async function SamplesPage({
       sampleEta: s.sampleEta ? s.sampleEta.toISOString() : null,
       etaRevisions: etaCountMap.get(s.id) ?? 0,
       sampleReceivedDate: s.sampleReceivedDate ? s.sampleReceivedDate.toISOString() : null,
+      sampleRoom: s.sampleRoom ?? "",
       fobCost: s.fobCost ? s.fobCost.toString() : null,
       currency: s.currency,
       customerSellPrice: s.customerSellPrice ? s.customerSellPrice.toString() : null,
       marginPercent: margin ? margin.toFixed(1) : null,
       skuCount: s._count.skuVariants,
+      commentCount: s._count.comments,
       variants: s.skuVariants.map((v) => {
         const vs = variantSampleStatus({ received: v.received, revisionsRequestedAt: v.revisionsRequestedAt, sampleEta: v.sampleEta });
         return {
@@ -119,9 +122,7 @@ export default async function SamplesPage({
         brands={settings.brands}
         canEdit={canEdit}
         isAdmin={isAdmin}
-        initialOverdue={sp.overdue === "1"}
-        initialStatus={sp.status ?? ""}
-        initialFactory={sp.factory ?? ""}
+        initialFilters={sampleFiltersFromQuery(sp)}
       />
     </div>
   );

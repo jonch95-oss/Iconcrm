@@ -241,6 +241,9 @@ model Sample {
 
   sampleEta          DateTime?
   sampleReceivedDate DateTime?
+  // Which of the factory's sample rooms the physical sample came out of,
+  // captured when it's received (free text — rooms vary by factory).
+  sampleRoom         String?
 
   fobCost  Decimal?  @db.Decimal(12, 4)
   currency Currency  @default(USD)

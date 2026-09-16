@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "Image", "Sample #", "Brand", "Category", "Season", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments",
+    "Factory", "Target Customer", "Status", "Sample Room", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments",
   ];
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -58,7 +58,7 @@ export async function GET(request: Request) {
       num(s.fobCost), num(s.customerSellPrice), num(s.dutyRatePercent),
       num(s.freightPerUnit), num(s.inlandPerUnit),
       s.htsCode ?? "", s.material ?? "", s.composition ?? "", num(s.cbmPerCarton), s.casePackDefault ?? "",
-      s.factory?.name ?? "", s.targetCustomer ?? "", s.status,
+      s.factory?.name ?? "", s.targetCustomer ?? "", s.status, s.sampleRoom ?? "",
     ];
     const commentsText = s.comments.map((c) => c.body).filter(Boolean).join(" | ");
     const vEta = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");

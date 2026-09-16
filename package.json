@@ -14,7 +14,7 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:reset": "prisma migrate reset --force",
     "test:e2e": "playwright test",
-    "test:unit": "tsx tests/risk-engine.test.ts && tsx tests/import-key.test.ts && tsx tests/sample-receipt.test.ts"
+    "test:unit": "tsx tests/risk-engine.test.ts && tsx tests/import-key.test.ts && tsx tests/sample-receipt.test.ts && tsx tests/sample-filters.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

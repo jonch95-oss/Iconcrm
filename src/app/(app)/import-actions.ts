@@ -159,6 +159,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           size: v.size?.trim() || undefined,
           season: normalizeSeason(v.season ?? "") || undefined,
           targetCustomer: v.targetCustomer?.trim() || undefined,
+          sampleRoom: v.sampleRoom?.trim() || undefined,
           fobCost: toDecimal(v.fobCost) ?? undefined,
           customerSellPrice: toDecimal(v.customerSellPrice) ?? undefined,
           dutyRatePercent: toDecimal(v.dutyRatePercent) ?? undefined,

@@ -25,10 +25,15 @@ export const dynamic = "force-dynamic";
 
 export default async function SampleDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { id } = await params;
+  // ?tab=comments opens straight on the comments (the samples table links here
+  // from its comment marker).
+  const { tab } = await searchParams;
   const user = await requireUser();
 
   const sample = await prisma.sample.findUnique({
@@ -219,6 +224,7 @@ export default async function SampleDetailPage({
             <Detail label="Target customer" value={sample.targetCustomer ?? "—"} />
             <Detail label="Sample ETA" value={formatDate(sample.sampleEta)} />
             <Detail label="Received" value={formatDate(sample.sampleReceivedDate)} />
+            <Detail label="Sample room" value={sample.sampleRoom ?? "—"} />
             <Detail label="Requested by" value={sample.requestedBy?.name ?? sample.requestedByExternal ?? "—"} />
             <Detail label="Requested at" value={formatDate(sample.requestedAt)} />
             {sample.status === "dropped" && (
@@ -235,7 +241,7 @@ export default async function SampleDetailPage({
 
         <Card className="lg:col-span-2">
           <CardContent className="pt-6">
-            <Tabs defaultValue="skus">
+            <Tabs defaultValue={tab === "comments" ? "comments" : "skus"}>
               <TabsList className="flex-wrap h-auto">
                 <TabsTrigger value="skus">SKUs ({sample.skuVariants.length})</TabsTrigger>
                 <TabsTrigger value="comments">Comments ({sample.comments.length})</TabsTrigger>

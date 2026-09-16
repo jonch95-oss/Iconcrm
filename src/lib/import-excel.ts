@@ -44,6 +44,7 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   trackingNumber: ["tracking", "trackingno", "trackingnumber", "trackingid", "awb", "airwaybill", "waybill"],
   trackingCarrier: ["carrier", "courier", "shipvia", "shippedvia"],
   received: ["received", "rcvd", "recd", "samplereceived", "got", "inhouse"],
+  sampleRoom: ["sampleroom", "room", "showroom", "factorysampleroom", "sampleroomno", "sampleroomnumber"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {
@@ -273,6 +274,7 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
     { header: "UPC", width: 16 },
     { header: "SKU Code", width: 14 },
     { header: "Received", width: 10 },
+    { header: "Sample Room", width: 14 },
     { header: "Color ETA", width: 12 },
   ];
   ws.addRow(columns.map((c) => c.header));

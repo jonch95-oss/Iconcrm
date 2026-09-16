@@ -56,3 +56,31 @@ assert.equal(sampleDisplayStatus("sample_requested", []), "sample_requested");
 assert.equal(sampleDisplayStatus("on_order_form", v(true, false)), "on_order_form");
 
 console.log("sample-receipt: all tests passed");
+
+// --- revision version bump ---------------------------------------------------
+import { parseSampleVersion, nextSampleVersionNumber } from "../src/lib/sample-receipt";
+
+// A first-round sample becomes v2 when the revised one arrives.
+assert.deepEqual(parseSampleVersion("LAB-HB-10079"), { base: "LAB-HB-10079", version: 1 });
+assert.equal(nextSampleVersionNumber("LAB-HB-10079"), "LAB-HB-10079 - v2");
+
+// Round two becomes round three — the suffix bumps, it doesn't stack.
+assert.deepEqual(parseSampleVersion("LAB-HB-10079 - v2"), { base: "LAB-HB-10079", version: 2 });
+assert.equal(nextSampleVersionNumber("LAB-HB-10079 - v2"), "LAB-HB-10079 - v3");
+assert.equal(nextSampleVersionNumber("LAB-HB-10079 - v9"), "LAB-HB-10079 - v10");
+
+// However it was typed by hand.
+assert.equal(nextSampleVersionNumber("TB26_ACC0052-v2"), "TB26_ACC0052 - v3");
+assert.equal(nextSampleVersionNumber("TB26_ACC0052 V4"), "TB26_ACC0052 - v5");
+
+// An explicit first round is still round one.
+assert.deepEqual(parseSampleVersion("STYLE-V1"), { base: "STYLE", version: 1 });
+assert.equal(nextSampleVersionNumber("STYLE-V1"), "STYLE - v2");
+
+// A "v" buried in the style number is NOT a revision suffix — bumping it must
+// not eat the tail of the name.
+assert.deepEqual(parseSampleVersion("OW-BXBM-10002"), { base: "OW-BXBM-10002", version: 1 });
+assert.deepEqual(parseSampleVersion("LAB-HB-10079REV2"), { base: "LAB-HB-10079REV2", version: 1 });
+assert.equal(nextSampleVersionNumber("LAB-HB-10079REV2"), "LAB-HB-10079REV2 - v2");
+
+console.log("sample-version: all tests passed");

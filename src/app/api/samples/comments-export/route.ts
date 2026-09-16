@@ -7,9 +7,10 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 /**
- * Export sample comments to Excel — one row per sample, with paired columns per
- * comment: "Comment N Image" (the attached photo, embedded) and "Comment N"
- * (the text). Column count grows to the busiest sample's comment count.
+ * Export sample comments to Excel — one row per sample: the sample's own photo
+ * in column A, then paired columns per comment: "Comment N Image" (the photo
+ * attached to that comment) and "Comment N" (the text). Column count grows to
+ * the busiest sample's comment count.
  */
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -26,6 +27,7 @@ export async function GET(request: Request) {
     select: {
       sampleNumber: true,
       styleName: true,
+      imageUrl: true,
       comments: {
         orderBy: { createdAt: "asc" },
         select: { body: true, imageUrl: true, createdAt: true, user: { select: { name: true } }, authorLabel: true },
@@ -40,35 +42,39 @@ export async function GET(request: Request) {
   wb.creator = "ICON LUXURY GROUP";
   const ws = wb.addWorksheet("Comments");
 
-  const header: string[] = ["Sample #", "Style Name"];
+  const header: string[] = ["Image", "Sample #", "Style Name"];
   for (let i = 1; i <= maxComments; i++) header.push(`Comment ${i} Image`, `Comment ${i}`);
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
-  ws.views = [{ state: "frozen", ySplit: 1, xSplit: 2 }];
+  ws.views = [{ state: "frozen", ySplit: 1, xSplit: 3 }];
 
   const imageJobs: { rowNumber: number; col: number; url: string }[] = [];
 
   for (const s of samples) {
-    const row: (string | null)[] = [s.sampleNumber, s.styleName ?? ""];
+    const row: (string | null)[] = ["", s.sampleNumber, s.styleName ?? ""];
     s.comments.forEach((c) => {
       const who = c.user?.name ?? c.authorLabel ?? "External";
       const when = c.createdAt.toISOString().slice(0, 10);
       row.push("", `${c.body || ""}${c.body ? "\n" : ""}— ${who}, ${when}`);
     });
     const added = ws.addRow(row);
-    // Queue each comment's image into its "Comment N Image" column (0-based col
-    // index: 2 + i*2 for comment i).
+    // The sample's own photo in column A, so a comment sheet reads like the
+    // sample list it came from.
+    if (s.imageUrl) imageJobs.push({ rowNumber: added.number, col: 0, url: s.imageUrl });
+    // Then each comment's image into its "Comment N Image" column (0-based col
+    // index: 3 + i*2 for comment i).
     s.comments.forEach((c, i) => {
-      if (c.imageUrl) imageJobs.push({ rowNumber: added.number, col: 2 + i * 2, url: c.imageUrl });
+      if (c.imageUrl) imageJobs.push({ rowNumber: added.number, col: 3 + i * 2, url: c.imageUrl });
     });
   }
 
-  ws.getColumn(1).width = 18;
-  ws.getColumn(2).width = 26;
+  ws.getColumn(1).width = 16; // sample image
+  ws.getColumn(2).width = 18;
+  ws.getColumn(3).width = 26;
   for (let i = 0; i < maxComments; i++) {
-    ws.getColumn(3 + i * 2).width = 16; // image
-    ws.getColumn(4 + i * 2).width = 44; // text
+    ws.getColumn(4 + i * 2).width = 16; // comment image
+    ws.getColumn(5 + i * 2).width = 44; // comment text
   }
 
   const embed = async ({ rowNumber, col, url }: { rowNumber: number; col: number; url: string }) => {
