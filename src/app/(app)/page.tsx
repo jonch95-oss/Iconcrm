@@ -7,6 +7,7 @@ import { formatDateTime } from "@/lib/date";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { RiskBadge } from "@/components/status-badge";
+import { AWAITING_SAMPLE } from "@/lib/status";
 import { formatDate } from "@/lib/date";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +36,12 @@ export default async function DashboardPage() {
         description="Wholesale production pipeline at a glance."
       />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-8">
-        <StatCard label="Open samples" value={metrics.openSamples} href="/samples" />
+        <StatCard
+          label="Open samples"
+          value={metrics.openSamples}
+          href={`/samples?status=${AWAITING_SAMPLE}`}
+          hint="Requested, ETA set or out for revisions — not received yet"
+        />
         <StatCard
           label="Overdue ETAs"
           value={metrics.overdueSamples}

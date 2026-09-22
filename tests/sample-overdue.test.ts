@@ -31,3 +31,21 @@ assert.equal(isSampleOverdue({ status: "eta_set", sampleEta: null, sampleReceive
 assert.equal(isSampleOverdue({ status: "revisions_requested", sampleEta: past, sampleReceivedDate: null }), true);
 
 console.log("sample-overdue: all tests passed");
+
+// --- what "open" counts ------------------------------------------------------
+import { isAwaitingSample, AWAITING_SAMPLE_STATUSES, PARTIAL_RECEIPT } from "../src/lib/status";
+
+// The chase list: asked for, dated, or back with the factory for revisions.
+for (const status of AWAITING_SAMPLE_STATUSES) assert.equal(isAwaitingSample(status), true, status);
+// A master with some colors in is still waiting on the rest.
+assert.equal(isAwaitingSample(PARTIAL_RECEIPT), true);
+
+// Everything past receipt has been delivered — it isn't what anyone is chasing.
+for (const status of ["sample_received", "quoted", "on_order_form", "pi_received", "pi_matched",
+  "po_issued", "in_production", "shipped", "packing_list_matched", "closed",
+  "produced_without_sample", "approved_by_image", "dropped"] as const)
+  assert.equal(isAwaitingSample(status), false, status);
+// Paused by decision, so not on the chase list either.
+assert.equal(isAwaitingSample("on_hold"), false);
+
+console.log("open-samples: all tests passed");

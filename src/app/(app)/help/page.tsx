@@ -32,10 +32,11 @@ const B = ({ children }: { children: React.ReactNode }) => <span className="font
 const SECTIONS: Section[] = [
   {
     id: "intro", title: "1. Getting around",
-    keywords: "navigation sidebar menu roles admin member viewer",
+    keywords: "navigation sidebar menu roles admin member viewer open samples dashboard tile chase list count",
     body: (
       <>
-        <p>The left sidebar is your menu: <B>Samples</B>, <B>Order Forms</B>, <B>PIs</B>, <B>POs</B>, <B>Customer POs</B>, <B>Packing Lists</B>, <B>Shipments</B>, <B>Receive</B>, and (admins) <B>Settings</B>. Most work starts on <B>Samples</B>.</p>
+        <p>The left sidebar is your menu: <B>Samples</B>, <B>Order Forms</B>, <B>PIs</B>, <B>POs</B>, <B>Customer POs</B>, <B>Packing Lists</B>, <B>Shipments</B>, <B>Receive</B>, <B>Revisions &amp; Comments</B>, and (admins) <B>Settings</B>. Most work starts on <B>Samples</B>.</p>
+        <p><B>Open samples</B> on the dashboard is the chase list: styles a factory still owes you a physical sample for — Sample Requested, ETA Set, out for Revisions, or a master with only some colors in. Anything received, quoted, ordered or on hold is not counted. Clicking the tile opens exactly those rows.</p>
         <Tip kind="click"><B>Roles.</B> <B>Admin</B> can do everything incl. Settings &amp; Suggested Groups. <B>Can edit</B> creates/edits samples, groups, order forms. <B>Viewer</B> is read-only.</Tip>
       </>
     ),

@@ -60,6 +60,9 @@ import {
   SAMPLE_STATUS_LABEL,
   PARTIAL_RECEIPT,
   PARTIAL_RECEIPT_LABEL,
+  AWAITING_SAMPLE,
+  AWAITING_SAMPLE_LABEL,
+  isAwaitingSample,
   sampleDisplayStatus,
 } from "@/lib/status";
 import { SAMPLE_CATEGORIES, seasonChoices } from "@/lib/catalog";
@@ -78,6 +81,8 @@ const SEASON_CHOICES = seasonChoices();
 // Status filter options, in pipeline order. Partial sits next to Sample
 // Received because that's where you go looking for it: "what's half here?"
 const STATUS_FILTER_OPTIONS: [string, string][] = [
+  // First, because it's the working set: what the factories still owe us.
+  [AWAITING_SAMPLE, AWAITING_SAMPLE_LABEL],
   ...SAMPLE_PIPELINE.flatMap((s): [string, string][] =>
     s === "sample_received"
       ? [[s, SAMPLE_STATUS_LABEL[s]], [PARTIAL_RECEIPT, PARTIAL_RECEIPT_LABEL]]
@@ -602,7 +607,11 @@ export function SamplesTable({
       // Match what the badge shows, not the stored value: a sample whose
       // colors are all in reads (and filters as) Sample Received, and one
       // that's part-way in filters as Partial.
-      if (statusFilter && sampleDisplayStatus(r.status, r.variants) !== statusFilter) return false;
+      if (statusFilter) {
+        const shown = sampleDisplayStatus(r.status, r.variants);
+        const hit = statusFilter === AWAITING_SAMPLE ? isAwaitingSample(shown) : shown === statusFilter;
+        if (!hit) return false;
+      }
       if (factoryFilter && r.factoryId !== factoryFilter) return false;
       if (brandFilter && r.brand !== brandFilter) return false;
       if (seasonFilter && r.season !== seasonFilter) return false;

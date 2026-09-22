@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeThreeWay, isFullyMatched } from "@/lib/match";
-import { NEVER_OVERDUE_STATUSES } from "@/lib/status";
+import { NEVER_OVERDUE_STATUSES, AWAITING_SAMPLE_STATUSES } from "@/lib/status";
 
 /** Dashboard KPI counts. */
 export async function dashboardMetrics() {
@@ -14,8 +14,12 @@ export async function dashboardMetrics() {
 
   const [openSamples, overdueSamples, pisAwaiting, unresolvedVariances, posInProduction] =
     await Promise.all([
+      // "Open" = a physical sample is still owed. It used to mean "not closed
+      // or dropped", which counted everything ever requested — a style received,
+      // quoted, ordered and shipped stayed "open" until someone archived it by
+      // hand, so the number only ever grew.
       prisma.sample.count({
-        where: { status: { notIn: ["closed", "dropped"] } },
+        where: { status: { in: AWAITING_SAMPLE_STATUSES }, sampleReceivedDate: null },
       }),
       prisma.sample.count({
         where: {

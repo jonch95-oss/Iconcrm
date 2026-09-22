@@ -245,6 +245,30 @@ export function sampleReceipt(variants: readonly { received: boolean }[]): Sampl
 }
 
 /**
+ * The statuses where a physical sample is still owed: asked for, dated, or sent
+ * back for revisions. This is what "open" means on the dashboard — the chase
+ * list. Everything past receipt is someone else's job (costing, an order form,
+ * production), and on-hold work is paused by decision.
+ */
+export const AWAITING_SAMPLE_STATUSES: SampleStatus[] = [
+  "sample_requested",
+  "eta_set",
+  "revisions_requested",
+];
+
+/**
+ * Filter value covering the set above (plus part-received masters, which are
+ * still waiting on their remaining colors). Not a stored status.
+ */
+export const AWAITING_SAMPLE = "awaiting_sample";
+export const AWAITING_SAMPLE_LABEL = "Awaiting sample (not received)";
+
+/** Does this row belong in the "awaiting a sample" set, as displayed? */
+export function isAwaitingSample(shown: SampleDisplayStatus): boolean {
+  return shown === PARTIAL_RECEIPT || AWAITING_SAMPLE_STATUSES.includes(shown as SampleStatus);
+}
+
+/**
  * A sample whose colors are only part-way in. Not a stored SampleStatus — it's
  * derived from the colors — but it reads as one in the status column and the
  * Samples status filter, so it needs a value of its own.
