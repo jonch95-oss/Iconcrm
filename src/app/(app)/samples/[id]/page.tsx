@@ -11,8 +11,8 @@ import { PipelineChain, type ChainNode } from "@/components/pipeline-chain";
 import { formatMoney, formatPercent, marginPercent } from "@/lib/money";
 import { landedCost } from "@/lib/landed";
 import { SampleImage } from "./sample-image";
-import { formatDate, formatDateTime, isOverdue } from "@/lib/date";
-import { DROPPED_REASON_LABEL } from "@/lib/status";
+import { formatDate, formatDateTime } from "@/lib/date";
+import { DROPPED_REASON_LABEL, isSampleOverdue } from "@/lib/status";
 import { SampleActions } from "./sample-actions";
 import { RequestRevisionsButton } from "./request-revisions-button";
 import { CommentForm } from "./comment-form";
@@ -95,7 +95,7 @@ export default async function SampleDetailPage({
   const margin = marginPercent(sample.customerSellPrice, sample.fobCost);
   const landed = landedCost(sample);
   const landedMargin = marginPercent(sample.customerSellPrice, landed);
-  const overdue = !sample.sampleReceivedDate && isOverdue(sample.sampleEta);
+  const overdue = isSampleOverdue(sample);
 
   // Build the linked chain breadcrumb.
   const orderForm = sample.orderFormLines[0]?.orderForm;

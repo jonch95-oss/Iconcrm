@@ -9,8 +9,8 @@ import { ImportSamplesButton } from "./import-samples-button";
 import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
-import { ageInDays, isOverdue } from "@/lib/date";
-import { variantSampleStatus, type BadgeTone } from "@/lib/status";
+import { ageInDays } from "@/lib/date";
+import { variantSampleStatus, isSampleOverdue, type BadgeTone } from "@/lib/status";
 import { getSettings } from "@/lib/settings";
 import { sampleFiltersFromQuery } from "@/lib/sample-filters";
 
@@ -90,7 +90,7 @@ export default async function SamplesPage({
         };
       }),
       ageDays: ageInDays(s.requestedAt) ?? 0,
-      overdue: !s.sampleReceivedDate && isOverdue(s.sampleEta),
+      overdue: isSampleOverdue(s),
       requestedBy: s.requestedBy?.name ?? s.requestedByExternal ?? "—",
     };
   });

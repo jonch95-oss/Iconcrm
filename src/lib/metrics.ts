@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { computeThreeWay, isFullyMatched } from "@/lib/match";
+import { NEVER_OVERDUE_STATUSES } from "@/lib/status";
 
 /** Dashboard KPI counts. */
 export async function dashboardMetrics() {
@@ -20,7 +21,8 @@ export async function dashboardMetrics() {
         where: {
           sampleReceivedDate: null,
           sampleEta: { lt: now },
-          status: { notIn: ["closed", "dropped", "packing_list_matched", "shipped"] },
+          // Same rule the badges use — on hold is not late.
+          status: { notIn: NEVER_OVERDUE_STATUSES },
         },
       }),
       prisma.proformaInvoice.count({

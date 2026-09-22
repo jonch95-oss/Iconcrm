@@ -199,10 +199,16 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           await prisma.sample.update({
             where: { id: existing.id },
             // Only set the 6-week ETA when one isn't already present, so a
-            // manually-adjusted ETA survives a re-import.
+            // manually-adjusted ETA survives a re-import. A sheet that puts a
+            // sample on hold stops its clock instead: no ETA, and any ETA it
+            // was carrying is cleared.
             data: {
               ...fields,
-              ...(existing.sampleEta ? {} : { sampleEta: importEta }),
+              ...(fields.status === "on_hold"
+                ? { sampleEta: null }
+                : existing.sampleEta
+                  ? {}
+                  : { sampleEta: importEta }),
               ...(!existing.sampleEta && !fields.status && existing.status === "sample_requested" ? { status: "eta_set" as SampleStatus } : {}),
             },
           });
@@ -213,9 +219,10 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             data: {
               sampleNumber,
               ...fields,
-              sampleEta: importEta,
-              // Imported samples always get the +6wk ETA, so the natural state is
-              // "ETA Set" (or "Quoted" if a FOB came in). A sheet Status wins.
+              // Imported samples get the +6wk ETA, so the natural state is "ETA
+              // Set" (or "Quoted" if a FOB came in). A sheet Status wins — and
+              // a sheet that says on hold gets no ETA at all.
+              sampleEta: fields.status === "on_hold" ? null : importEta,
               status: fields.status ?? (fields.fobCost ? "quoted" : "eta_set"),
               requestedById: user.id,
             },

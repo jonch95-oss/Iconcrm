@@ -4,9 +4,9 @@ import { requireUser } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL, SAMPLE_STATUS_TONE } from "@/lib/status";
+import { SAMPLE_PIPELINE, SAMPLE_STATUS_LABEL, SAMPLE_STATUS_TONE, isSampleOverdue } from "@/lib/status";
 import type { SampleStatus } from "@prisma/client";
-import { formatDate, isOverdue } from "@/lib/date";
+import { formatDate } from "@/lib/date";
 import { Table as TableIcon, AlertTriangle, Calendar } from "lucide-react";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +43,7 @@ export default async function SamplesBoardPage() {
               </div>
               <div className="space-y-2">
                 {items.map((s) => {
-                  const overdue = !s.sampleReceivedDate && isOverdue(s.sampleEta);
+                  const overdue = isSampleOverdue(s);
                   return (
                     <Link
                       key={s.id}

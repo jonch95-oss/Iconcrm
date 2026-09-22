@@ -50,7 +50,7 @@ const SECTIONS: Section[] = [
         <ul className="ml-5 list-disc space-y-1">
           <li><B>Search</B> matches sample #, style name, etc.</li>
           <li><B>Status, Factory, Brand, Color, Season, Category</B> dropdowns narrow the list. The <B>Color</B> filter matches a sample&apos;s own color <em>or</em> any of its color SKUs.</li>
-          <li><B>Overdue</B> shows samples past ETA that aren&apos;t received.</li>
+          <li><B>Overdue</B> shows samples past ETA that aren&apos;t received — On Hold, Dropped, Closed, Shipped and Packing List Matched never count as overdue.</li>
         </ul>
         <h3 className="mt-4 font-semibold">Expand a family (color tree)</h3>
         <p>Click the <B>chevron (›)</B> at the start of a row to reveal its color children — each color&apos;s <B>SKU number</B>, <B>status</B>, editable <B>ETA</B>, <B>Received</B> toggle, and <B>Request revisions</B> button.</p>
@@ -70,7 +70,7 @@ const SECTIONS: Section[] = [
               ["Sample Received", "The physical sample arrived — on a multi-color sample, every color is in."],
               ["Partial \u00b7 2 of 5", "Some colors arrived, the rest are still coming. Shows automatically once you tick colors off one by one \u2014 find them all with the Partial (some colors in) option in the status filter."],
               ["Quoted (FOB)", "A FOB cost was entered."],
-              ["On Hold", "Paused by hand; won't auto-advance."],
+              ["On Hold", "Paused by hand: the ETA is cleared, it stops counting as overdue, and it won't auto-advance. Give it a new ETA when it restarts."],
               ["Revisions Requested", "You asked the factory for changes."],
               ["Produced without Sample", "Went to production with no sample — sets ETA to 100 days out automatically."],
               ["Approved by Image", "Approved from a photo — ETA unchanged."],

@@ -1,4 +1,5 @@
 import type { SampleStatus, POStatus, ShipmentStatus, RiskStatus } from "@prisma/client";
+import { isOverdue } from "@/lib/date";
 
 // ---------------------------------------------------------------------------
 // Sample lifecycle pipeline (single source of truth)
@@ -191,6 +192,37 @@ const RISK_RANK: Record<RiskStatus, number> = {
 export function worstRisk(statuses: RiskStatus[]): RiskStatus | null {
   if (statuses.length === 0) return null;
   return statuses.reduce((a, b) => (RISK_RANK[b] > RISK_RANK[a] ? b : a));
+}
+
+// ---------------------------------------------------------------------------
+// Overdue
+// ---------------------------------------------------------------------------
+
+/**
+ * Statuses an ETA can't be late against. On hold means the clock is stopped by
+ * decision — chasing it would be chasing yourself — and the rest are either
+ * finished or abandoned.
+ */
+export const NEVER_OVERDUE_STATUSES: SampleStatus[] = [
+  "on_hold",
+  "dropped",
+  "closed",
+  "shipped",
+  "packing_list_matched",
+];
+
+/**
+ * Is this sample late? One rule for the table, the board, the detail page and
+ * the alert emails, so a row can't read OVERDUE in one place and not another.
+ */
+export function isSampleOverdue(sample: {
+  status: SampleStatus;
+  sampleEta: Date | string | null;
+  sampleReceivedDate: Date | string | null;
+}): boolean {
+  if (sample.sampleReceivedDate) return false;
+  if (NEVER_OVERDUE_STATUSES.includes(sample.status)) return false;
+  return isOverdue(sample.sampleEta);
 }
 
 // ---------------------------------------------------------------------------

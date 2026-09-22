@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { isAuthorizedCron } from "@/lib/cron";
 import { sendEmail } from "@/lib/email";
 import { MorningDigestEmail } from "@/emails/morning-digest";
+import { NEVER_OVERDUE_STATUSES } from "@/lib/status";
 
 /**
  * ETA watchdog: samples/POs with ETA within 3 days → reminder; ETA passed with
@@ -17,11 +18,13 @@ export async function GET(req: NextRequest) {
 
   const [dueSoonSamples, overdueSamples, dueSoonPOs, overduePOs, admins] = await Promise.all([
     prisma.sample.findMany({
-      where: { sampleReceivedDate: null, sampleEta: { gte: now, lte: in3 }, status: { notIn: ["closed", "dropped"] } },
+      where: { sampleReceivedDate: null, sampleEta: { gte: now, lte: in3 }, status: { notIn: NEVER_OVERDUE_STATUSES } },
       select: { sampleNumber: true, sampleEta: true },
     }),
     prisma.sample.findMany({
-      where: { sampleReceivedDate: null, sampleEta: { lt: now }, status: { notIn: ["closed", "dropped", "shipped", "packing_list_matched"] } },
+      // On-hold samples are excluded: nobody should be chased for a clock
+      // their own side stopped.
+      where: { sampleReceivedDate: null, sampleEta: { lt: now }, status: { notIn: NEVER_OVERDUE_STATUSES } },
       select: { sampleNumber: true, sampleEta: true },
     }),
     prisma.purchaseOrder.findMany({

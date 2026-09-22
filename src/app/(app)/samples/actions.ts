@@ -153,6 +153,22 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
   }
   // Status changes are allowed for any editor (member+).
 
+  // Putting a sample on hold stops the clock: the ETA that was on it is no
+  // longer a date anyone is working to, so it's cleared (logged as a revision,
+  // never silent). Setting a new ETA later is allowed — it just won't count as
+  // late while the sample stays on hold.
+  if (status === "on_hold" && before.status !== "on_hold" && newEta) {
+    await changeEta({
+      parentType: "sample",
+      parentId: before.id,
+      oldEta: before.sampleEta,
+      newEta: null,
+      reason: "On hold — ETA cleared",
+      userId: user.id,
+    });
+    newEta = null;
+  }
+
   // "Produced without sample" implies a long lead time: set the ETA to 100 days
   // out when first entering this status (logged as a revision, never silent).
   if (status === "produced_without_sample" && before.status !== "produced_without_sample") {
