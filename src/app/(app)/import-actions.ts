@@ -350,15 +350,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   // owning the row it's anchored to. The last image per sample wins.
   if (imageByRow.size > 0) {
     const { uploadBlob } = await import("@/lib/blob");
-    // Compress embedded photos before storing: they render as ~130px
-    // thumbnails, so full-resolution images just waste storage/bandwidth.
-    // Load sharp lazily and tolerate its absence: if it can't be resolved or
-    // initialized at runtime, fall back to storing the original bytes rather
-    // than failing the whole import after samples were already created.
-    // (Inferred type avoids sharp's `export =` typing quirks.)
-    const sharp = await import("sharp")
-      .then((m) => m.default)
-      .catch(() => null);
+    const { normalizeImage, UNREADABLE_IMAGE_HINT } = await import("@/lib/image");
     let storageDown = false;
 
     // Resolve each embedded image to the sample that owns its row, then
@@ -409,7 +401,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
     // reprocessed once on the next import. v2 = transparency-aware (keep PNG
     // alpha; flatten opaque onto white) — replaces v1's black-background JPEGs.
     const PIPELINE_VERSION = "v2";
-    const processImage = async ({ img, kind, targetId, sampleId }: ImageJob) => {
+    const processImage = async ({ img, kind, targetId, sampleId, rowNumber }: ImageJob) => {
       try {
         const key = `${kind}:${targetId}`;
         const hash = `${PIPELINE_VERSION}:${createHash("sha256").update(img.buffer).digest("hex")}`;
@@ -420,30 +412,21 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
           if (kind === "variant" && sampleId) variantImagedSamples.add(sampleId);
           return; // unchanged — no upload
         }
-        let buffer: Buffer = img.buffer;
-        let ext = img.extension;
-        if (sharp) {
-          try {
-            const meta = await sharp(img.buffer).metadata();
-            const base = sharp(img.buffer).resize({ width: 1000, height: 1000, fit: "inside", withoutEnlargement: true });
-            if (meta.hasAlpha) {
-              // Transparent images (e.g. product cutouts) are kept as PNG so
-              // they display exactly as they do in the source sheet. Converting
-              // to JPEG would drop the alpha channel and paint the background.
-              buffer = await base.png({ compressionLevel: 9 }).toBuffer();
-              ext = "png";
-            } else {
-              // Opaque photos compress well as JPEG; flatten guards against any
-              // stray alpha rendering as a black background.
-              buffer = await base.flatten({ background: "#ffffff" }).jpeg({ quality: 80 }).toBuffer();
-              ext = "jpeg";
-            }
-          } catch {
-            // If sharp can't read it, fall back to the original bytes.
-          }
+        const normalized = await normalizeImage(img.buffer);
+        if (!normalized) {
+          // Storing these bytes would leave the sample looking like it has a
+          // photo while the page shows an empty frame, so drop the image and
+          // say why. Any dead photo from an earlier import goes too.
+          summary.skipped.push({ row: rowNumber, reason: `Photo skipped — ${UNREADABLE_IMAGE_HINT}` });
+          if (kind === "variant")
+            await prisma.skuVariant.updateMany({ where: { id: targetId, imageUrl: { not: null } }, data: { imageUrl: null, imageHash: null } });
+          else
+            await prisma.sample.updateMany({ where: { id: targetId, imageUrl: { not: null } }, data: { imageUrl: null, imageHash: null } });
+          return;
         }
+        const { buffer, ext, contentType } = normalized;
         const path = kind === "variant" ? `variants/${targetId}/photo.${ext}` : `samples/${targetId}/photo.${ext}`;
-        const url = await uploadBlob(path, buffer, `image/${ext}`, { addRandomSuffix: false });
+        const url = await uploadBlob(path, buffer, contentType, { addRandomSuffix: false });
         if (kind === "variant") {
           await prisma.skuVariant.update({ where: { id: targetId }, data: { imageUrl: url, imageHash: hash } });
           if (sampleId) variantImagedSamples.add(sampleId);

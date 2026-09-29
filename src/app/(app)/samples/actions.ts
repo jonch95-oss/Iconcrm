@@ -462,13 +462,20 @@ export async function uploadSampleImage(formData: FormData): Promise<ActionResul
     return { ok: false, error: "Image is too large (8 MB max)." };
   }
 
+  // Re-encode to something browsers actually draw: a HEIC straight off a
+  // phone, or a picture pasted out of Excel, would otherwise be stored as a
+  // photo that renders as an empty frame.
+  const { normalizeImage, UNREADABLE_IMAGE_HINT } = await import("@/lib/image");
+  const normalized = await normalizeImage(Buffer.from(await file.arrayBuffer()));
+  if (!normalized) return { ok: false, error: `Couldn't use that image — ${UNREADABLE_IMAGE_HINT}` };
+
   const { uploadBlob } = await import("@/lib/blob");
   let url: string;
   try {
     url = await uploadBlob(
-      `samples/${sampleId}/${file.name}`,
-      Buffer.from(await file.arrayBuffer()),
-      file.type,
+      `samples/${sampleId}/photo.${normalized.ext}`,
+      normalized.buffer,
+      normalized.contentType,
     );
   } catch {
     return {
