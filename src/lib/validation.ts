@@ -100,7 +100,10 @@ export const commentSchema = z.object({
   sampleId: z.string().min(1),
   skuVariantId: optionalString,
   body: z.string().trim().optional(),
+  // One comment can carry several reference photos. Sent as a JSON array of
+  // blob URLs; imageUrl remains for anything posting a single one.
   imageUrl: optionalString,
+  imageUrls: optionalString,
 });
 
 export const factorySchema = z.object({

@@ -47,7 +47,10 @@ function recapText(f: RecapFactory, since: Date | null): string {
     );
     if (s.entries.length === 0) lines.push("  - Flagged for revision — no note recorded.");
     for (const e of s.entries)
-      lines.push(`  - ${day(e.at)} ${RECAP_ENTRY_LABEL[e.kind]}${e.color ? ` (${e.color})` : ""}: ${e.body}`);
+      lines.push(
+        `  - ${day(e.at)} ${RECAP_ENTRY_LABEL[e.kind]}${e.color ? ` (${e.color})` : ""}: ${e.body}` +
+          (e.imageUrls.length ? ` [${e.imageUrls.length} photo${e.imageUrls.length === 1 ? "" : "s"}]` : ""),
+      );
     lines.push("");
   }
   return lines.join("\n");
@@ -202,10 +205,12 @@ export default async function RevisionsPage({
                             </Badge>
                             {e.color && <span className="text-xs text-[var(--muted-foreground)]">{e.color}</span>}
                             <span className="min-w-0 flex-1">{e.body}</span>
-                            {e.imageUrl && (
-                              // eslint-disable-next-line @next/next/no-img-element
-                              <img src={e.imageUrl} alt="" className="h-10 w-10 rounded border border-[var(--border)] bg-white object-contain" />
-                            )}
+                            {e.imageUrls.map((url, n) => (
+                              <a key={url} href={url} target="_blank" rel="noopener noreferrer" title={`View ${n + 1} of ${e.imageUrls.length}`}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt="" className="h-10 w-10 rounded border border-[var(--border)] bg-white object-contain" />
+                              </a>
+                            ))}
                             <span className="shrink-0 text-xs text-[var(--muted-foreground)]">
                               {formatDate(e.at)} · {e.author}
                             </span>

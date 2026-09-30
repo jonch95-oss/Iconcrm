@@ -43,32 +43,38 @@ export async function GET(request: Request) {
       // belongs in the recap, as a row with empty note columns.
       const entries = s.entries.length
         ? s.entries
-        : [{ id: s.id, kind: "revision" as const, at: null, body: "", author: "", color: null, imageUrl: null }];
+        : [{ id: s.id, kind: "revision" as const, at: null, body: "", author: "", color: null, imageUrls: [] as string[] }];
       entries.forEach((e, i) => {
-        const row = ws.addRow([
-          "",
-          f.name,
-          s.sampleNumber,
-          s.styleName,
-          s.brand,
-          s.color,
-          s.statusLabel,
-          s.open ? "YES" : "",
-          s.openDays ?? "",
-          day(s.sampleEta),
-          e.at ? day(e.at) : "",
-          e.body ? RECAP_ENTRY_LABEL[e.kind] : "",
-          e.color ?? "",
-          e.body,
-          e.author,
-          "",
-        ]);
-        // The photo goes on the style's first note row only — repeating it down
-        // every note would bloat the file for no gain.
-        if (i === 0 && s.imageUrl) imageJobs.push({ rowNumber: row.number, col: 0, url: s.imageUrl });
-        // What was attached to the note itself — the detail shot of the fault.
-        if (e.imageUrl) imageJobs.push({ rowNumber: row.number, col: 15, url: e.imageUrl });
-        if (s.open) row.getCell(8).font = { bold: true, color: { argb: "FFB45309" } };
+        // A note can carry several views of the same fault. Each gets its own
+        // row so every photo lands in the file at a size worth looking at;
+        // the repeats carry the note's context and say which view they are.
+        const photos = e.imageUrls.length ? e.imageUrls : [null];
+        photos.forEach((photo, p) => {
+          const repeat = p > 0;
+          const row = ws.addRow([
+            "",
+            f.name,
+            s.sampleNumber,
+            s.styleName,
+            s.brand,
+            s.color,
+            s.statusLabel,
+            s.open ? "YES" : "",
+            s.openDays ?? "",
+            day(s.sampleEta),
+            e.at ? day(e.at) : "",
+            e.body ? RECAP_ENTRY_LABEL[e.kind] : "",
+            e.color ?? "",
+            repeat ? `(view ${p + 1} of ${photos.length})` : e.body,
+            repeat ? "" : e.author,
+            "",
+          ]);
+          // The style photo goes on its first row only — repeating it down
+          // every note would bloat the file for no gain.
+          if (i === 0 && p === 0 && s.imageUrl) imageJobs.push({ rowNumber: row.number, col: 0, url: s.imageUrl });
+          if (photo) imageJobs.push({ rowNumber: row.number, col: 15, url: photo });
+          if (s.open) row.getCell(8).font = { bold: true, color: { argb: "FFB45309" } };
+        });
       });
     }
   }

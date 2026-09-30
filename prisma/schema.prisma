@@ -355,7 +355,12 @@ model Comment {
   skuVariantId String? // when set, the comment is about a specific color SKU
   skuVariant   SkuVariant? @relation(fields: [skuVariantId], references: [id], onDelete: Cascade)
   body      String   @db.Text
-  imageUrl  String?  // optional reference image attached to the comment
+  // Reference photos on the comment — several, so one note can carry the
+  // front, the back and the detail shot of the same fault. imageUrl is the
+  // original single-image field, kept in step with imageUrls[0] so anything
+  // still reading it shows the same picture.
+  imageUrl  String?
+  imageUrls String[] @default([])
   tags      String[] @default([]) // e.g. "duplicate-email"
   createdAt DateTime @default(now())
 

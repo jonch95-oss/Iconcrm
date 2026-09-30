@@ -13,6 +13,7 @@ import { autoSkuCode, skuBase, deriveColorCode } from "@/lib/sku";
 import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
 import { parseDateInput } from "@/lib/date";
+import { commentImages, MAX_COMMENT_IMAGES } from "@/lib/comment-images";
 import {
   sampleCreateSchema,
   sampleUpdateSchema,
@@ -274,24 +275,116 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
   return { ok: true, id: updated.id };
 }
 
+/** Blob URLs we accept as comment photos — our own storage, nothing else. */
+const BLOB_URL = /^https:\/\/[a-z0-9.-]+\.public\.blob\.vercel-storage\.com\//i;
+
+function parseImageUrls(raw: string | undefined, single: string | undefined): string[] {
+  const list: string[] = [];
+  if (raw) {
+    try {
+      const parsed: unknown = JSON.parse(raw);
+      if (Array.isArray(parsed)) list.push(...parsed.filter((u): u is string => typeof u === "string"));
+    } catch {
+      // Not JSON — treat it as one URL.
+      list.push(raw);
+    }
+  }
+  if (single) list.push(single);
+  const clean = [...new Set(list.map((u) => u.trim()).filter((u) => BLOB_URL.test(u)))];
+  return clean.slice(0, MAX_COMMENT_IMAGES);
+}
+
 export async function addComment(formData: FormData): Promise<ActionResult> {
   const user = await assertRole("member");
   const parsed = commentSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return { ok: false, error: "Invalid comment" };
   const body = (parsed.data.body ?? "").trim();
-  const imageUrl = parsed.data.imageUrl?.trim() || null;
-  if (!body && !imageUrl) return { ok: false, error: "Add a comment for production, or an image." };
+  const imageUrls = parseImageUrls(parsed.data.imageUrls, parsed.data.imageUrl);
+  if (!body && imageUrls.length === 0)
+    return { ok: false, error: "Add a comment for production, or an image." };
   const comment = await prisma.comment.create({
-    data: { sampleId: parsed.data.sampleId, skuVariantId: parsed.data.skuVariantId || null, userId: user.id, body, imageUrl },
+    data: {
+      sampleId: parsed.data.sampleId,
+      skuVariantId: parsed.data.skuVariantId || null,
+      userId: user.id,
+      body,
+      imageUrls,
+      // Kept in step so anything still reading the single field sees the same
+      // first photo rather than nothing.
+      imageUrl: imageUrls[0] ?? null,
+    },
   });
   await logAudit({
     entityType: "comment",
     entityId: comment.id,
     action: "comment_added",
     userId: user.id,
-    after: { sampleId: parsed.data.sampleId, skuVariantId: comment.skuVariantId, body: body.slice(0, 200), hasImage: !!imageUrl },
+    after: { sampleId: parsed.data.sampleId, skuVariantId: comment.skuVariantId, body: body.slice(0, 200), images: imageUrls.length },
   });
   revalidatePath(`/samples/${parsed.data.sampleId}`);
+  revalidatePath("/revisions");
+  return { ok: true };
+}
+
+/**
+ * Attach more photos to a comment that's already posted — the usual case being
+ * that you write the note, then go back to the sample and take the other views.
+ */
+export async function addCommentImages(commentId: string, urls: string[]): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: { id: true, sampleId: true, imageUrl: true, imageUrls: true },
+  });
+  if (!comment) return { ok: false, error: "Comment not found." };
+  const incoming = parseImageUrls(JSON.stringify(urls), undefined);
+  if (incoming.length === 0) return { ok: false, error: "No image to add." };
+
+  const current = commentImages(comment);
+  const next = [...new Set([...current, ...incoming])].slice(0, MAX_COMMENT_IMAGES);
+  if (next.length === current.length)
+    return { ok: false, error: `A comment can hold ${MAX_COMMENT_IMAGES} images.` };
+
+  await prisma.comment.update({
+    where: { id: commentId },
+    data: { imageUrls: next, imageUrl: next[0] ?? null },
+  });
+  await logAudit({
+    entityType: "comment",
+    entityId: commentId,
+    action: "comment_images_added",
+    userId: user.id,
+    after: { sampleId: comment.sampleId, added: next.length - current.length, total: next.length },
+  });
+  revalidatePath(`/samples/${comment.sampleId}`);
+  revalidatePath("/revisions");
+  return { ok: true };
+}
+
+/** Take one photo off a comment (wrong view, duplicate, wrong style). */
+export async function removeCommentImage(commentId: string, url: string): Promise<ActionResult> {
+  const user = await assertRole("member");
+  const comment = await prisma.comment.findUnique({
+    where: { id: commentId },
+    select: { id: true, sampleId: true, body: true, imageUrl: true, imageUrls: true },
+  });
+  if (!comment) return { ok: false, error: "Comment not found." };
+  const next = commentImages(comment).filter((u) => u !== url);
+  if (!comment.body.trim() && next.length === 0)
+    return { ok: false, error: "That's the comment's only content — delete the comment instead." };
+
+  await prisma.comment.update({
+    where: { id: commentId },
+    data: { imageUrls: next, imageUrl: next[0] ?? null },
+  });
+  await logAudit({
+    entityType: "comment",
+    entityId: commentId,
+    action: "comment_image_removed",
+    userId: user.id,
+    after: { sampleId: comment.sampleId, remaining: next.length },
+  });
+  revalidatePath(`/samples/${comment.sampleId}`);
   revalidatePath("/revisions");
   return { ok: true };
 }

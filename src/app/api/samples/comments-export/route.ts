@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import ExcelJS from "exceljs";
 import { prisma } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
+import { commentImages } from "@/lib/comment-images";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -30,7 +31,7 @@ export async function GET(request: Request) {
       imageUrl: true,
       comments: {
         orderBy: { createdAt: "asc" },
-        select: { body: true, imageUrl: true, createdAt: true, user: { select: { name: true } }, authorLabel: true },
+        select: { body: true, imageUrl: true, imageUrls: true, createdAt: true, user: { select: { name: true } }, authorLabel: true },
       },
     },
     orderBy: { sampleNumber: "asc" },
@@ -49,7 +50,9 @@ export async function GET(request: Request) {
   ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE8E8E8" } };
   ws.views = [{ state: "frozen", ySplit: 1, xSplit: 3 }];
 
-  const imageJobs: { rowNumber: number; col: number; url: string }[] = [];
+  // `slot` stacks a comment's views down its own image column, so a note with
+  // three photos shows all three instead of just the first.
+  const imageJobs: { rowNumber: number; col: number; slot: number; count: number; url: string }[] = [];
 
   for (const s of samples) {
     const row: (string | null)[] = ["", s.sampleNumber, s.styleName ?? ""];
@@ -61,11 +64,14 @@ export async function GET(request: Request) {
     const added = ws.addRow(row);
     // The sample's own photo in column A, so a comment sheet reads like the
     // sample list it came from.
-    if (s.imageUrl) imageJobs.push({ rowNumber: added.number, col: 0, url: s.imageUrl });
+    if (s.imageUrl) imageJobs.push({ rowNumber: added.number, col: 0, slot: 0, count: 1, url: s.imageUrl });
     // Then each comment's image into its "Comment N Image" column (0-based col
     // index: 3 + i*2 for comment i).
     s.comments.forEach((c, i) => {
-      if (c.imageUrl) imageJobs.push({ rowNumber: added.number, col: 3 + i * 2, url: c.imageUrl });
+      const views = commentImages(c);
+      views.forEach((url, slot) => {
+        imageJobs.push({ rowNumber: added.number, col: 3 + i * 2, slot, count: views.length, url });
+      });
     });
   }
 
@@ -77,7 +83,7 @@ export async function GET(request: Request) {
     ws.getColumn(5 + i * 2).width = 44; // comment text
   }
 
-  const embed = async ({ rowNumber, col, url }: { rowNumber: number; col: number; url: string }) => {
+  const embed = async ({ rowNumber, col, slot, count, url }: { rowNumber: number; col: number; slot: number; count: number; url: string }) => {
     try {
       const res = await fetch(url);
       if (!res.ok) return;
@@ -85,8 +91,18 @@ export async function GET(request: Request) {
       const extension = ct.includes("png") ? "png" : ct.includes("gif") ? "gif" : "jpeg";
       const base64 = Buffer.from(await res.arrayBuffer()).toString("base64");
       const imageId = wb.addImage({ base64, extension });
-      if ((ws.getRow(rowNumber).height ?? 0) < 84) ws.getRow(rowNumber).height = 84;
-      ws.addImage(imageId, { tl: { col, row: rowNumber - 1 }, ext: { width: 100, height: 100 } });
+      // Each view sits below the last, and the row grows to fit them all. The
+      // row offset is a FRACTION OF THE ROW, and exceljs converts it against a
+      // fixed row height (~88px per slot at count = 3) rather than the height
+      // set here — so stacked views are drawn at 84px to sit inside that gap
+      // instead of overlapping the one below.
+      const size = count > 1 ? 84 : 100;
+      const needed = 84 * count;
+      if ((ws.getRow(rowNumber).height ?? 0) < needed) ws.getRow(rowNumber).height = needed;
+      ws.addImage(imageId, {
+        tl: { col, row: rowNumber - 1 + slot / count },
+        ext: { width: size, height: size },
+      });
     } catch {
       // best-effort; skip unreadable images
     }

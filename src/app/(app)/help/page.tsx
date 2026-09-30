@@ -157,7 +157,8 @@ const SECTIONS: Section[] = [
     keywords: "comments image photo per color export",
     body: (
       <>
-        <p><B>Sample-level:</B> open a sample → <B>Comments for production</B> tab → type a note, optionally <B>Attach image</B>, → <B>Comment for production</B>.</p>
+        <p><B>Sample-level:</B> open a sample → <B>Comments for production</B> tab → type a note, optionally <B>Attach images</B>, → <B>Comment for production</B>.</p>
+        <p><B>Several views per note.</B> Pick more than one file at once (or press Attach again) to put the front, the back and the detail shot on the same comment — up to 8. Took the other views after posting? <B>Add view</B> on the comment attaches them later, and the <B>×</B> on any photo takes it off. Every view goes to the factory: they show on the Revisions &amp; Comments board, and both Excel exports carry them all.</p>
         <p><B>Per-color:</B> in the SKU grid, click the <B>speech-bubble</B> on a color to add/read comments for that color only.</p>
         <Tip>The <B>Comments</B> button on the Samples toolbar exports an Excel with paired <em>Comment for production N Image</em> / <em>Comment for production N</em> columns per sample, each row led by the sample&apos;s photo.</Tip>
       </>

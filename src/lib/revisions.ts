@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { SAMPLE_STATUS_LABEL } from "@/lib/status";
+import { commentImages } from "@/lib/comment-images";
 import type { Prisma, SampleStatus } from "@prisma/client";
 
 /**
@@ -18,7 +19,8 @@ export type RecapEntry = {
   author: string;
   /** Set when the entry is about one color rather than the whole sample. */
   color: string | null;
-  imageUrl: string | null;
+  /** Every reference photo on the note — a fault usually needs more than one view. */
+  imageUrls: string[];
   /**
    * Triage. Only comment-backed entries can be acted on — an ETA change or a
    * color flag is a fact about the sample, not an item in someone's inbox — so
@@ -267,7 +269,7 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
       body: c.body,
       author: c.user?.name ?? c.authorLabel ?? "—",
       color: c.skuVariant?.color ?? null,
-      imageUrl: c.imageUrl,
+      imageUrls: commentImages(c),
       commentId: c.id,
       acknowledgedAt: c.acknowledgedAt,
       acknowledgedBy: c.acknowledgedBy?.name ?? null,
@@ -284,7 +286,7 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
         body: older.body,
         author: older.user?.name ?? older.authorLabel ?? "—",
         color: older.skuVariant?.color ?? null,
-        imageUrl: older.imageUrl,
+        imageUrls: commentImages(older),
         commentId: older.id,
         acknowledgedAt: older.acknowledgedAt,
         acknowledgedBy: null,
@@ -306,7 +308,7 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
         body: `Revisions requested for ${v.color}`,
         author: v.revisionsRequestedBy?.name ?? "—",
         color: v.color,
-        imageUrl: null,
+        imageUrls: [],
         commentId: null,
         acknowledgedAt: null,
         acknowledgedBy: null,
@@ -326,7 +328,7 @@ export async function getRevisionRecap(filters: RecapFilters, viewerId?: string)
           (e.reason ? ` (${e.reason})` : ""),
         author: e.changedBy?.name ?? "—",
         color: null,
-        imageUrl: null,
+        imageUrls: [],
         commentId: null,
         acknowledgedAt: null,
         acknowledgedBy: null,

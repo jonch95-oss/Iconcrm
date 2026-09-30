@@ -7,6 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { SampleStatusBadge } from "@/components/status-badge";
+import { CommentImages } from "./comment-images";
+import { commentImages } from "@/lib/comment-images";
 import { PipelineChain, type ChainNode } from "@/components/pipeline-chain";
 import { formatMoney, formatPercent, marginPercent } from "@/lib/money";
 import { landedCost } from "@/lib/landed";
@@ -264,7 +266,7 @@ export default async function SampleDetailPage({
                       .map((c) => ({
                         id: c.id,
                         body: c.body,
-                        imageUrl: c.imageUrl,
+                        images: commentImages(c),
                         author: c.user?.name ?? c.authorLabel ?? "External",
                         createdAt: c.createdAt.toISOString(),
                       })),
@@ -290,12 +292,12 @@ export default async function SampleDetailPage({
                         <span className="text-xs text-[var(--muted-foreground)]">{formatDateTime(c.createdAt)}</span>
                       </div>
                       {c.body && <p className="whitespace-pre-wrap">{c.body}</p>}
-                      {c.imageUrl && (
-                        <a href={c.imageUrl} target="_blank" rel="noopener noreferrer" className="mt-2 inline-block">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img src={c.imageUrl} alt="comment reference" className="max-h-40 rounded border border-[var(--border)] object-contain bg-white" />
-                        </a>
-                      )}
+                      <CommentImages
+                        commentId={c.id}
+                        sampleId={sample.id}
+                        images={commentImages(c)}
+                        canEdit={canEdit}
+                      />
                       {c.tags.length > 0 && (
                         <div className="mt-2 flex gap-1">
                           {c.tags.map((t) => (

@@ -19,6 +19,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
+import { CommentImages } from "./comment-images";
+import { MAX_COMMENT_IMAGES } from "@/lib/comment-images";
+import { uploadCommentImages } from "@/lib/upload-images";
 
 export interface SkuRow {
   id: string;
@@ -30,7 +33,7 @@ export interface SkuRow {
   received: boolean;
   imageUrl: string | null;
   sampleEta: string; // yyyy-mm-dd or ""
-  comments: { id: string; body: string; imageUrl: string | null; author: string; createdAt: string }[];
+  comments: { id: string; body: string; images: string[]; author: string; createdAt: string }[];
 }
 
 export function SkuManager({
@@ -171,22 +174,22 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
   const router = useRouter();
   const [open, setOpen] = React.useState(false);
   const [body, setBody] = React.useState("");
-  const [file, setFile] = React.useState<File | null>(null);
+  const [files, setFiles] = React.useState<File[]>([]);
   const [pending, start] = React.useTransition();
   const inputRef = React.useRef<HTMLInputElement>(null);
   const submit = () => {
-    if (!body.trim() && !file) { toast.error("Add a comment for production, or an image."); return; }
+    if (!body.trim() && files.length === 0) { toast.error("Add a comment for production, or an image."); return; }
     start(async () => {
       try {
+        const { urls, rejected } = await uploadCommentImages(`comments/${sampleId}/${variantId}`, files);
+        if (rejected.length) toast.error(`Couldn't read ${rejected.join(", ")} — save as JPEG or PNG and try again.`);
+        if (!body.trim() && urls.length === 0) return;
         const fd = new FormData();
         fd.set("sampleId", sampleId); fd.set("skuVariantId", variantId); fd.set("body", body);
-        if (file) {
-          const blob = await upload(`comments/${sampleId}/${variantId}/${Date.now()}-${file.name}`, file, { access: "public", handleUploadUrl: "/api/import/blob-upload" });
-          fd.set("imageUrl", blob.url);
-        }
+        fd.set("imageUrls", JSON.stringify(urls));
         const res = await addComment(fd);
         if (!res.ok) { toast.error(res.error); return; }
-        setBody(""); setFile(null); if (inputRef.current) inputRef.current.value = "";
+        setBody(""); setFiles([]); if (inputRef.current) inputRef.current.value = "";
         toast.success("Comment for production added"); router.refresh();
       } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
     });
@@ -206,12 +209,7 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
             <div key={c.id} className="rounded-md border border-[var(--border)] p-2 text-sm">
               <div className="mb-1 flex justify-between text-xs text-[var(--muted-foreground)]"><span>{c.author}</span><span>{new Date(c.createdAt).toLocaleString()}</span></div>
               {c.body && <p className="whitespace-pre-wrap">{c.body}</p>}
-              {c.imageUrl && (
-                <a href={c.imageUrl} target="_blank" rel="noopener noreferrer">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={c.imageUrl} alt="ref" className="mt-1 max-h-32 rounded border border-[var(--border)] object-contain bg-white" />
-                </a>
-              )}
+              <CommentImages commentId={c.id} sampleId={sampleId} images={c.images} canEdit={canEdit} />
             </div>
           ))}
         </div>
@@ -220,10 +218,17 @@ function VariantCommentsDialog({ sampleId, variantId, color, comments, canEdit }
             <Textarea value={body} onChange={(e) => setBody(e.target.value)} placeholder={`Comment about ${color || "this color"}…`} rows={2} />
             <div className="flex items-center justify-between">
               <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()} disabled={pending}>
-                <ImagePlus className="h-4 w-4" /> {file ? file.name.slice(0, 16) : "Image"}
+                <ImagePlus className="h-4 w-4" /> {files.length ? `${files.length} image${files.length === 1 ? "" : "s"}` : "Images"}
               </Button>
-              <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => setFile(e.target.files?.[0] ?? null)} />
-              <Button size="sm" onClick={submit} disabled={pending || (!body.trim() && !file)}>{pending ? "Posting…" : "Comment for production"}</Button>
+              <input
+                ref={inputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => setFiles((f) => [...f, ...Array.from(e.target.files ?? [])].slice(0, MAX_COMMENT_IMAGES))}
+              />
+              <Button size="sm" onClick={submit} disabled={pending || (!body.trim() && files.length === 0)}>{pending ? "Posting…" : "Comment for production"}</Button>
             </div>
           </div>
         )}
