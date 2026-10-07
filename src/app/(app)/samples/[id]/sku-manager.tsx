@@ -14,6 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import type { SkuVariantField } from "../actions";
 import { addSkuVariant, deleteSkuVariant, editSkuVariant, toggleSkuReceived, fillSkuCodesForSample, uploadSkuVariantImage, addComment } from "../actions";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -30,6 +31,10 @@ export interface SkuRow {
   upc: string;
   skuCode: string | null;
   unitsPerCarton: number | null;
+  /** What this color carries of its own; blank means "same as the sample". */
+  fobCost: string | null;
+  material: string | null;
+  styleNumber: string | null;
   received: boolean;
   imageUrl: string | null;
   sampleEta: string; // yyyy-mm-dd or ""
@@ -39,15 +44,22 @@ export interface SkuRow {
 export function SkuManager({
   sampleId,
   skus,
+  sampleFob,
+  sampleMaterial,
+  sampleStyleNumber,
   canEdit,
 }: {
   sampleId: string;
   skus: SkuRow[];
+  /** The sample's own values — what a color falls back to. */
+  sampleFob: string | null;
+  sampleMaterial: string | null;
+  sampleStyleNumber: string | null;
   canEdit: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
-  const [form, setForm] = React.useState({ size: "", color: "", upc: "", skuCode: "", unitsPerCarton: "" });
+  const [form, setForm] = React.useState({ size: "", color: "", upc: "", skuCode: "", unitsPerCarton: "", fobCost: "", material: "", styleNumber: "" });
 
   const add = () => {
     if (!form.size || !form.color) {
@@ -60,7 +72,7 @@ export function SkuManager({
     startTransition(async () => {
       const res = await addSkuVariant(fd);
       if (res.ok) {
-        setForm({ size: "", color: "", upc: "", skuCode: "", unitsPerCarton: "" });
+        setForm({ size: "", color: "", upc: "", skuCode: "", unitsPerCarton: "", fobCost: "", material: "", styleNumber: "" });
         toast.success("SKU added");
         router.refresh();
       } else {
@@ -111,6 +123,9 @@ export function SkuManager({
             <TableHead>UPC</TableHead>
             <TableHead>SKU code</TableHead>
             <TableHead>Units/carton</TableHead>
+            <TableHead>TP style #</TableHead>
+            <TableHead>Material</TableHead>
+            <TableHead>FOB</TableHead>
             <TableHead>Sample ETA</TableHead>
             <TableHead>Received</TableHead>
             <TableHead>Comments for production</TableHead>
@@ -120,7 +135,7 @@ export function SkuManager({
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 10 : 9} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 13 : 12} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
@@ -133,6 +148,37 @@ export function SkuManager({
                 <TableCell className="font-mono text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="upc" value={s.upc} canEdit={canEdit} mono /></TableCell>
                 <TableCell className="text-xs"><EditableSkuCell id={s.id} sampleId={sampleId} field="skuCode" value={s.skuCode ?? ""} canEdit={canEdit} /></TableCell>
                 <TableCell className="tabular-nums"><EditableSkuCell id={s.id} sampleId={sampleId} field="unitsPerCarton" value={s.unitsPerCarton != null ? String(s.unitsPerCarton) : ""} canEdit={canEdit} numeric /></TableCell>
+                <TableCell className="text-xs">
+                  <EditableSkuCell
+                    id={s.id}
+                    sampleId={sampleId}
+                    field="styleNumber"
+                    value={s.styleNumber ?? ""}
+                    canEdit={canEdit}
+                    placeholder={sampleStyleNumber ?? undefined}
+                  />
+                </TableCell>
+                <TableCell className="text-xs">
+                  <EditableSkuCell
+                    id={s.id}
+                    sampleId={sampleId}
+                    field="material"
+                    value={s.material ?? ""}
+                    canEdit={canEdit}
+                    placeholder={sampleMaterial ?? undefined}
+                  />
+                </TableCell>
+                <TableCell className="tabular-nums">
+                  <EditableSkuCell
+                    id={s.id}
+                    sampleId={sampleId}
+                    field="fobCost"
+                    value={s.fobCost ?? ""}
+                    canEdit={canEdit}
+                    numeric
+                    placeholder={sampleFob ?? undefined}
+                  />
+                </TableCell>
                 <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="sampleEta" value={s.sampleEta} canEdit={canEdit} date /></TableCell>
                 <TableCell>
                   <Checkbox checked={s.received} disabled={!canEdit || pending} onCheckedChange={(v) => toggleReceived(s.id, !!v)} />
@@ -158,6 +204,9 @@ export function SkuManager({
           <SmallField label="UPC" value={form.upc} onChange={(v) => setForm((f) => ({ ...f, upc: v }))} />
           <SmallField label="SKU code" value={form.skuCode} onChange={(v) => setForm((f) => ({ ...f, skuCode: v }))} />
           <SmallField label="Units/carton" value={form.unitsPerCarton} onChange={(v) => setForm((f) => ({ ...f, unitsPerCarton: v }))} type="number" />
+          <SmallField label="TP style #" value={form.styleNumber} onChange={(v) => setForm((f) => ({ ...f, styleNumber: v }))} />
+          <SmallField label="Material" value={form.material} onChange={(v) => setForm((f) => ({ ...f, material: v }))} />
+          <SmallField label="FOB" value={form.fobCost} onChange={(v) => setForm((f) => ({ ...f, fobCost: v }))} type="number" />
           <Button size="sm" onClick={add} disabled={pending}>
             <Plus className="h-4 w-4" /> Add SKU
           </Button>
@@ -284,22 +333,33 @@ function EditableSkuCell({
   mono,
   numeric,
   date,
+  placeholder,
 }: {
   id: string;
   sampleId: string;
-  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta";
+  field: SkuVariantField;
   value: string;
   canEdit: boolean;
   mono?: boolean;
   numeric?: boolean;
   date?: boolean;
+  /** Shown greyed when the cell is empty — what the color inherits from the sample. */
+  placeholder?: string;
 }) {
   const router = useRouter();
   const [editing, setEditing] = React.useState(false);
   const [pending, startTransition] = React.useTransition();
 
+  const inherited = placeholder ? (
+    <span className="text-[var(--muted-foreground)]" title="From the sample — type here to give this color its own">
+      {placeholder}
+    </span>
+  ) : (
+    <span className="text-[var(--muted-foreground)]">—</span>
+  );
+
   if (!canEdit) {
-    return <span className={mono ? "font-mono text-xs" : ""}>{value || "—"}</span>;
+    return <span className={mono ? "font-mono text-xs" : ""}>{value || inherited}</span>;
   }
 
   const save = (raw: string) => {
@@ -322,6 +382,8 @@ function EditableSkuCell({
         autoFocus
         defaultValue={value}
         type={date ? "date" : numeric ? "number" : "text"}
+        step={numeric ? "0.01" : undefined}
+        placeholder={placeholder}
         disabled={pending}
         className="h-7 w-32 text-xs"
         onBlur={(e) => save(e.target.value)}
@@ -340,7 +402,7 @@ function EditableSkuCell({
       onClick={() => setEditing(true)}
       disabled={pending}
     >
-      {value || <span className="text-[var(--muted-foreground)]">—</span>}
+      {value || inherited}
     </button>
   );
 }
@@ -356,10 +418,11 @@ function SmallField({
   onChange: (v: string) => void;
   type?: string;
 }) {
+  const id = `new-sku-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`;
   return (
     <div className="space-y-1">
-      <label className="text-xs text-[var(--muted-foreground)]">{label}</label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} type={type} className="h-8 w-28 text-xs" />
+      <label htmlFor={id} className="text-xs text-[var(--muted-foreground)]">{label}</label>
+      <Input id={id} value={value} onChange={(e) => onChange(e.target.value)} type={type} step={type === "number" ? "0.01" : undefined} className="h-8 w-28 text-xs" />
     </div>
   );
 }

@@ -45,6 +45,11 @@ const SAMPLE_ALIASES: Record<string, string[]> = {
   trackingCarrier: ["carrier", "courier", "shipvia", "shippedvia"],
   received: ["received", "rcvd", "recd", "samplereceived", "got", "inhouse"],
   sampleRoom: ["sampleroom", "room", "showroom", "factorysampleroom", "sampleroomno", "sampleroomnumber"],
+  // What the color on this row carries of its own, where it differs from
+  // the sample's: the factory quotes suede and denim as separate lines.
+  variantFob: ["colorfob", "colourfob", "skufob", "variantfob", "fobcolor", "fobbycolor"],
+  variantMaterial: ["colormaterial", "colourmaterial", "skumaterial", "variantmaterial", "materialcolor"],
+  variantStyleNumber: ["colortpstyle", "tpstyle", "tpstyleno", "tpstylenumber", "colorstyle", "colourstyle", "skustyle", "variantstyle", "factorystyle"],
 };
 
 const PI_LINE_ALIASES: Record<string, string[]> = {
@@ -224,6 +229,9 @@ const SKU_ALIASES: Record<string, string[]> = {
   skuCode: ["sku", "skucode", "itemcode", "skunumber"],
   unitsPerCarton: ["units", "unitspercarton", "casepack", "caseqty", "pack", "unitscarton"],
   received: ["received", "rcvd", "recd", "samplereceived"],
+  fobCost: ["fob", "fobcost", "colorfob", "fobprice", "cost", "price"],
+  material: ["material", "materials", "matl", "fabric", "composition"],
+  styleNumber: ["tpstyle", "tpstyleno", "tpstylenumber", "style", "styleno", "stylenumber", "factorystyle"],
 };
 export const parseSkuWorkbook = (b: Buffer) => parseWorkbook(b, SKU_ALIASES);
 
@@ -273,6 +281,9 @@ export async function buildSamplesTemplate(brands: readonly string[] = SAMPLE_BR
     { header: "Target Customer", width: 18 },
     { header: "UPC", width: 16 },
     { header: "SKU Code", width: 14 },
+    { header: "Color TP Style #", width: 16 },
+    { header: "Color Material", width: 16 },
+    { header: "Color FOB", width: 11 },
     { header: "Received", width: 10 },
     { header: "Sample Room", width: 14 },
     { header: "Color ETA", width: 12 },

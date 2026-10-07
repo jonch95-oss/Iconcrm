@@ -416,6 +416,9 @@ export async function addSkuVariant(formData: FormData): Promise<ActionResult> {
       upc,
       skuCode,
       unitsPerCarton: parsed.data.unitsPerCarton ?? null,
+      fobCost: toDecimal(parsed.data.fobCost),
+      material: parsed.data.material?.trim() || null,
+      styleNumber: parsed.data.styleNumber?.trim() || null,
     },
   });
   await logAudit({
@@ -493,7 +496,7 @@ export async function createOrderFormFromSamples(
               sampleId: s.id,
               skuVariantId: variant.id,
               quantity: 0,
-              fobCostSnapshot: s.fobCost,
+              fobCostSnapshot: variant.fobCost ?? s.fobCost,
               currency: s.currency,
             },
           });
@@ -914,10 +917,14 @@ export async function bulkAddVariantsByColor(
 }
 
 
+/** The columns of the SKU grid that can be edited in place. */
+export type SkuVariantField =
+  | "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta" | "fobCost" | "material" | "styleNumber";
+
 export async function editSkuVariant(
   id: string,
   sampleId: string,
-  field: "size" | "color" | "upc" | "skuCode" | "unitsPerCarton" | "sampleEta",
+  field: SkuVariantField,
   value: string,
 ): Promise<ActionResult> {
   const user = await assertRole("member");
@@ -925,6 +932,9 @@ export async function editSkuVariant(
   let data: Prisma.SkuVariantUpdateInput;
   if (field === "unitsPerCarton") {
     data = { unitsPerCarton: v ? parseInt(v, 10) || null : null };
+  } else if (field === "fobCost") {
+    // Blank means "use the sample's price", not "free".
+    data = { fobCost: v ? toDecimal(v) : null };
   } else if (field === "sampleEta") {
     data = { sampleEta: parseDateInput(v) };
   } else if (field === "upc") {
@@ -935,6 +945,9 @@ export async function editSkuVariant(
     data = { upc: v || null };
   } else if (field === "skuCode") {
     data = { skuCode: v || null };
+  } else if (field === "material" || field === "styleNumber") {
+    // Blank means "same as the sample", not "none".
+    data = { [field]: v || null };
   } else if (field === "size") {
     data = { size: v || "OS" };
   } else {

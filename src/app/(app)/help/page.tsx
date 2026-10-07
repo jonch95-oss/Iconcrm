@@ -166,7 +166,7 @@ const SECTIONS: Section[] = [
   },
   {
     id: "import", title: "9. Importing from Excel",
-    keywords: "import template download grouped skus master sample number per color image transparent png size",
+    keywords: "import template download grouped skus master sample number per color image transparent png size factory price list fob quote color price material",
     body: (
       <>
         <Steps items={[
@@ -177,6 +177,14 @@ const SECTIONS: Section[] = [
         <h3 className="mt-4 font-semibold">Grouped SKUs on upload</h3>
         <p>Put <B>one color per row</B> and either repeat the same <B>Sample #</B>, or give each row its own Sample # plus a shared <B>Master Sample #</B>. Both build one master family with a color SKU each; the photo in column A becomes that color&apos;s image.</p>
         <Tip>Transparent PNGs stay transparent; other photos go on white (never black). Files up to ~250&nbsp;MB. For bulk edits use the <B>data-only</B> export.</Tip>
+
+        <h3 className="mt-4 font-semibold">Factory prices</h3>
+        <p>Samples → <B>Factory prices</B> takes the factory&apos;s own quote sheet — a style column and an FOB column is all it needs — and shows every price that would move, old → new, before anything is written. A quote line whose style number sits on a color goes straight onto that color. Otherwise: a style quoted once is applied; a style quoted per material is matched on the sample&apos;s own material, or, when the colors name their materials, priced color by color. Anything it can&apos;t place is listed with the reason and a <B>Copy this list</B> button for your reply to the factory.</p>
+        <Tip>Prices only land on samples that already exist — a quote sheet full of styles you don&apos;t carry can&apos;t create them. Only the FOB moves: no ETA, no status change, and the old price is kept in the sample&apos;s audit trail.</Tip>
+
+        <h3 className="mt-4 font-semibold">A price per color</h3>
+        <p>Suede and denim rarely cost the same, so every color row in the SKU grid carries its own <B>TP style #</B>, <B>Material</B> and <B>FOB</B>. Leave one blank and the color uses the sample&apos;s — shown greyed in the cell, so you can see what it&apos;s inheriting. Order form and PI lines take the color&apos;s price when it has one.</p>
+        <p>They travel in the <B>Color TP Style #</B>, <B>Color Material</B> and <B>Color FOB</B> columns of the sample sheet, and in Export/Import SKUs. Putting the factory&apos;s own style number on a color is what makes <B>Factory prices</B> exact: a quote line for that number lands on that color, with no material guessing at all.</p>
       </>
     ),
   },

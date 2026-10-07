@@ -94,6 +94,9 @@ export const skuVariantSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v && v !== "" ? Number(v) : undefined)),
+  fobCost: decimalString,
+  material: optionalString,
+  styleNumber: optionalString,
 });
 
 export const commentSchema = z.object({

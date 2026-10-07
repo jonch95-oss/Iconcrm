@@ -323,6 +323,9 @@ model SkuVariant {
   upc             String? @unique // UPC lives at size/color level; issued after the SKU
   skuCode         String?
   unitsPerCarton  Int?
+  fobCost         Decimal? @db.Decimal(10, 2) // this color's own price; falls back to the sample's
+  material        String? // what this color is made of, where it differs from the sample's
+  styleNumber     String? // the factory's own style # for this color ("TP style #")
   received        Boolean @default(false) // did we receive this color's physical sample
   imageUrl        String? // per-color product image
   imageHash       String? // hash of the imported image bytes (skip re-uploads)
@@ -343,6 +346,7 @@ model SkuVariant {
   updatedAt DateTime @updatedAt
 
   @@index([sampleId])
+  @@index([styleNumber])
 }
 
 model Comment {

@@ -95,6 +95,19 @@ export default async function SampleDetailPage({
   const canEdit = hasRole(user.role, "member");
   const isAdmin = hasRole(user.role, "admin");
   const margin = marginPercent(sample.customerSellPrice, sample.fobCost);
+  // Colors are often quoted apart (suede vs. denim), so a single number up top
+  // would be a lie: show the spread of what the colors actually cost, with the
+  // sample's own price standing in for the colors that don't carry one.
+  const colorPrices = sample.skuVariants
+    .map((v) => v.fobCost ?? sample.fobCost)
+    .filter((f) => f != null)
+    .map(Number)
+    .sort((a, b) => a - b);
+  const [low, high] = [colorPrices[0], colorPrices[colorPrices.length - 1]];
+  const fobSummary =
+    colorPrices.length === 0 || low === high
+      ? formatMoney(sample.fobCost ?? low ?? null, sample.currency)
+      : `${formatMoney(low, sample.currency)}–${formatMoney(high, sample.currency)} by color`;
   const landed = landedCost(sample);
   const landedMargin = marginPercent(sample.customerSellPrice, landed);
   const overdue = isSampleOverdue(sample);
@@ -217,7 +230,7 @@ export default async function SampleDetailPage({
             <Detail label="Case pack" value={sample.casePackDefault ?? "—"} />
             <Detail label="HTS code" value={sample.htsCode ?? "—"} />
             <Detail label="Material" value={sample.material ?? "—"} />
-            <Detail label="FOB cost" value={formatMoney(sample.fobCost, sample.currency)} />
+            <Detail label="FOB cost" value={fobSummary} />
             <Detail label="FOB port" value={sample.fobPort ?? "—"} />
             <Detail label="Customer sell price" value={formatMoney(sample.customerSellPrice, sample.currency)} />
             <Detail label="FOB margin" value={margin ? formatPercent(margin) : "—"} />
@@ -259,6 +272,9 @@ export default async function SampleDetailPage({
                 <SkuManager
                   sampleId={sample.id}
                   canEdit={canEdit}
+                  sampleFob={sample.fobCost != null ? String(sample.fobCost) : null}
+                  sampleMaterial={sample.material}
+                  sampleStyleNumber={sample.styleNumber}
                   skus={sample.skuVariants.map((s) => ({
                     id: s.id,
                     comments: sample.comments
@@ -275,6 +291,9 @@ export default async function SampleDetailPage({
                     upc: s.upc ?? "",
                     skuCode: s.skuCode,
                     unitsPerCarton: s.unitsPerCarton,
+                    fobCost: s.fobCost != null ? String(s.fobCost) : null,
+                    material: s.material,
+                    styleNumber: s.styleNumber,
                     received: s.received,
                     imageUrl: s.imageUrl ?? null,
                     sampleEta: s.sampleEta ? s.sampleEta.toISOString().slice(0, 10) : "",

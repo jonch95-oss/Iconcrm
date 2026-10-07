@@ -66,7 +66,13 @@ async function buildLineData(
   unitPrice: Prisma.Decimal,
 ) {
   let fob: Prisma.Decimal | null = null;
-  if (sampleId) {
+  // A color quoted on its own is what this line should be checked against;
+  // the sample's price only stands in when the color hasn't got one.
+  if (skuVariantId) {
+    const variant = await prisma.skuVariant.findUnique({ where: { id: skuVariantId }, select: { fobCost: true } });
+    fob = variant?.fobCost ?? null;
+  }
+  if (!fob && sampleId) {
     const sample = await prisma.sample.findUnique({ where: { id: sampleId }, select: { fobCost: true } });
     fob = sample?.fobCost ?? null;
   }

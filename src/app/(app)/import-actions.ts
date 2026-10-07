@@ -256,6 +256,11 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         const colorsToAdd = colorList.length > 0 ? colorList : [""];
         const single = colorsToAdd.length === 1;
         let rowVariantId: string | null = null;
+        // A color priced on its own; blank leaves whatever the color already
+        // had, and the sample's price covers the colors that never get one.
+        const variantFob = toDecimal(v.variantFob) ?? undefined;
+        const variantMaterial = v.variantMaterial?.trim() || undefined;
+        const variantStyle = v.variantStyleNumber?.trim() || undefined;
         for (const color of colorsToAdd) {
           const code = color ? colorCodeMap.get(color.toUpperCase()) : undefined;
           const autoSku = code ? `${base}${code.trim().toUpperCase()}` : null;
@@ -285,6 +290,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
                 upc: rowUpc || dup.upc,
                 skuCode: skuCode ?? dup.skuCode,
                 unitsPerCarton: units ?? dup.unitsPerCarton,
+                fobCost: variantFob ?? dup.fobCost,
+                material: variantMaterial ?? dup.material,
+                styleNumber: variantStyle ?? dup.styleNumber,
                 ...(received ? { received: true } : {}),
               },
             });
@@ -298,6 +306,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
                 color: color || "—",
                 skuCode: skuCode ?? null,
                 unitsPerCarton: units,
+                fobCost: variantFob,
+                material: variantMaterial,
+                styleNumber: variantStyle,
                 received,
               },
             });
@@ -728,6 +739,10 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
     const code = color ? ccMap.get(color.toUpperCase()) : undefined;
     const skuCode = (v.skuCode ?? "").trim() || (code ? `${base}${code}` : null);
     const units = v.unitsPerCarton ? parseInt(v.unitsPerCarton, 10) || null : null;
+    // A blank FOB means "use the sample's price", so it never clears one.
+    const fob = toDecimal(v.fobCost) ?? undefined;
+    const material = (v.material ?? "").trim() || undefined;
+    const styleNumber = (v.styleNumber ?? "").trim() || undefined;
     if (!size && !color && !upc) continue;
 
     let existing = upc ? await prisma.skuVariant.findUnique({ where: { upc } }) : null;
@@ -749,13 +764,16 @@ export async function importSkusForSample(sampleId: string, formData: FormData):
           upc: upc || existing.upc,
           skuCode: skuCode ?? existing.skuCode,
           unitsPerCarton: units ?? existing.unitsPerCarton,
+          fobCost: fob ?? existing.fobCost,
+          material: material ?? existing.material,
+          styleNumber: styleNumber ?? existing.styleNumber,
           ...(receivedRow ? { received: true } : {}),
         },
       });
       summary.updated += 1;
     } else {
       await prisma.skuVariant.create({
-        data: { sampleId, size: size || "OS", color: color || "—", upc: upc || null, skuCode, unitsPerCarton: units, received: receivedRow },
+        data: { sampleId, size: size || "OS", color: color || "—", upc: upc || null, skuCode, unitsPerCarton: units, fobCost: fob, material, styleNumber, received: receivedRow },
       });
       summary.created += 1;
     }
@@ -824,11 +842,18 @@ export async function previewFactoryPriceList(formData: FormData): Promise<Price
   if (rows.length === 0) return { ...NO_PREVIEW, error: "No priced rows on the first sheet." };
 
   const samples = await prisma.sample.findMany({
-    select: { id: true, sampleNumber: true, styleNumber: true, styleName: true, material: true, composition: true, fobCost: true },
+    select: {
+      id: true, sampleNumber: true, styleNumber: true, styleName: true, material: true, composition: true, fobCost: true,
+      skuVariants: { select: { id: true, color: true, material: true, styleNumber: true, fobCost: true } },
+    },
   });
   const report = matchPrices(
     rows,
-    samples.map((s) => ({ ...s, fob: s.fobCost == null ? null : Number(s.fobCost) })),
+    samples.map((s) => ({
+      ...s,
+      fob: s.fobCost == null ? null : Number(s.fobCost),
+      variants: s.skuVariants.map((v) => ({ id: v.id, color: v.color, material: v.material, styleNumber: v.styleNumber, fob: v.fobCost == null ? null : Number(v.fobCost) })),
+    })),
   );
   return {
     ok: true,
@@ -848,7 +873,7 @@ export async function previewFactoryPriceList(formData: FormData): Promise<Price
  * record of the old price and who replaced it.
  */
 export async function applyFactoryPrices(
-  prices: { sampleId: string; fob: number }[],
+  prices: { sampleId: string; variantId?: string; fob: number }[],
 ): Promise<{ ok: boolean; updated: number; error?: string }> {
   const user = await assertRole("member");
   const clean = prices
@@ -856,25 +881,41 @@ export async function applyFactoryPrices(
     .slice(0, 5000);
   if (clean.length === 0) return { ok: false, updated: 0, error: "Nothing to apply." };
 
-  const existing = await prisma.sample.findMany({
+  const samples = await prisma.sample.findMany({
     where: { id: { in: clean.map((p) => p.sampleId) } },
-    select: { id: true, fobCost: true },
+    select: { id: true, fobCost: true, skuVariants: { select: { id: true, fobCost: true } } },
   });
-  const fobBefore = new Map(existing.map((s) => [s.id, s.fobCost == null ? null : Number(s.fobCost)]));
+  const sampleFob = new Map(samples.map((s) => [s.id, s.fobCost == null ? null : Number(s.fobCost)]));
+  const variantFob = new Map(samples.flatMap((s) => s.skuVariants.map((v) => [v.id, v.fobCost == null ? null : Number(v.fobCost)] as const)));
 
   let updated = 0;
-  for (const { sampleId, fob } of clean) {
-    if (!fobBefore.has(sampleId)) continue;
-    await prisma.sample.update({ where: { id: sampleId }, data: { fobCost: toDecimal(fob) } });
-    await logAudit({
-      entityType: "sample",
-      entityId: sampleId,
-      action: "fob_from_price_list",
-      userId: user.id,
-      before: { fobCost: fobBefore.get(sampleId) },
-      after: { fobCost: fob },
-    });
+  for (const { sampleId, variantId, fob } of clean) {
+    if (!sampleFob.has(sampleId)) continue;
+    // A price quoted for one color belongs on that color, not on the sample.
+    if (variantId) {
+      if (!variantFob.has(variantId)) continue;
+      await prisma.skuVariant.update({ where: { id: variantId }, data: { fobCost: toDecimal(fob) } });
+      await logAudit({
+        entityType: "sku_variant",
+        entityId: variantId,
+        action: "fob_from_price_list",
+        userId: user.id,
+        before: { sampleId, fobCost: variantFob.get(variantId) },
+        after: { fobCost: fob },
+      });
+    } else {
+      await prisma.sample.update({ where: { id: sampleId }, data: { fobCost: toDecimal(fob) } });
+      await logAudit({
+        entityType: "sample",
+        entityId: sampleId,
+        action: "fob_from_price_list",
+        userId: user.id,
+        before: { fobCost: sampleFob.get(sampleId) },
+        after: { fobCost: fob },
+      });
+    }
     updated += 1;
+    revalidatePath(`/samples/${sampleId}`);
   }
   revalidatePath("/samples");
   return { ok: true, updated };

@@ -62,7 +62,7 @@ export function PriceListDialog() {
   const apply = () => {
     if (!preview?.changes.length) return;
     startApplying(async () => {
-      const res = await applyFactoryPrices(preview.changes.map((c) => ({ sampleId: c.sampleId, fob: c.fob })));
+      const res = await applyFactoryPrices(preview.changes.map((c) => ({ sampleId: c.sampleId, variantId: c.variantId, fob: c.fob })));
       if (!res.ok) {
         toast.error(res.error ?? "Couldn't apply the prices.");
         return;
@@ -174,8 +174,11 @@ export function PriceListDialog() {
                   </thead>
                   <tbody>
                     {preview.changes.map((c) => (
-                      <tr key={c.sampleId} className="border-t border-[var(--border)]">
-                        <td className="px-2 py-1.5 font-mono">{c.sampleNumber}</td>
+                      <tr key={c.variantId ?? c.sampleId} className="border-t border-[var(--border)]">
+                        <td className="px-2 py-1.5 font-mono">
+                          {c.sampleNumber}
+                          {c.color && <span className="ml-1 font-sans text-[var(--muted-foreground)]">· {c.color}</span>}
+                        </td>
                         <td className="px-2 py-1.5">{c.styleName}</td>
                         <td className="px-2 py-1.5 text-right tabular-nums text-[var(--muted-foreground)]">{money(c.fobNow)}</td>
                         <td className="px-2 py-1.5 text-right font-medium tabular-nums">{money(c.fob)}</td>

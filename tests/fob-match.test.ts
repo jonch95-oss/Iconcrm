@@ -126,6 +126,96 @@ assert.deepEqual(
 assert.equal(report.priced.length - report.changes.length, 1);
 assert.equal(report.styles, new Set(priceRows.map((r) => r.base.toUpperCase())).size);
 
+// ---- a style quoted per color ----------------------------------------------
+// Two colors, two prices, each color's name naming its own row: the prices go
+// on the colors, not on the sample.
+const perColor = matchPrices(
+  [
+    price("OW-DUO", "DENIM / LEATHER", 24.61),
+    price("OW-DUO", "SUEDE / LEATHER", 42.69),
+  ],
+  [
+    sample("d1", "OW-DUO", {
+      styleName: "TWO TONE HOBO",
+      variants: [
+        { id: "v-denim", color: "DENIM BLUE", fob: null },
+        { id: "v-suede", color: "SUEDE TAUPE", fob: null },
+      ],
+    }),
+  ],
+);
+assert.deepEqual(
+  perColor.priced.map((p) => [p.color, p.fob, p.variantId]),
+  [["DENIM BLUE", 24.61, "v-denim"], ["SUEDE TAUPE", 42.69, "v-suede"]],
+);
+assert.equal(perColor.skipped.length, 0);
+
+// One color matching and one not is not a result: pricing half the colors
+// leaves the rest on a price meant for another material.
+const halfMatched = matchPrices(
+  [
+    price("OW-HALF", "DENIM / LEATHER", 24.61),
+    price("OW-HALF", "SUEDE / LEATHER", 42.69),
+  ],
+  [
+    sample("h1", "OW-HALF", {
+      variants: [
+        { id: "v-denim", color: "DENIM BLUE", fob: null },
+        { id: "v-black", color: "BLACK", fob: null },
+      ],
+    }),
+  ],
+);
+assert.equal(halfMatched.priced.length, 0);
+assert.match(halfMatched.skipped[0].reason, /several prices/);
+
+// ---- a color that knows its own factory style number ------------------------
+// The sheet quotes LAB-77-SUEDE; that number is on the color, so the price goes
+// straight onto it — no material guessing, and the sample is left alone.
+const byColorStyle = matchPrices(
+  [price("LAB-77-SUEDE", "SUEDE / LEATHER", 42.69), price("LAB-77-DENIM", "DENIM / LEATHER", 24.61)],
+  [
+    sample("c1", "LAB-77", {
+      fob: 30,
+      variants: [
+        { id: "v-s", color: "TAUPE", material: "Suede", styleNumber: "LAB-77-SUEDE", fob: null },
+        { id: "v-d", color: "INDIGO", material: "Denim", styleNumber: "LAB-77-DENIM", fob: null },
+      ],
+    }),
+  ],
+);
+assert.deepEqual(
+  byColorStyle.priced.map((p) => [p.variantId, p.fob, p.matchedOn]),
+  [["v-s", 42.69, "TP style # on the color"], ["v-d", 24.61, "TP style # on the color"]],
+);
+assert.equal(byColorStyle.skipped.length, 0);
+
+// The color's own material breaks a tie when its style number is quoted twice.
+const twoQuotes = matchPrices(
+  [price("LAB-88-A", "SUEDE / LEATHER", 42.69), price("LAB-88-A", "RAFFIA / LEATHER", 31.4)],
+  [
+    sample("c2", "LAB-88", {
+      variants: [{ id: "v-r", color: "NATURAL", material: "Raffia", styleNumber: "LAB-88-A", fob: null }],
+    }),
+  ],
+);
+assert.deepEqual(twoQuotes.priced.map((p) => [p.variantId, p.fob]), [["v-r", 31.4]]);
+
+// A style number two colors share names neither of them; the sample's own
+// number still catches the row.
+const sharedByColors = matchPrices(
+  [price("LAB-99", "PU", 8.5)],
+  [
+    sample("c3", "LAB-99", {
+      variants: [
+        { id: "v-1", color: "BLACK", styleNumber: "LAB-99", fob: null },
+        { id: "v-2", color: "WHITE", styleNumber: "LAB-99", fob: null },
+      ],
+    }),
+  ],
+);
+assert.deepEqual(sharedByColors.priced.map((p) => [p.sampleNumber, p.variantId, p.fob]), [["LAB-99", undefined, 8.5]]);
+
 // ---- reading the factory's own sheet ---------------------------------------
 async function readsTheFactorySheet() {
   const wb = new ExcelJS.Workbook();

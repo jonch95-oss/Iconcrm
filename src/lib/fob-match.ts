@@ -35,12 +35,17 @@ export interface MatchSample {
   material?: string | null;
   composition?: string | null;
   fob: number | null;
+  /** This sample's colors, each with whatever it carries of its own. */
+  variants?: { id: string; color: string; material?: string | null; styleNumber?: string | null; fob: number | null }[];
 }
 
 export interface PricedSample {
   sampleId: string;
   sampleNumber: string;
   styleName: string;
+  /** Set when the price belongs to one color rather than the whole sample. */
+  variantId?: string;
+  color?: string;
   fobNow: number | null;
   fob: number;
   matchedOn: string;
@@ -168,10 +173,47 @@ export async function parsePriceList(
   return { rows, columns };
 }
 
+type Variant = NonNullable<MatchSample["variants"]>[number];
+
+/** Everything a color says about itself: its material first, then its name. */
+const colorWords = (variant: Variant) => new Set([...words(variant.material), ...words(variant.color)]);
+
+/**
+ * A color takes a price when its own name points at one row and no other:
+ * "DENIM" on the sample, "DENIM / LEATHER" on the sheet. All or nothing — the
+ * caller falls back to pricing the sample as a whole when any color misses.
+ */
+function priceEachColor(rows: PriceRow[], sample: MatchSample, on: string): PricedSample[] | null {
+  const variants = sample.variants ?? [];
+  if (variants.length < 2) return null;
+  const lines: PricedSample[] = [];
+  for (const variant of variants) {
+    const mine = colorWords(variant);
+    if (mine.size === 0) return null;
+    const scored = rows.map((r) => ({ r, fit: materialFit(r.composition, mine) })).sort((a, b) => betterFit(a.fit, b.fit));
+    const best = scored[0];
+    const tiedPrices = [...new Set(scored.filter((x) => sameFit(x.fit, best.fit)).map((x) => x.r.fob))];
+    if (best.fit.hits === 0 || tiedPrices.length > 1) return null;
+    lines.push({
+      sampleId: sample.id,
+      sampleNumber: sample.sampleNumber,
+      styleName: sample.styleName || rows[0].styleName,
+      variantId: variant.id,
+      color: variant.color,
+      fobNow: variant.fob,
+      fob: best.r.fob as number,
+      matchedOn: on,
+      why: `${variant.material ? `material “${variant.material}”` : `color “${variant.color}”`} matches “${best.r.composition}”`,
+    });
+  }
+  return lines;
+}
+
 /** Decide, per sample, which price on the list is the right one. */
 export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobMatchReport {
   const byNumber = new Map<string, MatchSample>();
   const byStyleNumber = new Map<string, MatchSample[]>();
+  const byColorStyleNumber = new Map<string, { sample: MatchSample; variant: Variant }[]>();
   const sampleWords = new Map<string, Set<string>>();
   for (const s of samples) {
     byNumber.set(key(s.sampleNumber), s);
@@ -181,12 +223,24 @@ export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobM
       list.push(s);
       byStyleNumber.set(key(s.styleNumber), list);
     }
+    for (const variant of s.variants ?? []) {
+      if (!variant.styleNumber) continue;
+      const list = byColorStyleNumber.get(key(variant.styleNumber)) ?? [];
+      list.push({ sample: s, variant });
+      byColorStyleNumber.set(key(variant.styleNumber), list);
+    }
   }
 
   // Point each price row at a sample that already exists: exact number, then
   // the number without its variant letter, then the same two against Style #
   // — and only when exactly one sample carries it.
   const resolve = (row: PriceRow) => {
+    // A color that carries the factory's own style number needs no guesswork:
+    // the row names it outright, material and all.
+    for (const k of [key(row.style), key(row.base)]) {
+      const hits = byColorStyleNumber.get(k);
+      if (hits?.length === 1) return { sample: hits[0].sample, variant: hits[0].variant, on: "TP style # on the color" };
+    }
     for (const k of [key(row.style), key(row.base)]) {
       const hit = byNumber.get(k);
       if (hit) return { sample: hit, on: k === key(row.style) ? "sample #" : "sample # (variant folded in)" };
@@ -200,7 +254,7 @@ export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobM
     return { ambiguous };
   };
 
-  const groups = new Map<string, { sample: MatchSample; on: string; rows: PriceRow[] }>();
+  const groups = new Map<string, { sample: MatchSample; variant?: Variant; on: string; rows: PriceRow[] }>();
   const unmatched = new Map<string, { rows: PriceRow[]; ambiguous: number }>();
   const noPrice: PriceRow[] = [];
   for (const row of priceRows) {
@@ -208,7 +262,7 @@ export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobM
       noPrice.push(row);
       continue;
     }
-    const { sample, on, ambiguous } = resolve(row);
+    const { sample, variant, on, ambiguous } = resolve(row);
     if (!sample) {
       const g = unmatched.get(key(row.base)) ?? { rows: [], ambiguous: 0 };
       g.rows.push(row);
@@ -216,19 +270,21 @@ export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobM
       unmatched.set(key(row.base), g);
       continue;
     }
-    const g = groups.get(sample.id) ?? { sample, on: on!, rows: [] };
+    const target = variant?.id ?? sample.id;
+    const g = groups.get(target) ?? { sample, variant, on: on!, rows: [] };
     g.rows.push(row);
-    groups.set(sample.id, g);
+    groups.set(target, g);
   }
 
   const priced: PricedSample[] = [];
   const skipped: UnpricedStyle[] = [];
-  for (const { sample, on, rows } of groups.values()) {
+  for (const { sample, variant, on, rows } of groups.values()) {
     const line = (fob: number, why: string): PricedSample => ({
       sampleId: sample.id,
       sampleNumber: sample.sampleNumber,
       styleName: sample.styleName || rows[0].styleName,
-      fobNow: sample.fob,
+      ...(variant ? { variantId: variant.id, color: variant.color } : {}),
+      fobNow: variant ? variant.fob : sample.fob,
       fob,
       matchedOn: on,
       why,
@@ -238,7 +294,36 @@ export function matchPrices(priceRows: PriceRow[], samples: MatchSample[]): FobM
       priced.push(line(prices[0], rows.length > 1 ? `${rows.length} price rows, all ${prices[0]}` : "one price on the list"));
       continue;
     }
-    // Several prices: let the sample's own material pick one.
+    // The rows belong to one color: its own material decides between them.
+    if (variant) {
+      const scored = rows.map((r) => ({ r, fit: materialFit(r.composition, colorWords(variant)) })).sort((a, b) => betterFit(a.fit, b.fit));
+      const best = scored[0];
+      const tiedPrices = [...new Set(scored.filter((x) => sameFit(x.fit, best.fit)).map((x) => x.r.fob))];
+      if (best.fit.hits > 0 && tiedPrices.length === 1) {
+        priced.push(line(best.r.fob as number, `material “${variant.material || variant.color}” matches “${best.r.composition}”`));
+      } else {
+        skipped.push({
+          style: `${sample.sampleNumber} · ${variant.color}`,
+          styleName: sample.styleName || rows[0].styleName,
+          reason: "several prices for this color, and its material doesn't pick one",
+          detail: rows.map((r) => `${r.fob} (${r.composition || "no composition"})`).join(" · "),
+        });
+      }
+      continue;
+    }
+
+    // Several prices and several colors: the quote is probably per color
+    // (suede, denim, raffia), so price the colors themselves — but only when
+    // every one of them lands on a price of its own. A half-matched set would
+    // leave the rest quietly falling back to a price meant for another
+    // material, which is worse than leaving the lot for a human.
+    const perColor = priceEachColor(rows, sample, on);
+    if (perColor) {
+      priced.push(...perColor);
+      continue;
+    }
+
+    // Otherwise: let the sample's own material pick one price for all of it.
     const mine = sampleWords.get(sample.id)!;
     const scored = rows.map((r) => ({ r, fit: materialFit(r.composition, mine) })).sort((a, b) => betterFit(a.fit, b.fit));
     const best = scored[0];

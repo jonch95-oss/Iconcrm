@@ -40,7 +40,7 @@ export async function GET(request: Request) {
     "Image", "Sample #", "Brand", "Category", "Season", "Style #", "Style Name", "Description",
     "FOB", "Sell Price", "Duty %", "Freight/Unit", "Inland/Unit",
     "HTS Code", "Material", "Composition", "CBM/Carton", "Case Pack",
-    "Factory", "Target Customer", "Status", "Sample Room", "Size", "Color", "UPC", "SKU Code", "Received", "Color ETA", "Comments for production",
+    "Factory", "Target Customer", "Status", "Sample Room", "Size", "Color", "UPC", "SKU Code", "Color TP Style #", "Color Material", "Color FOB", "Received", "Color ETA", "Comments for production",
   ];
   ws.addRow(header);
   ws.getRow(1).font = { bold: true };
@@ -64,11 +64,11 @@ export async function GET(request: Request) {
     const vEta = (d: Date | null) => (d ? d.toISOString().slice(0, 10) : "");
     let firstRow = 0;
     if (s.skuVariants.length === 0) {
-      firstRow = ws.addRow([...base, s.size ?? "", "", "", "", "", commentsText]).number;
+      firstRow = ws.addRow([...base, s.size ?? "", "", "", "", "", "", "", "", commentsText]).number;
       if (withPhotos && s.imageUrl) imageJobs.push({ rowNumber: firstRow, url: s.imageUrl });
     } else {
       s.skuVariants.forEach((v, i) => {
-        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.received ? "Y" : "", vEta(v.sampleEta), i === 0 ? commentsText : ""]).number;
+        const r = ws.addRow([...base, v.size, v.color, v.upc ?? "", v.skuCode ?? "", v.styleNumber ?? "", v.material ?? "", num(v.fobCost), v.received ? "Y" : "", vEta(v.sampleEta), i === 0 ? commentsText : ""]).number;
         if (i === 0) firstRow = r;
         // Embed each color's own image on its row (falls back to the sample
         // photo on the first row) so per-color images round-trip on re-import.
