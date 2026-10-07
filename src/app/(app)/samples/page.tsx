@@ -6,6 +6,7 @@ import { LayoutGrid, Boxes } from "lucide-react";
 import { SamplesTable, type SampleRow } from "./samples-table";
 import { NewSampleDialog } from "./new-sample-dialog";
 import { ImportSamplesButton } from "./import-samples-button";
+import { PriceListDialog } from "./price-list-dialog";
 import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
@@ -114,6 +115,7 @@ export default async function SamplesPage({
         )}
         {canEdit && <FetchEmailedSheetsButton />}
         {canEdit && <ImportSamplesButton />}
+        {canEdit && <PriceListDialog />}
         {canEdit && <NewSampleDialog factories={factories} brands={settings.brands} />}
       </PageHeader>
       <SamplesTable

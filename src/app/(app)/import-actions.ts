@@ -14,6 +14,7 @@ import { getSettings } from "@/lib/settings";
 import { createHash } from "crypto";
 import { syncSampleReceipt } from "@/lib/sample-receipt";
 import { computeFobLine } from "@/lib/match";
+import { parsePriceList, matchPrices, type PricedSample, type UnpricedStyle } from "@/lib/fob-match";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
 
@@ -788,4 +789,93 @@ export async function importColorCodes(formData: FormData): Promise<ImportSummar
   }
   revalidatePath("/settings");
   return summary;
+}
+
+export interface PriceListPreview {
+  ok: boolean;
+  error?: string;
+  /** Which columns of the factory's sheet we read. */
+  columns?: Record<string, string>;
+  priceRows: number;
+  styles: number;
+  samples: number;
+  /** Prices that would move, and the ones already right. */
+  changes: PricedSample[];
+  alreadyCorrect: number;
+  skipped: UnpricedStyle[];
+}
+
+const NO_PREVIEW: PriceListPreview = { ok: false, priceRows: 0, styles: 0, samples: 0, changes: [], alreadyCorrect: 0, skipped: [] };
+
+/**
+ * Read a factory price list and say what it would do — without touching
+ * anything. Prices only ever land on samples that already exist: a style the
+ * CRM doesn't carry is reported, never created. Styles priced per material
+ * (the same number quoted for suede, denim, raffia…) are matched on the
+ * sample's own material, and left alone when that doesn't single one out.
+ */
+export async function previewFactoryPriceList(formData: FormData): Promise<PriceListPreview> {
+  await assertRole("member");
+  const buf = await readUpload(formData);
+  if (typeof buf === "string") return { ...NO_PREVIEW, error: buf };
+
+  const { rows, error, columns } = await parsePriceList(buf);
+  if (error) return { ...NO_PREVIEW, error };
+  if (rows.length === 0) return { ...NO_PREVIEW, error: "No priced rows on the first sheet." };
+
+  const samples = await prisma.sample.findMany({
+    select: { id: true, sampleNumber: true, styleNumber: true, styleName: true, material: true, composition: true, fobCost: true },
+  });
+  const report = matchPrices(
+    rows,
+    samples.map((s) => ({ ...s, fob: s.fobCost == null ? null : Number(s.fobCost) })),
+  );
+  return {
+    ok: true,
+    columns,
+    priceRows: report.priceRows,
+    styles: report.styles,
+    samples: samples.length,
+    changes: report.changes,
+    alreadyCorrect: report.priced.length - report.changes.length,
+    skipped: report.skipped,
+  };
+}
+
+/**
+ * Write the prices the preview offered. Only the FOB moves — no ETA, no status,
+ * nothing else the general importer would touch — and every sample keeps a
+ * record of the old price and who replaced it.
+ */
+export async function applyFactoryPrices(
+  prices: { sampleId: string; fob: number }[],
+): Promise<{ ok: boolean; updated: number; error?: string }> {
+  const user = await assertRole("member");
+  const clean = prices
+    .filter((p) => typeof p.sampleId === "string" && Number.isFinite(p.fob) && p.fob > 0)
+    .slice(0, 5000);
+  if (clean.length === 0) return { ok: false, updated: 0, error: "Nothing to apply." };
+
+  const existing = await prisma.sample.findMany({
+    where: { id: { in: clean.map((p) => p.sampleId) } },
+    select: { id: true, fobCost: true },
+  });
+  const fobBefore = new Map(existing.map((s) => [s.id, s.fobCost == null ? null : Number(s.fobCost)]));
+
+  let updated = 0;
+  for (const { sampleId, fob } of clean) {
+    if (!fobBefore.has(sampleId)) continue;
+    await prisma.sample.update({ where: { id: sampleId }, data: { fobCost: toDecimal(fob) } });
+    await logAudit({
+      entityType: "sample",
+      entityId: sampleId,
+      action: "fob_from_price_list",
+      userId: user.id,
+      before: { fobCost: fobBefore.get(sampleId) },
+      after: { fobCost: fob },
+    });
+    updated += 1;
+  }
+  revalidatePath("/samples");
+  return { ok: true, updated };
 }
