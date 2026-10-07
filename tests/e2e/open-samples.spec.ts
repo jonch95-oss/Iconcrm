@@ -56,6 +56,48 @@ test("a sample leaving the awaiting set drops out of the count", async ({ page }
   await page.getByRole("button", { name: "Mark received" }).last().click();
   await expect(page.locator("[data-sonner-toast]").filter({ hasText: "marked received" }).first()).toBeVisible();
 
-  await page.goto("/");
-  expect(await tileCount()).toBe(before - 1);
+  // The dashboard is a cached route, so re-ask for it with a fresh URL until
+  // the count catches up rather than reading whatever the router kept.
+  await expect
+    .poll(async () => {
+      await page.goto(`/?t=${Date.now()}`);
+      return tileCount();
+    }, { timeout: 20_000 })
+    .toBe(before - 1);
+});
+
+test("a revised sample received from the table leaves the chase list", async ({ page }) => {
+  await login(page);
+
+  // A sample of our own, sent back to the factory for revisions.
+  const number = `CHASE-${Date.now()}`;
+  await page.goto("/samples");
+  await page.getByRole("button", { name: "New sample" }).click();
+  await page.locator('input[name="sampleNumber"]').fill(number);
+  await page.getByRole("button", { name: "Create sample" }).click();
+  await expect(page.getByRole("dialog")).toBeHidden({ timeout: 20_000 });
+  await page.goto(`/samples?q=${encodeURIComponent(number)}`);
+  await page.getByRole("link", { name: number }).first().click();
+  await page.waitForURL(/\/samples\/[^/?]+/);
+  await page.getByRole("button", { name: /Request revisions/i }).first().click();
+  await page.getByRole("textbox").last().fill("Handle is too short");
+  await page.getByRole("button", { name: /Request revisions|Send|Confirm/i }).last().click();
+  await expect(page.getByText(/Revisions Requested/i).first()).toBeVisible();
+
+  // It's on the chase list, as it should be — the revised one is still owed.
+  await page.goto("/samples?status=awaiting_sample");
+  await expect(page.locator("tbody tr", { hasText: number })).toHaveCount(1);
+
+  // The replacement arrives and is ticked off from the table itself.
+  const row = page.locator("tbody tr", { hasText: number }).first();
+  await row.getByRole("checkbox").check();
+  await page.getByRole("button", { name: "Mark received" }).click();
+  await page.getByRole("button", { name: "Mark received" }).last().click();
+  await expect(page.locator("[data-sonner-toast]").filter({ hasText: "marked received" }).first()).toBeVisible();
+
+  // ...and it stops being chased: received is received, whichever screen did it.
+  await page.goto("/samples?status=awaiting_sample");
+  await expect(page.locator("tbody tr", { hasText: number })).toHaveCount(0);
+  await page.goto(`/samples?q=${encodeURIComponent(number)}`);
+  await expect(page.locator("tbody tr", { hasText: number }).first()).toContainText("Sample Received");
 });

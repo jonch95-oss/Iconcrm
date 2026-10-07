@@ -643,7 +643,10 @@ export async function bulkReceiveSamples(
         sampleReceivedDate: now,
         receivedById: user.id,
         trackingStatus: "delivered",
-        status: ["sample_requested", "eta_set"].includes(s.status) ? "sample_received" : undefined,
+        // Same rule as the scan screen: anything short of received moves up,
+        // including a sample that was out for revisions — the revised one is
+        // on the desk now, so it stops reading as still owed.
+        status: advanceSampleStatus(s.status, "sample_received"),
         ...(room ? { sampleRoom: room } : {}),
       },
     });

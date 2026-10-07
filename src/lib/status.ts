@@ -269,6 +269,26 @@ export function isAwaitingSample(shown: SampleDisplayStatus): boolean {
 }
 
 /**
+ * The same question asked of a sample rather than a status, colors included —
+ * so the dashboard tile counts exactly the rows the list behind it shows. A
+ * stored status alone can't answer it: 2 colors of 5 in is still waiting on
+ * three, and all 5 in is not waiting at all, whatever the sample says.
+ */
+export function awaitsSample(sample: {
+  status: SampleStatus;
+  skuVariants?: readonly { received: boolean }[];
+}): boolean {
+  return isAwaitingSample(sampleDisplayStatus(sample.status, sample.skuVariants ?? []));
+}
+
+/**
+ * The statuses worth loading to answer the above: the awaiting ones, plus
+ * "received" — a sample marked received whose colors are only part-way in
+ * reads as partial, and is still owed.
+ */
+export const AWAITING_SAMPLE_CANDIDATES: SampleStatus[] = [...AWAITING_SAMPLE_STATUSES, "sample_received"];
+
+/**
  * A sample whose colors are only part-way in. Not a stored SampleStatus — it's
  * derived from the colors — but it reads as one in the status column and the
  * Samples status filter, so it needs a value of its own.
