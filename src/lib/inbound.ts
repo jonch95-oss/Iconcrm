@@ -56,7 +56,7 @@ export async function processInboundEmail(payload: InboundPayload): Promise<Inbo
 
   // 2a) Sample-request spreadsheet attached? Import every row as its own
   // sample (style #, description, color, photo), dated to the email and with
-  // a default 6-week ETA. This takes precedence over single-sample parsing.
+  // the default lead-time ETA. This takes precedence over single-sample parsing.
   // Best-effort brand: a "BRAND:" hint in the subject, else the sender's domain
   // label (e.g. design@lab.com -> "Lab"). Falls back to blank; user can edit.
   const subjBrand = (payload.subject ?? "").match(/brand\s*[:=]\s*([A-Za-z0-9 &.-]{2,30})/i)?.[1]?.trim();

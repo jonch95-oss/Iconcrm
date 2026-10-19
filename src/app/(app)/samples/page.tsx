@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/db";
+import { canApproveEta } from "@/lib/eta-approval";
+import { pendingEtaBySample } from "@/lib/eta-changes";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -50,6 +52,9 @@ export default async function SamplesPage({
     }),
   ]);
   const etaCountMap = new Map(etaCounts.map((e) => [e.parentId, e._count._all]));
+  // Dates someone has asked to move: the list marks those rather than showing
+  // the old date as though nothing had been asked.
+  const etaPending = await pendingEtaBySample(samples.map((s) => s.id));
 
   const rows: SampleRow[] = samples.map((s) => {
     const margin = marginPercent(s.customerSellPrice, s.fobCost);
@@ -68,6 +73,12 @@ export default async function SamplesPage({
       factoryId: s.factoryId ?? "",
       factoryName: s.factory?.name ?? "",
       sampleEta: s.sampleEta ? s.sampleEta.toISOString() : null,
+      etaPending: etaPending.get(s.id)
+        ? {
+            proposedEta: etaPending.get(s.id)!.proposedEta?.toISOString().slice(0, 10) ?? null,
+            requestedBy: etaPending.get(s.id)!.requestedBy,
+          }
+        : null,
       etaRevisions: etaCountMap.get(s.id) ?? 0,
       sampleReceivedDate: s.sampleReceivedDate ? s.sampleReceivedDate.toISOString() : null,
       sampleRoom: s.sampleRoom ?? "",
@@ -97,6 +108,9 @@ export default async function SamplesPage({
   });
 
   const canEdit = hasRole(user.role, "member");
+  // Whether this viewer's ETA edits land, or go to the owner and Moshe first.
+  const prefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
+  const viewerApprovesEta = canApproveEta(user, prefs?.notificationPrefs);
   const isAdmin = hasRole(user.role, "admin");
 
   return (
@@ -123,6 +137,7 @@ export default async function SamplesPage({
         factories={factories}
         brands={settings.brands}
         canEdit={canEdit}
+        canApproveEta={viewerApprovesEta}
         isAdmin={isAdmin}
         initialFilters={sampleFiltersFromQuery(sp)}
       />

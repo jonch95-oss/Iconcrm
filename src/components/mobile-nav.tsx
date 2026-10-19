@@ -27,12 +27,13 @@ const NAV = [
   { href: "/receive", label: "Receive Samples" },
   { href: "/revisions", label: "Revisions & Comments" },
   { href: "/needs-review", label: "Needs Review" },
+  { href: "/eta-changes", label: "ETA changes" },
   { href: "/factories", label: "Factories" },
   { href: "/settings", label: "Admin Settings" },
   { href: "/help", label: "Help & Guide" },
 ];
 
-export function MobileNav({ revisionBadge = 0 }: { revisionBadge?: number }) {
+export function MobileNav({ revisionBadge = 0, etaBadge = 0 }: { revisionBadge?: number; etaBadge?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = React.useState(false);
   return (
@@ -60,6 +61,11 @@ export function MobileNav({ revisionBadge = 0 }: { revisionBadge?: number }) {
                 )}
               >
                 {item.label}
+                {item.href === "/eta-changes" && etaBadge > 0 && (
+                  <span className="ml-auto min-w-5 rounded-full bg-[var(--bronze)] px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-[hsl(30_8%_10%)] tabular-nums">
+                    {etaBadge}
+                  </span>
+                )}
                 {item.href === "/revisions" && revisionBadge > 0 && (
                   <span className="ml-auto min-w-5 rounded-full bg-[var(--bronze)] px-1.5 py-0.5 text-center text-[11px] font-semibold leading-none text-[hsl(30_8%_10%)] tabular-nums">
                     {revisionBadge}

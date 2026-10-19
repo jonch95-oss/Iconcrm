@@ -15,6 +15,7 @@ import { createHash } from "crypto";
 import { syncSampleReceipt } from "@/lib/sample-receipt";
 import { computeFobLine } from "@/lib/match";
 import { parsePriceList, matchPrices, type PricedSample, type UnpricedStyle } from "@/lib/fob-match";
+import { defaultEta } from "@/lib/eta-approval";
 import { detectCarrier, resolveParcel, type ParcelCarrier } from "@/lib/parcel";
 import type { Prisma, SampleStatus } from "@prisma/client";
 
@@ -102,9 +103,9 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
   let currentSampleId: string | null = null;
   let currentSampleNumber = "";
 
-  // Imported samples are given an estimated arrival 6 weeks out from the
-  // upload date (overridable later per sample).
-  const importEta = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+  // Imported samples are given an estimated arrival the standard lead time out
+  // from the upload date (overridable later per sample).
+  const importEta = defaultEta();
 
   // HTS auto-fill: category + material -> HTS (+ effective duty), always applied.
   const htsRows = await prisma.htsMapping
@@ -199,7 +200,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
         if (existing) {
           await prisma.sample.update({
             where: { id: existing.id },
-            // Only set the 6-week ETA when one isn't already present, so a
+            // Only set the default ETA when one isn't already present, so a
             // manually-adjusted ETA survives a re-import. A sheet that puts a
             // sample on hold stops its clock instead: no ETA, and any ETA it
             // was carrying is cleared.
@@ -220,7 +221,7 @@ export async function importSamplesExcel(formData: FormData): Promise<ImportSumm
             data: {
               sampleNumber,
               ...fields,
-              // Imported samples get the +6wk ETA, so the natural state is "ETA
+              // Imported samples get the default ETA, so the natural state is "ETA
               // Set" (or "Quoted" if a FOB came in). A sheet Status wins — and
               // a sheet that says on hold gets no ETA at all.
               sampleEta: fields.status === "on_hold" ? null : importEta,

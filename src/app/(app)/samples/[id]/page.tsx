@@ -1,6 +1,8 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
+import { canApproveEta } from "@/lib/eta-approval";
+import { ChangeEtaButton } from "./change-eta-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -93,6 +95,14 @@ export default async function SampleDetailPage({
   ]);
 
   const canEdit = hasRole(user.role, "member");
+  // Whether this viewer's ETA edits land, or go to the owner and Moshe first.
+  const viewerPrefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
+  const viewerApprovesEta = canApproveEta(user, viewerPrefs?.notificationPrefs);
+  const pendingEta = await prisma.etaChangeRequest.findFirst({
+    where: { sampleId: sample.id, skuVariantId: null, status: "pending" },
+    include: { requestedBy: { select: { name: true, email: true } } },
+    orderBy: { createdAt: "desc" },
+  });
   const isAdmin = hasRole(user.role, "admin");
   const margin = marginPercent(sample.customerSellPrice, sample.fobCost);
   // Colors are often quoted apart (suede vs. denim), so a single number up top
@@ -237,7 +247,28 @@ export default async function SampleDetailPage({
             <Detail label="Landed cost (FOB + duty + freight + inland)" value={formatMoney(landed, sample.currency)} />
             <Detail label="Landed margin" value={landedMargin ? formatPercent(landedMargin) : "—"} />
             <Detail label="Target customer" value={sample.targetCustomer ?? "—"} />
-            <Detail label="Sample ETA" value={formatDate(sample.sampleEta)} />
+            <Detail
+              label="Sample ETA"
+              value={
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {formatDate(sample.sampleEta)}
+                  {pendingEta && (
+                    <Link href="/eta-changes" className="text-xs text-[var(--warning)] hover:underline">
+                      {(pendingEta.requestedBy?.name ?? pendingEta.requestedBy?.email ?? "Someone")} asked for{" "}
+                      {pendingEta.proposedEta ? formatDate(pendingEta.proposedEta) : "no date"} — waiting on approval
+                    </Link>
+                  )}
+                  {canEdit && (
+                    <ChangeEtaButton
+                      sampleId={sample.id}
+                      sampleNumber={sample.sampleNumber}
+                      currentEta={sample.sampleEta ? sample.sampleEta.toISOString().slice(0, 10) : ""}
+                      canApprove={viewerApprovesEta}
+                    />
+                  )}
+                </span>
+              }
+            />
             <Detail label="Received" value={formatDate(sample.sampleReceivedDate)} />
             <Detail label="Sample room" value={sample.sampleRoom ?? "—"} />
             <Detail label="Requested by" value={sample.requestedBy?.name ?? sample.requestedByExternal ?? "—"} />
@@ -271,7 +302,9 @@ export default async function SampleDetailPage({
                 {canEdit && <SkuIoButtons sampleId={sample.id} />}
                 <SkuManager
                   sampleId={sample.id}
+                  sampleNumber={sample.sampleNumber}
                   canEdit={canEdit}
+                  canApproveEta={viewerApprovesEta}
                   sampleFob={sample.fobCost != null ? String(sample.fobCost) : null}
                   sampleMaterial={sample.material}
                   sampleStyleNumber={sample.styleNumber}

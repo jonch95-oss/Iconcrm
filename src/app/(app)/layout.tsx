@@ -2,6 +2,8 @@ import { requireUser } from "@/lib/session";
 import { prisma } from "@/lib/db";
 import { canSeeRevisionBadge } from "@/lib/revision-badge";
 import { outstandingRevisionCount } from "@/lib/revisions";
+import { canApproveEta } from "@/lib/eta-approval";
+import { pendingEtaChangeCount } from "@/lib/eta-changes";
 import { AppSidebar } from "@/components/app-sidebar";
 import { GlobalSearch } from "@/components/global-search";
 import { UserMenu } from "@/components/user-menu";
@@ -22,12 +24,15 @@ export default async function AppLayout({
   const revisionBadge = canSeeRevisionBadge(user, prefs?.notificationPrefs)
     ? await outstandingRevisionCount()
     : 0;
+  // Dates waiting on a decision. The people who decide need the count in front
+  // of them; everyone else would just be watching a number they can't clear.
+  const etaBadge = canApproveEta(user, prefs?.notificationPrefs) ? await pendingEtaChangeCount() : 0;
   return (
     <div className="flex h-screen overflow-hidden">
-      <AppSidebar revisionBadge={revisionBadge} />
+      <AppSidebar revisionBadge={revisionBadge} etaBadge={etaBadge} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--background)] px-4">
-          <MobileNav revisionBadge={revisionBadge} />
+          <MobileNav revisionBadge={revisionBadge} etaBadge={etaBadge} />
           <GlobalSearch />
           <div className="ml-auto flex items-center gap-3">
             <UserMenu name={user.name} email={user.email} role={user.role} />

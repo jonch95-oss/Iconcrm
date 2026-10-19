@@ -98,6 +98,7 @@ import { updateSample, bulkDeleteSamples, editSkuVariant, toggleSkuReceived, req
 import { CreateOrderFormButton } from "./create-order-form-dialog";
 import { ReceiveSamplesDialog } from "./receive-samples-dialog";
 import { toast } from "sonner";
+import { ChangeEtaDialog } from "@/components/change-eta-dialog";
 
 export interface SampleRow {
   id: string;
@@ -114,6 +115,8 @@ export interface SampleRow {
   factoryId: string;
   factoryName: string;
   sampleEta: string | null;
+  /** A date change waiting on an approver, if there is one. */
+  etaPending: { proposedEta: string | null; requestedBy: string } | null;
   etaRevisions: number;
   sampleReceivedDate: string | null;
   fobCost: string | null;
@@ -372,6 +375,65 @@ function InlineSelect({
   );
 }
 
+/**
+ * The ETA in the list. An approver types straight into it, as before. Everyone
+ * else gets the box that asks why, because their change goes to an approver
+ * rather than onto the sample — and the cell says so while one is waiting,
+ * instead of showing the old date as if nothing had been asked.
+ */
+function EtaCell({
+  sampleId,
+  sampleNumber,
+  value,
+  canEdit,
+  canApprove,
+  pending,
+}: {
+  sampleId: string;
+  sampleNumber: string;
+  value: string;
+  canEdit: boolean;
+  canApprove: boolean;
+  pending: SampleRow["etaPending"];
+}) {
+  const [open, setOpen] = React.useState(false);
+  const waiting = pending ? (
+    <span
+      title={`${pending.requestedBy} asked for ${pending.proposedEta ?? "no date"} — waiting on the owner or Moshe`}
+      className="text-[10px] uppercase tracking-wide text-[var(--warning)]"
+    >
+      change pending
+    </span>
+  ) : null;
+
+  // The first date on a sample isn't a change, so it still goes straight in.
+  if (!canEdit || canApprove || !value) {
+    return (
+      <span className="flex items-center gap-1">
+        <InlineEdit id={sampleId} field="sampleEta" value={value} type="date" canEdit={canEdit} />
+        {waiting}
+      </span>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <button type="button" className="text-left tabular-nums underline-offset-2 hover:underline" onClick={() => setOpen(true)}>
+        {value || "—"}
+      </button>
+      {waiting}
+      <ChangeEtaDialog
+        sampleId={sampleId}
+        sampleNumber={sampleNumber}
+        currentEta={value}
+        canApprove={canApprove}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </span>
+  );
+}
+
 function InlineEdit({
   id,
   field,
@@ -402,7 +464,6 @@ function InlineEdit({
     const fd = new FormData();
     fd.set("id", id);
     fd.set(field, val);
-    if (field === "sampleEta") fd.set("etaReason", "Inline edit");
     startTransition(async () => {
       const res = await updateSample(fd);
       if (res.ok) {
@@ -448,9 +509,22 @@ function InlineEdit({
 }
 
 type ChildVariant = SampleRow["variants"][number];
-function SkuChildRow({ sampleId, v, canEdit }: { sampleId: string; v: ChildVariant; canEdit: boolean }) {
+function SkuChildRow({
+  sampleId,
+  sampleNumber,
+  v,
+  canEdit,
+  canApproveEta,
+}: {
+  sampleId: string;
+  sampleNumber: string;
+  v: ChildVariant;
+  canEdit: boolean;
+  canApproveEta: boolean;
+}) {
   const router = useRouter();
   const [pending, start] = React.useTransition();
+  const [askingEta, setAskingEta] = React.useState(false);
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>) =>
     start(async () => {
       const r = await fn();
@@ -465,7 +539,29 @@ function SkuChildRow({ sampleId, v, canEdit }: { sampleId: string; v: ChildVaria
       </Link>
       <span className="w-28 shrink-0 text-[var(--muted-foreground)]">{v.color || "—"}</span>
       <Badge variant={v.statusTone}>{v.statusLabel}</Badge>
-      {canEdit ? (
+      {canEdit && !canApproveEta && v.sampleEta ? (
+        // This color already has a date, and this viewer can't move one: same
+        // route as everywhere else — say why, and an approver decides.
+        <>
+          <button
+            type="button"
+            className="rounded px-1 py-0.5 tabular-nums underline-offset-2 hover:underline"
+            onClick={() => setAskingEta(true)}
+          >
+            {v.sampleEta}
+          </button>
+          <ChangeEtaDialog
+            sampleId={sampleId}
+            skuVariantId={v.id}
+            sampleNumber={sampleNumber}
+            color={v.color}
+            currentEta={v.sampleEta}
+            canApprove={false}
+            open={askingEta}
+            onOpenChange={setAskingEta}
+          />
+        </>
+      ) : canEdit ? (
         <input
           type="date"
           defaultValue={v.sampleEta}
@@ -502,6 +598,7 @@ export function SamplesTable({
   factories,
   brands,
   canEdit,
+  canApproveEta,
   isAdmin,
   initialFilters,
 }: {
@@ -509,6 +606,8 @@ export function SamplesTable({
   factories: { id: string; name: string }[];
   brands: string[];
   canEdit: boolean;
+  /** Whether this viewer's ETA edits go live, or go to the owner and Moshe. */
+  canApproveEta: boolean;
   isAdmin?: boolean;
   initialFilters: SampleFilters;
 }) {
@@ -769,12 +868,13 @@ export function SamplesTable({
         header: ({ column }) => <SortBtn column={column} label="ETA" />,
         cell: ({ row }) => (
           <div className="flex items-center gap-1">
-            <InlineEdit
-              id={row.original.id}
-              field="sampleEta"
+            <EtaCell
+              sampleId={row.original.id}
+              sampleNumber={row.original.sampleNumber}
               value={toDateInputValue(row.original.sampleEta)}
-              type="date"
               canEdit={canEdit}
+              canApprove={canApproveEta}
+              pending={row.original.etaPending}
             />
             {row.original.etaRevisions > 0 && (
               <Badge variant="outline" className="text-[10px]">
@@ -851,7 +951,7 @@ export function SamplesTable({
       },
       { accessorKey: "requestedBy", header: "Requested by" },
     ],
-    [canEdit, factories, brands, isAdmin, expanded, toggleExpanded],
+    [canEdit, canApproveEta, factories, brands, isAdmin, expanded, toggleExpanded],
   );
 
   const table = useReactTable({
@@ -1189,7 +1289,14 @@ export function SamplesTable({
                       <TableCell colSpan={row.getVisibleCells().length} className="py-1.5">
                         <div className="space-y-1 pl-16">
                           {row.original.variants.map((v) => (
-                            <SkuChildRow key={v.id} sampleId={row.original.id} v={v} canEdit={canEdit} />
+                            <SkuChildRow
+                              key={v.id}
+                              sampleId={row.original.id}
+                              sampleNumber={row.original.sampleNumber}
+                              v={v}
+                              canEdit={canEdit}
+                              canApproveEta={canApproveEta}
+                            />
                           ))}
                         </div>
                       </TableCell>

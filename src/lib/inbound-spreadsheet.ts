@@ -1,11 +1,11 @@
 import { prisma } from "@/lib/db";
+import { defaultEta } from "@/lib/eta-approval";
 import { parseSamplesWorkbook } from "@/lib/import-excel";
 import { uploadBlob } from "@/lib/blob";
 import { logAudit } from "@/lib/audit";
 import { toDecimal } from "@/lib/money";
 
 const SHEET_EXT = /\.(xlsx|xlsm)$/i;
-const SS27_DEFAULT_ETA_WEEKS = 6;
 
 export interface SpreadsheetImportResult {
   isSampleRequest: boolean;
@@ -19,7 +19,7 @@ export interface SpreadsheetImportResult {
  * When a cc'd email carries a sample-request spreadsheet (STYLE # / DESCRIPTION
  * / COLOR / IMAGE columns), create a sample per row instead of one sample for
  * the whole email. Pulls embedded photos, sets the request date to when the
- * email was sent, and defaults each ETA to +6 weeks.
+ * email was sent, and defaults each ETA to the standard lead time.
  */
 export async function importSampleRequestAttachment(
   attachments: { name: string; contentBase64?: string; contentType?: string; downloadUrl?: string }[],
@@ -58,8 +58,7 @@ export async function importSampleRequestAttachment(
     !!parsed.mappedColumns.color;
   if (!looksLikeRequest) return null;
 
-  const eta = new Date(opts.sentAt);
-  eta.setDate(eta.getDate() + SS27_DEFAULT_ETA_WEEKS * 7);
+  const eta = defaultEta(opts.sentAt);
 
   const result: SpreadsheetImportResult = {
     isSampleRequest: true,

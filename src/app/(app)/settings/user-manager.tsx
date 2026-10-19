@@ -14,7 +14,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { updateUserRole, updateUserName, toggleUserActive, inviteUser, setRevisionBadgeVisible } from "./actions";
+import { updateUserRole, updateUserName, toggleUserActive, inviteUser, setRevisionBadgeVisible, setEtaApprover } from "./actions";
 import { toast } from "sonner";
 import type { Role } from "@prisma/client";
 
@@ -26,6 +26,7 @@ export interface UserRow {
   isActive: boolean;
   /** Sees the outstanding-revisions count in the nav. */
   revisionBadge: boolean;
+  etaApprover: boolean;
 }
 
 /** Click the name to rename someone — it's the name that shows up on every
@@ -104,6 +105,13 @@ export function UserManager({ users }: { users: UserRow[] }) {
       else toast.error(res.error);
     });
   };
+  const setApprover = (userId: string, approver: boolean) => {
+    startTransition(async () => {
+      const res = await setEtaApprover(userId, approver);
+      if (res.ok) { toast.success(approver ? "Can approve ETA changes" : "No longer approves ETA changes"); router.refresh(); }
+      else toast.error(res.error);
+    });
+  };
   const toggle = (userId: string, isActive: boolean) => {
     startTransition(async () => {
       await toggleUserActive(userId, isActive);
@@ -131,6 +139,7 @@ export function UserManager({ users }: { users: UserRow[] }) {
               <TableHead>Role</TableHead>
               <TableHead>Status</TableHead>
               <TableHead title="Shows the outstanding-revisions count in the sidebar">Revision badge</TableHead>
+              <TableHead title="Can take an ETA change live instead of having to ask">ETA approver</TableHead>
               <TableHead></TableHead>
             </TableRow>
           </TableHeader>
@@ -162,11 +171,23 @@ export function UserManager({ users }: { users: UserRow[] }) {
                 <TableCell>
                   <label className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
                     <Checkbox
+                      aria-label={`Revision badge for ${u.email}`}
                       checked={u.revisionBadge}
                       disabled={pending}
                       onCheckedChange={(v) => setBadge(u.id, !!v)}
                     />
                     {u.revisionBadge ? "shown" : "hidden"}
+                  </label>
+                </TableCell>
+                <TableCell>
+                  <label className="flex items-center gap-2 text-xs text-[var(--muted-foreground)]">
+                    <Checkbox
+                      aria-label={`ETA approver for ${u.email}`}
+                      checked={u.etaApprover}
+                      disabled={pending}
+                      onCheckedChange={(v) => setApprover(u.id, !!v)}
+                    />
+                    {u.etaApprover ? "approves" : "asks"}
                   </label>
                 </TableCell>
                 <TableCell>

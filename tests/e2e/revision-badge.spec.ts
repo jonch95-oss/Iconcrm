@@ -101,7 +101,10 @@ test("the per-user toggle decides it either way", async ({ browser }) => {
 
   await page.goto("/settings");
   await page.getByRole("tab", { name: /Users/ }).click();
-  await page.locator("tr", { hasText: "casey@ourdomain.com" }).getByRole("checkbox").click();
+  await page
+    .locator("tr", { hasText: "casey@ourdomain.com" })
+    .getByRole("checkbox", { name: /Revision badge/ })
+    .click();
   const toast = page.locator("[data-sonner-toast]").filter({ hasText: /Badge (on|off)/ }).first();
   await expect(toast).toBeVisible();
   // Direction-agnostic: the run flips whatever the last one left behind.

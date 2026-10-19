@@ -7,6 +7,7 @@ import { getSettings } from "@/lib/settings";
 import { SettingsForm } from "./settings-form";
 import { UserManager, type UserRow } from "./user-manager";
 import { canSeeRevisionBadge } from "@/lib/revision-badge";
+import { canApproveEta } from "@/lib/eta-approval";
 import { ColorCodeManager, type ColorCodeRow } from "./color-code-manager";
 import { HtsMappingManager, type HtsRow } from "./hts-mapping-manager";
 import { buildHtsResolver } from "@/lib/hts";
@@ -68,6 +69,7 @@ export default async function SettingsPage() {
     role: u.role,
     isActive: u.isActive,
     revisionBadge: canSeeRevisionBadge(u, u.notificationPrefs),
+    etaApprover: canApproveEta(u, u.notificationPrefs),
   }));
 
   return (

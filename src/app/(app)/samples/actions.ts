@@ -6,6 +6,8 @@ import { assertRole } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
 import { advanceSampleStatus } from "@/lib/status";
+import { defaultEta, canApproveEta, etaChangeNeedsApproval, etaDiffers } from "@/lib/eta-approval";
+import { requestEtaChange } from "./eta-actions";
 import { syncSampleReceipt, markAllVariantsReceived, bumpVersionIfRevised } from "@/lib/sample-receipt";
 import { buildHtsResolver } from "@/lib/hts";
 import { normalizeSeason } from "@/lib/catalog";
@@ -21,7 +23,9 @@ import {
   commentSchema,
 } from "@/lib/validation";
 
-type ActionResult = { ok: true; id?: string; renamed?: string[]; received?: number } | { ok: false; error: string };
+type ActionResult =
+  | { ok: true; id?: string; renamed?: string[]; received?: number; etaPending?: boolean }
+  | { ok: false; error: string };
 
 async function htsForSample(
   category?: string | null,
@@ -126,16 +130,38 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
       : before.sampleReceivedDate;
   const fob = d.fobCost !== undefined ? toDecimal(d.fobCost) : before.fobCost;
 
-  // ETA change → log a revision (never silently overwrite).
-  if (d.sampleEta !== undefined && (newEta?.getTime() ?? null) !== (before.sampleEta?.getTime() ?? null)) {
-    await changeEta({
-      parentType: "sample",
-      parentId: before.id,
-      oldEta: before.sampleEta,
-      newEta,
-      reason: d.etaReason ?? "Updated",
-      userId: user.id,
-    });
+  // Moving a date that's already there is a request, not an edit: it waits for
+  // the owner or Moshe, and until then the sample keeps the date the factory
+  // was given. A first date, or an approver's own edit, goes straight on —
+  // logged as a revision either way, never silently overwritten.
+  let etaPending = false;
+  if (d.sampleEta !== undefined && etaDiffers(before.sampleEta, newEta)) {
+    const prefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
+    const canApprove = canApproveEta(user, prefs?.notificationPrefs);
+    if (etaChangeNeedsApproval({ currentEta: before.sampleEta, nextEta: newEta, canApprove })) {
+      const reason = (d.etaReason ?? "").trim();
+      if (!reason) {
+        return { ok: false, error: "Say why the date is moving — the owner or Moshe has to approve it." };
+      }
+      await requestEtaChange({
+        sampleId: before.id,
+        currentEta: before.sampleEta,
+        proposedEta: newEta,
+        reason,
+        userId: user.id,
+      });
+      newEta = before.sampleEta; // the live date doesn't move until it's approved
+      etaPending = true;
+    } else {
+      await changeEta({
+        parentType: "sample",
+        parentId: before.id,
+        oldEta: before.sampleEta,
+        newEta,
+        reason: d.etaReason?.trim() || "Updated",
+        userId: user.id,
+      });
+    }
   }
 
   // Automatic forward status transitions.
@@ -272,7 +298,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
 
   revalidatePath("/samples");
   revalidatePath(`/samples/${updated.id}`);
-  return { ok: true, id: updated.id };
+  return { ok: true, id: updated.id, etaPending };
 }
 
 /** Blob URLs we accept as comment photos — our own storage, nothing else. */
@@ -788,7 +814,7 @@ export async function bulkDeleteSamples(sampleIds: string[]): Promise<ActionResu
 
 /**
  * Flag a sample as needing revisions: records the reviewer's note in the
- * sample's comments, resets the ETA to 6 weeks out, and logs the ETA change.
+ * sample's comments, resets the ETA to the standard lead time, and logs it.
  */
 export async function requestRevisions(sampleId: string, comment: string): Promise<ActionResult> {
   const user = await assertRole("member");
@@ -801,7 +827,7 @@ export async function requestRevisions(sampleId: string, comment: string): Promi
   });
   if (!sample) return { ok: false, error: "Sample not found." };
 
-  const newEta = new Date(Date.now() + 42 * 24 * 60 * 60 * 1000);
+  const newEta = defaultEta();
   await prisma.$transaction([
     prisma.sample.update({
       where: { id: sampleId },
@@ -939,7 +965,14 @@ export async function editSkuVariant(
     // Blank means "use the sample's price", not "free".
     data = { fobCost: v ? toDecimal(v) : null };
   } else if (field === "sampleEta") {
-    data = { sampleEta: parseDateInput(v) };
+    const next = parseDateInput(v);
+    const prefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
+    const current = (await prisma.skuVariant.findUnique({ where: { id }, select: { sampleEta: true } }))?.sampleEta ?? null;
+    // A color's date is a commitment like any other, so moving one waits too.
+    if (etaChangeNeedsApproval({ currentEta: current, nextEta: next, canApprove: canApproveEta(user, prefs?.notificationPrefs) })) {
+      return { ok: false, error: "Say why the date is moving — the owner or Moshe has to approve it." };
+    }
+    data = { sampleEta: next };
   } else if (field === "upc") {
     if (v) {
       const dup = await prisma.skuVariant.findUnique({ where: { upc: v }, select: { id: true } });

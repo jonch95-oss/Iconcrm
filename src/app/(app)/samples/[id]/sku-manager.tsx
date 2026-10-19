@@ -21,6 +21,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { CommentImages } from "./comment-images";
+import { ChangeEtaDialog } from "@/components/change-eta-dialog";
 import { MAX_COMMENT_IMAGES } from "@/lib/comment-images";
 import { uploadCommentImages } from "@/lib/upload-images";
 
@@ -43,19 +44,24 @@ export interface SkuRow {
 
 export function SkuManager({
   sampleId,
+  sampleNumber,
   skus,
   sampleFob,
   sampleMaterial,
   sampleStyleNumber,
   canEdit,
+  canApproveEta,
 }: {
   sampleId: string;
+  sampleNumber: string;
   skus: SkuRow[];
+  /** Whether this viewer's ETA edits go live, or go to the owner and Moshe. */
   /** The sample's own values — what a color falls back to. */
   sampleFob: string | null;
   sampleMaterial: string | null;
   sampleStyleNumber: string | null;
   canEdit: boolean;
+  canApproveEta: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = React.useTransition();
@@ -179,7 +185,15 @@ export function SkuManager({
                     placeholder={sampleFob ?? undefined}
                   />
                 </TableCell>
-                <TableCell><EditableSkuCell id={s.id} sampleId={sampleId} field="sampleEta" value={s.sampleEta} canEdit={canEdit} date /></TableCell>
+                <TableCell>
+                  <VariantEtaCell
+                    sampleId={sampleId}
+                    sampleNumber={sampleNumber}
+                    variant={s}
+                    canEdit={canEdit}
+                    canApprove={canApproveEta}
+                  />
+                </TableCell>
                 <TableCell>
                   <Checkbox checked={s.received} disabled={!canEdit || pending} onCheckedChange={(v) => toggleReceived(s.id, !!v)} />
                 </TableCell>
@@ -216,6 +230,47 @@ export function SkuManager({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * A color's own ETA. Same rule as the sample's: an approver types it in, and
+ * anyone else says why and sends it on — unless the color has no date yet, in
+ * which case nothing is being moved.
+ */
+function VariantEtaCell({
+  sampleId,
+  sampleNumber,
+  variant,
+  canEdit,
+  canApprove,
+}: {
+  sampleId: string;
+  sampleNumber: string;
+  variant: SkuRow;
+  canEdit: boolean;
+  canApprove: boolean;
+}) {
+  const [open, setOpen] = React.useState(false);
+  if (!canEdit || canApprove || !variant.sampleEta) {
+    return <EditableSkuCell id={variant.id} sampleId={sampleId} field="sampleEta" value={variant.sampleEta} canEdit={canEdit} date />;
+  }
+  return (
+    <>
+      <button type="button" className="text-left tabular-nums underline-offset-2 hover:underline" onClick={() => setOpen(true)}>
+        {variant.sampleEta}
+      </button>
+      <ChangeEtaDialog
+        sampleId={sampleId}
+        skuVariantId={variant.id}
+        sampleNumber={sampleNumber}
+        color={variant.color}
+        currentEta={variant.sampleEta}
+        canApprove={canApprove}
+        open={open}
+        onOpenChange={setOpen}
+      />
+    </>
   );
 }
 

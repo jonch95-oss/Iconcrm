@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DEFAULT_ETA_WEEKS } from "@/lib/eta-approval";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
@@ -29,7 +30,7 @@ export function RequestRevisionsButton({ sampleId }: { sampleId: string }) {
     start(async () => {
       const res = await requestRevisions(sampleId, comment.trim());
       if (res.ok) {
-        toast.success("Revisions requested — ETA reset to 6 weeks");
+        toast.success(`Revisions requested — ETA reset to ${DEFAULT_ETA_WEEKS} weeks`);
         setComment("");
         setOpen(false);
         router.refresh();
@@ -52,7 +53,7 @@ export function RequestRevisionsButton({ sampleId }: { sampleId: string }) {
         </DialogHeader>
         <p className="text-sm text-[var(--muted-foreground)]">
           Describe what needs revising. The sample moves to “Revisions Requested”, its ETA resets to
-          6 weeks from today, and your note is saved to Comments for production.
+          {DEFAULT_ETA_WEEKS} weeks from today, and your note is saved to Comments for production.
         </p>
         <Textarea
           value={comment}

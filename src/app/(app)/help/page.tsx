@@ -72,7 +72,7 @@ const SECTIONS: Section[] = [
               ["Partial \u00b7 2 of 5", "Some colors arrived, the rest are still coming. Shows automatically once you tick colors off one by one \u2014 find them all with the Partial (some colors in) option in the status filter."],
               ["Quoted (FOB)", "A FOB cost was entered."],
               ["On Hold", "Paused by hand: the ETA is cleared, it stops counting as overdue, and it won't auto-advance. Give it a new ETA when it restarts."],
-              ["Revisions Requested", "You asked the factory for changes."],
+              ["Revisions Requested", "You asked the factory for changes \u2014 the ETA resets to 8 weeks out."],
               ["Produced without Sample", "Went to production with no sample — sets ETA to 100 days out automatically."],
               ["Approved by Image", "Approved from a photo — ETA unchanged."],
               ["Dropped", "Cancelled (needs a reason)."],
@@ -189,7 +189,28 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "revisions", title: "10. Revisions & Comments recap",
+    id: "eta-changes", title: "10. ETA changes need approving",
+    keywords: "eta change approval approve reject propose date move pending request reason who why designer owner moshe eight weeks automatic default lead time",
+    body: (
+      <>
+        <p>A date already on a sample is a promise the whole business works to, so moving one is a <B>request</B>, not an edit. Whoever wants it moved says why; the sample keeps its date until <B>you or Moshe</B> approve the change on the <B>ETA changes</B> screen, where the count in the sidebar is what&apos;s waiting on you.</p>
+        <Steps items={[
+          <>A designer clicks the ETA — in the samples list, on the sample, or on a color — picks the new date and says why.</>,
+          <>It lands on <B>ETA changes</B>: old date → new date, who asked, and their reason. The sample itself doesn&apos;t budge, and the list marks it <B>change pending</B>.</>,
+          <><B>Approve</B> puts the date on the sample; <B>Reject</B> leaves it exactly as it was. Either way there&apos;s an <B>Undo</B>, and approving-by-mistake puts the old date back on the sample, not just the row back in the queue.</>,
+        ]} />
+        <h3 className="mt-4 font-semibold">What doesn&apos;t wait</h3>
+        <ul className="ml-5 list-disc space-y-1">
+          <li><B>Your own changes.</B> You and Moshe type a date and it&apos;s live, recorded against your name — your edit is the approval.</li>
+          <li><B>A sample&apos;s first date.</B> Nothing is being moved, so it goes straight on.</li>
+          <li><B>The dates the system sets:</B> an import, a factory&apos;s emailed request sheet, the <B>8 weeks</B> a revision resets to, the clear that follows putting a sample on hold, and the 100 days for Produced without Sample.</li>
+        </ul>
+        <Tip>Anyone can be made an approver (or either of you removed) with the ETA approver checkbox under <B>Settings › Users &amp; Roles</B>. Every request, decision and undo is in the sample&apos;s Audit tab with the name against it.</Tip>
+      </>
+    ),
+  },
+  {
+    id: "revisions", title: "11. Revisions & Comments recap",
     keywords: "revision recap comment dashboard factory summary email excel track changes awaiting revised sample undo dismiss mistake restore acknowledge assign",
     body: (
       <>
@@ -212,7 +233,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "export", title: "11. Exporting to Excel",
+    id: "export", title: "12. Exporting to Excel",
     keywords: "export excel data only comments csv color eta photos",
     body: (
       <>
@@ -227,7 +248,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "orderforms", title: "12. Order forms",
+    id: "orderforms", title: "13. Order forms",
     keywords: "order form create documents versions change history notes export xlsx pdf sku number delete revert",
     body: (
       <>
@@ -242,7 +263,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "shipments", title: "13. Shipments & Bills of Lading",
+    id: "shipments", title: "14. Shipments & Bills of Lading",
     keywords: "shipment bill of lading bl container vessel eta confirm upload pdf",
     body: (
       <Steps items={[
@@ -253,7 +274,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "settings", title: "14. Settings (admin)",
+    id: "settings", title: "15. Settings (admin)",
     keywords: "settings brands color codes hts users roles rename user name edit",
     body: (
       <ul className="ml-5 list-disc space-y-1">
@@ -265,7 +286,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "faq", title: "15. FAQ",
+    id: "faq", title: "16. FAQ",
     keywords: "faq sku blank black background too large group blocked color track x1 members not a group per color comments material",
     body: (
       <div className="space-y-2">
