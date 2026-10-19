@@ -251,13 +251,54 @@ const words = (v: unknown) =>
     .split(/[^A-Z0-9]+/)
     .filter((w) => w.length > 2 && !NOISE.has(w));
 
-/** How well a sheet row's color (and material) describes one of our colors. */
+/**
+ * Words the sheet and the CRM use for the same color. The factory writes
+ * "Navy" where we carry BLUE DENIM, "Aperol" for ORANGE, "Biege" for TAN —
+ * and "Print" for whatever the patterned colorway happens to be called:
+ * MULTI, CAMO, GRAFFITI, CHERRY BLOSSOM.
+ */
+const SYNONYMS = [
+  ["PRINT", "PRINTED", "PATTERN", "MULTI", "MULTICOLOR", "CAMO", "CAMOUFLAGE", "GRAFFITI", "FLORAL", "BLOSSOM", "LEOPARD", "PAISLEY", "STRIPE", "STRIPED", "PLAID", "CHECK", "ZEBRA", "SNAKE", "PYTHON", "CROC", "TIEDYE", "ANIMAL"],
+  ["NAVY", "BLUE", "DENIM", "INDIGO", "MARINE", "COBALT"],
+  ["BEIGE", "BIEGE", "TAN", "SAND", "NUDE", "KHAKI", "CAMEL", "STONE", "TAUPE"],
+  ["APEROL", "ORANGE", "RUST", "TERRACOTTA", "CORAL", "APRICOT"],
+  ["GREY", "GRAY", "CHARCOAL", "SILVER", "SLATE"],
+  ["BURGUNDY", "WINE", "MAROON", "OXBLOOD"],
+  ["OLIVE", "ARMY", "MILITARY", "GREEN", "SAGE", "FOREST", "MOSS"],
+  ["CREAM", "IVORY", "WHITE", "ECRU", "BONE", "CHALK", "OFFWHITE"],
+  ["BROWN", "CHOCOLATE", "COGNAC", "MOCHA", "ESPRESSO", "WALNUT"],
+  ["PINK", "BLUSH", "ROSE", "FUCHSIA", "MAGENTA"],
+  ["PURPLE", "LILAC", "LAVENDER", "VIOLET", "PLUM"],
+  ["YELLOW", "MUSTARD", "GOLD", "LEMON", "OCHRE"],
+  ["RED", "CHERRY", "SCARLET", "CRIMSON"],
+];
+
+const SAME = new Map<string, Set<string>>();
+for (const group of SYNONYMS) {
+  for (const word of group) {
+    const set = SAME.get(word) ?? new Set<string>();
+    for (const other of group) if (other !== word) set.add(other);
+    SAME.set(word, set);
+  }
+}
+
+/**
+ * How well a sheet row's color (and material) describes one of our colors.
+ * The same word scores higher than a synonym of it, so a sample carrying both
+ * NAVY and BLUE DENIM still resolves "Navy" to NAVY rather than tying.
+ */
 function colorFit(row: ShipRow, variant: ShipVariant): number {
   const mine = new Set([...words(variant.color), ...words(variant.material)]);
   if (mine.size === 0) return 0;
-  let hits = 0;
-  for (const w of [...words(row.color), ...words(row.material)]) if (mine.has(w)) hits += 1;
-  return hits;
+  let fit = 0;
+  for (const w of [...words(row.color), ...words(row.material)]) {
+    if (mine.has(w)) fit += 3;
+    else {
+      const same = SAME.get(w);
+      if (same) for (const alt of same) if (mine.has(alt)) { fit += 1; break; }
+    }
+  }
+  return fit;
 }
 
 const laterOf = (a: Date | null, b: Date) => (a && a.getTime() > b.getTime() ? a : b);
@@ -382,7 +423,10 @@ export function matchShipRows(rows: ShipRow[], samples: ShipSample[]): ShipRepor
     // whole sample (no colors on it at all).
     let target = variant;
     if (!target && sample.variants.length > 0) {
-      if (!row.color && sample.variants.length === 1) target = sample.variants[0];
+      // One colour on the sample and one row for it: whatever the factory
+      // calls it — "Print", "Black P", "Biege" — there is nothing else it
+      // could be. Most of what used to land in the unmatched list was this.
+      if (sample.variants.length === 1) target = sample.variants[0];
       else if (row.color) {
         const scored = sample.variants
           .map((v) => ({ v, fit: colorFit(row, v) }))

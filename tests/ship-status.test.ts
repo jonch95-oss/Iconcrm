@@ -115,6 +115,56 @@ async function main() {
   assert.equal(by("v-sku")!.matchedOn, "SKU code");
   assert.equal(by("v-sku")!.tracking, "877956909160");
 
+  // One colour on the sample, and the factory calls it something else
+  // entirely — "Print", "Black P", a typo. There is nothing else it could be,
+  // so it matches rather than landing in a list for someone to read.
+  const oneColour = matchShipRows(
+    [
+      { row: 170, style: "LAB-HB-10014", skuCode: "", upc: "", material: "", color: "Print", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+      { row: 151, style: "LAB-HB-10083", skuCode: "", upc: "", material: "", color: "Biege", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+    ],
+    [
+      { id: "o1", sampleNumber: "LAB-HB-10014", shippedDate: null, variants: [variant("v-black", "BLACK")] },
+      { id: "o2", sampleNumber: "LAB-HB-10083", shippedDate: null, variants: [variant("v-blk", "BLK")] },
+    ],
+  );
+  assert.deepEqual(oneColour.updates.map((u) => u.variantId).sort(), ["v-black", "v-blk"]);
+  assert.equal(oneColour.skipped.length, 0);
+
+  // Several colours, and the factory's word for one of them isn't ours:
+  // "Aperol" is the orange, "Navy" is the denim, "Print" is the camo. An
+  // exact word still wins over a synonym of it.
+  const named = matchShipRows(
+    [
+      { row: 52, style: "OW-A", skuCode: "", upc: "", material: "", color: "Aperol", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+      { row: 53, style: "OW-B", skuCode: "", upc: "", material: "", color: "Navy", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+      { row: 54, style: "OW-C", skuCode: "", upc: "", material: "", color: "Print", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+      { row: 55, style: "OW-D", skuCode: "", upc: "", material: "", color: "Navy", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false },
+    ],
+    [
+      { id: "a", sampleNumber: "OW-A", shippedDate: null, variants: [variant("a-tan", "Tan"), variant("a-orange", "ORANGE")] },
+      { id: "b", sampleNumber: "OW-B", shippedDate: null, variants: [variant("b-black", "BLACK"), variant("b-denim", "BLUE DENIM")] },
+      { id: "c", sampleNumber: "OW-C", shippedDate: null, variants: [variant("c-black", "BLACK"), variant("c-camo", "CAMO")] },
+      { id: "d", sampleNumber: "OW-D", shippedDate: null, variants: [variant("d-denim", "BLUE DENIM"), variant("d-navy", "NAVY")] },
+    ],
+  );
+  assert.deepEqual(named.updates.map((u) => u.variantId), ["a-orange", "b-denim", "c-camo", "d-navy"]);
+  assert.equal(named.skipped.length, 0);
+
+  // A word that fits none of them is still a question for a person: picking
+  // one at random would be worse than saying so.
+  const several = matchShipRows(
+    [{ row: 52, style: "OW-BSAW-10001", skuCode: "", upc: "", material: "", color: "Sunset", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false }],
+    [
+      {
+        id: "m1", sampleNumber: "OW-BSAW-10001", shippedDate: null,
+        variants: [variant("v-tan", "Tan"), variant("v-brown", "Brown"), variant("v-black", "BLACK"), variant("v-orange", "ORANGE")],
+      },
+    ],
+  );
+  assert.equal(several.updates.length, 0);
+  assert.match(several.skipped[0].reason, /isn't a color on this sample/);
+
   // Hyphens drift between the two systems; the letters and digits don't.
   const drifted = matchShipRows(
     [{ row: 2, style: "OW-BBPW-10001", skuCode: "", upc: "", material: "CANVAS", color: "Army", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false }],
