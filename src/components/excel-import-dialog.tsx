@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { Button } from "@/components/ui/button";
+import { describeActionError } from "@/lib/action-error";
 import {
   Dialog,
   DialogContent,
@@ -58,9 +59,7 @@ export function ExcelImportDialog({
         const res = await onImport(fd);
         setResult(res);
       } catch (e) {
-        setResult({
-          error: e instanceof Error ? e.message : "Upload failed. Please try again.",
-        } as ImportSummary);
+        setResult({ error: describeActionError(e, "Upload failed. Please try again.") } as ImportSummary);
       } finally {
         if (inputRef.current) inputRef.current.value = "";
       }

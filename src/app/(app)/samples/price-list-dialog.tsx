@@ -6,6 +6,7 @@ import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { DollarSign, FileUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { describeActionError } from "@/lib/action-error";
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -52,7 +53,7 @@ export function PriceListDialog() {
         }
         setPreview(await previewFactoryPriceList(fd));
       } catch (e) {
-        setPreview({ ...EMPTY, error: e instanceof Error ? e.message : "Upload failed. Please try again." });
+        setPreview({ ...EMPTY, error: describeActionError(e, "Upload failed. Please try again.") });
       } finally {
         if (inputRef.current) inputRef.current.value = "";
       }

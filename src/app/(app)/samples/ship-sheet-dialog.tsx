@@ -6,6 +6,7 @@ import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
 import { Truck, FileUp, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { describeActionError } from "@/lib/action-error";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   previewShipSheetFromOneDrive,
@@ -65,7 +66,7 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
         }
         setPreview(await previewShipSheetUpload(fd));
       } catch (e) {
-        setPreview({ ...EMPTY, error: e instanceof Error ? e.message : "Upload failed." });
+        setPreview({ ...EMPTY, error: describeActionError(e, "Upload failed.") });
       } finally {
         if (inputRef.current) inputRef.current.value = "";
       }
