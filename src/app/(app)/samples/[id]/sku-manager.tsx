@@ -39,6 +39,9 @@ export interface SkuRow {
   received: boolean;
   imageUrl: string | null;
   sampleEta: string; // yyyy-mm-dd or ""
+  /** When the factory sent this colour, and what on. Read from their sheet. */
+  shippedDate: string;
+  trackingNumber: string | null;
   comments: { id: string; body: string; images: string[]; author: string; createdAt: string }[];
 }
 
@@ -132,6 +135,7 @@ export function SkuManager({
             <TableHead>TP style #</TableHead>
             <TableHead>Material</TableHead>
             <TableHead>FOB</TableHead>
+            <TableHead>Shipped</TableHead>
             <TableHead>Sample ETA</TableHead>
             <TableHead>Received</TableHead>
             <TableHead>Comments for production</TableHead>
@@ -141,7 +145,7 @@ export function SkuManager({
         <TableBody>
           {skus.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={canEdit ? 13 : 12} className="text-center text-[var(--muted-foreground)]">
+              <TableCell colSpan={canEdit ? 14 : 13} className="text-center text-[var(--muted-foreground)]">
                 No SKU variants yet. Add size/color/UPC rows below.
               </TableCell>
             </TableRow>
@@ -184,6 +188,9 @@ export function SkuManager({
                     numeric
                     placeholder={sampleFob ?? undefined}
                   />
+                </TableCell>
+                <TableCell className="tabular-nums text-xs" title={s.trackingNumber ? `Tracking ${s.trackingNumber}` : undefined}>
+                  {s.shippedDate || <span className="text-[var(--muted-foreground)]">—</span>}
                 </TableCell>
                 <TableCell>
                   <VariantEtaCell

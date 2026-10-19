@@ -248,6 +248,14 @@ export default async function SampleDetailPage({
             <Detail label="Landed margin" value={landedMargin ? formatPercent(landedMargin) : "—"} />
             <Detail label="Target customer" value={sample.targetCustomer ?? "—"} />
             <Detail
+              label="Shipped from factory"
+              value={
+                sample.shippedDate
+                  ? `${formatDate(sample.shippedDate)}${sample.trackingNumber ? ` · ${sample.trackingNumber}` : ""}`
+                  : "—"
+              }
+            />
+            <Detail
               label="Sample ETA"
               value={
                 <span className="flex flex-wrap items-center justify-end gap-2">
@@ -330,6 +338,8 @@ export default async function SampleDetailPage({
                     received: s.received,
                     imageUrl: s.imageUrl ?? null,
                     sampleEta: s.sampleEta ? s.sampleEta.toISOString().slice(0, 10) : "",
+                    shippedDate: s.shippedDate ? s.shippedDate.toISOString().slice(0, 10) : "",
+                    trackingNumber: s.trackingNumber,
                   }))}
                 />
               </TabsContent>

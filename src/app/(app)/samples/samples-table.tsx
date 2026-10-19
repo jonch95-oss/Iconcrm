@@ -25,6 +25,7 @@ import {
   ChevronRight,
   ChevronDown,
   MessageSquare,
+  Truck,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,9 @@ export interface SampleRow {
   factoryId: string;
   factoryName: string;
   sampleEta: string | null;
+  /** When the factory sent it, and what on. */
+  shippedDate: string | null;
+  trackingNumber: string | null;
   /** A date change waiting on an approver, if there is one. */
   etaPending: { proposedEta: string | null; requestedBy: string } | null;
   etaRevisions: number;
@@ -883,6 +887,22 @@ export function SamplesTable({
             )}
           </div>
         ),
+      },
+      {
+        accessorKey: "shippedDate",
+        header: ({ column }) => <SortBtn column={column} label="Shipped" />,
+        // Read from the factory's status sheet, so it's shown rather than
+        // typed: the courier number sits behind it.
+        cell: ({ row }) => {
+          const shipped = toDateInputValue(row.original.shippedDate);
+          if (!shipped) return <span className="text-[var(--muted-foreground)]">—</span>;
+          return (
+            <span className="tabular-nums" title={row.original.trackingNumber ? `Tracking ${row.original.trackingNumber}` : "No courier number on the sheet"}>
+              {shipped}
+              {row.original.trackingNumber && <Truck className="ml-1 inline h-3 w-3 text-[var(--muted-foreground)]" />}
+            </span>
+          );
+        },
       },
       {
         accessorKey: "sampleReceivedDate",

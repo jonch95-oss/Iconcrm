@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { canApproveEta } from "@/lib/eta-approval";
+import { SHIP_SHEET_URL_VAR } from "@/lib/ship-sync";
 import { pendingEtaBySample } from "@/lib/eta-changes";
 import { PageHeader } from "@/components/page-header";
 import Link from "next/link";
@@ -9,6 +10,7 @@ import { SamplesTable, type SampleRow } from "./samples-table";
 import { NewSampleDialog } from "./new-sample-dialog";
 import { ImportSamplesButton } from "./import-samples-button";
 import { PriceListDialog } from "./price-list-dialog";
+import { ShipSheetDialog } from "./ship-sheet-dialog";
 import { FetchEmailedSheetsButton } from "./fetch-emailed-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { marginPercent } from "@/lib/money";
@@ -73,6 +75,8 @@ export default async function SamplesPage({
       factoryId: s.factoryId ?? "",
       factoryName: s.factory?.name ?? "",
       sampleEta: s.sampleEta ? s.sampleEta.toISOString() : null,
+      shippedDate: s.shippedDate ? s.shippedDate.toISOString() : null,
+      trackingNumber: s.trackingNumber,
       etaPending: etaPending.get(s.id)
         ? {
             proposedEta: etaPending.get(s.id)!.proposedEta?.toISOString().slice(0, 10) ?? null,
@@ -111,6 +115,8 @@ export default async function SamplesPage({
   // Whether this viewer's ETA edits land, or go to the owner and Moshe first.
   const prefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
   const viewerApprovesEta = canApproveEta(user, prefs?.notificationPrefs);
+  // Whether the factory's sheet can be read without someone uploading a copy.
+  const shipSheetReady = Boolean(process.env[SHIP_SHEET_URL_VAR]);
   const isAdmin = hasRole(user.role, "admin");
 
   return (
@@ -130,6 +136,7 @@ export default async function SamplesPage({
         {canEdit && <FetchEmailedSheetsButton />}
         {canEdit && <ImportSamplesButton />}
         {canEdit && <PriceListDialog />}
+        {canEdit && <ShipSheetDialog oneDriveReady={shipSheetReady} />}
         {canEdit && <NewSampleDialog factories={factories} brands={settings.brands} />}
       </PageHeader>
       <SamplesTable

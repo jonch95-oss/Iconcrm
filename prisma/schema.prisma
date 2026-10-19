@@ -277,6 +277,11 @@ model Sample {
   // sha256 of the last imported photo, so re-imports skip unchanged images
   imageHash String?
 
+  // When the factory sent it. Read from the factory's weekly status sheet, or
+  // typed in; a sample with colors keeps a date per color and this is the
+  // earliest of them.
+  shippedDate DateTime?
+
   // Inbound parcel tracking for the physical sample (courier from factory).
   trackingNumber  String?
   trackingCarrier String? // ups | fedex | dhl | usps | other
@@ -335,6 +340,9 @@ model SkuVariant {
   fobCost                Decimal?  @db.Decimal(10, 2) // this color's own price; falls back to the sample's
   material               String? // what this color is made of, where it differs from the sample's
   styleNumber            String? // the factory's own style # for this color ("TP style #")
+  shippedDate            DateTime? // when the factory sent this color
+  trackingNumber         String? // courier number for this color's parcel, when there is one
+  trackingCarrier        String? // ups | fedex | dhl | usps | other
   received               Boolean   @default(false) // did we receive this color's physical sample
   imageUrl               String? // per-color product image
   imageHash              String? // hash of the imported image bytes (skip re-uploads)

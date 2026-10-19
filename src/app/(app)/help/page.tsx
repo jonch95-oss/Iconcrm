@@ -189,7 +189,24 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "eta-changes", title: "10. ETA changes need approving",
+    id: "shipping", title: "10. Ship dates from the factory's sheet",
+    keywords: "shipped ship date tracking fedex onedrive status sheet factory weekly monday sample status tab courier receive",
+    body: (
+      <>
+        <p>The factory keeps its <B>Sample Status</B> tab in OneDrive and updates it on Mondays. The CRM reads it every morning and fills in the <B>Shipped</B> column: the date a sample left the factory, and the courier number where there is one.</p>
+        <Steps items={[
+          <>Each row is matched to a sample — by <B>UPC</B> or <B>SKU code</B> where the sheet has them, otherwise the <B>style number</B> (the factory&apos;s description after it is ignored).</>,
+          <>Within that style, the row&apos;s <B>colour</B> and <B>material</B> pick the colour it belongs to. A row with no colour is the whole style.</>,
+          <>A style we don&apos;t carry, or a colour that isn&apos;t on the sample, is listed rather than guessed at — and never created.</>,
+        ]} />
+        <p>Samples → <B>Shipping sheet</B> shows the same thing on demand: what Monday&apos;s update would change, old date → new, before anything is written. You can also drop a copy of the sheet into it if someone emails one.</p>
+        <Tip>Most rows say <B>Receive</B> where a courier number would go — those shipped and arrived with no number kept, so the date lands and there&apos;s nothing to chase. Where there <em>is</em> a number, the usual parcel sync follows it for a delivery date. A ship date never marks a sample received and never moves an ETA.</Tip>
+        <p className="mt-2 text-xs text-[var(--muted-foreground)]">Setup: in OneDrive, Share → Anyone with the link → Copy, and paste it into <code>ONEDRIVE_SHIP_SHEET_URL</code> in the deployment&apos;s environment settings. Until that&apos;s set, the dialog still reads a file you drop into it.</p>
+      </>
+    ),
+  },
+  {
+    id: "eta-changes", title: "11. ETA changes need approving",
     keywords: "eta change approval approve reject propose date move pending request reason who why designer owner moshe eight weeks automatic default lead time",
     body: (
       <>
@@ -210,7 +227,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "revisions", title: "11. Revisions & Comments recap",
+    id: "revisions", title: "12. Revisions & Comments recap",
     keywords: "revision recap comment dashboard factory summary email excel track changes awaiting revised sample undo dismiss mistake restore acknowledge assign",
     body: (
       <>
@@ -233,7 +250,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "export", title: "12. Exporting to Excel",
+    id: "export", title: "13. Exporting to Excel",
     keywords: "export excel data only comments csv color eta photos",
     body: (
       <>
@@ -248,7 +265,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "orderforms", title: "13. Order forms",
+    id: "orderforms", title: "14. Order forms",
     keywords: "order form create documents versions change history notes export xlsx pdf sku number delete revert",
     body: (
       <>
@@ -263,7 +280,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "shipments", title: "14. Shipments & Bills of Lading",
+    id: "shipments", title: "15. Shipments & Bills of Lading",
     keywords: "shipment bill of lading bl container vessel eta confirm upload pdf",
     body: (
       <Steps items={[
@@ -274,7 +291,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "settings", title: "15. Settings (admin)",
+    id: "settings", title: "16. Settings (admin)",
     keywords: "settings brands color codes hts users roles rename user name edit",
     body: (
       <ul className="ml-5 list-disc space-y-1">
@@ -286,7 +303,7 @@ const SECTIONS: Section[] = [
     ),
   },
   {
-    id: "faq", title: "16. FAQ",
+    id: "faq", title: "17. FAQ",
     keywords: "faq sku blank black background too large group blocked color track x1 members not a group per color comments material",
     body: (
       <div className="space-y-2">
