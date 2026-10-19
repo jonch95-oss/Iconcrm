@@ -11,6 +11,7 @@ import {
   previewShipSheetFromOneDrive,
   previewShipSheetUpload,
   applyShipSheet,
+  lastShipRun,
   type ShipPreview,
 } from "./ship-actions";
 
@@ -32,7 +33,14 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
   const [reading, startReading] = React.useTransition();
   const [applying, startApplying] = React.useTransition();
   const [dragging, setDragging] = React.useState(false);
+  const [lastRun, setLastRun] = React.useState<Awaited<ReturnType<typeof lastShipRun>>>(null);
   const inputRef = React.useRef<HTMLInputElement>(null);
+
+  // "Is it picking the sheet up?" should be answerable without reading server
+  // logs, so the last read — automatic or by hand — says so here.
+  React.useEffect(() => {
+    if (open) lastShipRun().then(setLastRun).catch(() => {});
+  }, [open]);
 
   const fromOneDrive = () =>
     startReading(async () => {
@@ -103,6 +111,23 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
 
         {!preview?.ok && (
           <div className="space-y-3">
+            <div className="rounded-md border border-[var(--border)] p-3 text-xs">
+              {lastRun ? (
+                <>
+                  <p className={lastRun.ok ? "" : "text-[var(--destructive)]"}>
+                    Last read {new Date(lastRun.when).toLocaleString()} ({lastRun.source}
+                    {lastRun.by ? ` · ${lastRun.by}` : ""}):{" "}
+                    {lastRun.ok
+                      ? `${lastRun.written} date${lastRun.written === 1 ? "" : "s"} recorded, ${lastRun.unmatched} not matched.`
+                      : lastRun.error}
+                  </p>
+                </>
+              ) : (
+                <p className="text-[var(--muted-foreground)]">
+                  The sheet hasn&apos;t been read yet — the automatic read runs each morning, or press the button below.
+                </p>
+              )}
+            </div>
             <Button onClick={fromOneDrive} disabled={reading || !oneDriveReady} className="w-full">
               <RefreshCw className={`h-4 w-4 ${reading ? "animate-spin" : ""}`} />
               {reading ? "Reading the sheet…" : "Read it from OneDrive now"}

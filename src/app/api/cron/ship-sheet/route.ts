@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthorizedCron } from "@/lib/cron";
-import { fetchShipWorkbook, previewShipSheet, applyShipUpdates } from "@/lib/ship-sync";
+import { getCurrentUser, hasRole } from "@/lib/session";
+import { runShipSheet } from "@/lib/ship-sync";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,25 +12,21 @@ export const maxDuration = 60;
  * rather than waiting a week, and re-reading costs nothing because only rows
  * whose date or courier number actually moved are written.
  *
- * Anything it can't place — a style we don't carry, a color that isn't on the
+ * An admin can also open this in a browser to run it on the spot and read the
+ * result — the same thing the Shipping sheet dialog does, in plain JSON when
+ * someone wants to see exactly what came back.
+ *
+ * Anything it can't place — a style we don't carry, a colour that isn't on the
  * sample — is counted here and listed in Samples → Shipping sheet, never
  * guessed at and never created.
  */
 export async function GET(req: NextRequest) {
-  if (!isAuthorizedCron(req)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const cron = isAuthorizedCron(req);
+  const user = cron ? null : await getCurrentUser();
+  if (!cron && !(user && hasRole(user.role, "admin"))) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
 
-  const { buffer, error } = await fetchShipWorkbook();
-  if (!buffer) return NextResponse.json({ ok: false, error }, { status: error?.startsWith("No OneDrive link") ? 200 : 502 });
-
-  const report = await previewShipSheet(buffer);
-  if (report.error) return NextResponse.json({ ok: false, error: report.error }, { status: 422 });
-
-  const { updated } = await applyShipUpdates(report.changes, null, "OneDrive status sheet");
-  return NextResponse.json({
-    ok: true,
-    sheetRows: report.sheetRows,
-    matched: report.updates.length,
-    updated,
-    unmatched: report.skipped.length,
-  });
+  const result = await runShipSheet({ source: cron ? "cron" : "manual", userId: user?.id ?? null });
+  return NextResponse.json(result, { status: result.ok ? 200 : 502 });
 }

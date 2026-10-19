@@ -169,6 +169,7 @@ model User {
   issuedPOs            PurchaseOrder[]    @relation("IssuedPOs")
   auditLogs            AuditLog[]
   etaRevisions         EtaRevision[]
+  shipSheetRuns        ShipSheetRun[]     @relation("ShipSheetRuns")
   etaChangesAsked      EtaChangeRequest[] @relation("EtaChangesRequested")
   etaChangesDecided    EtaChangeRequest[] @relation("EtaChangesDecided")
   productionReviews    ProductionSample[] @relation("ProductionReviews")
@@ -440,6 +441,28 @@ model EtaChangeRequest {
   @@index([status, createdAt])
   @@index([sampleId])
   @@index([skuVariantId])
+}
+
+/**
+ * What happened the last time the factory's status sheet was read. Without
+ * this, "is it picking the sheet up?" can only be answered by digging through
+ * server logs — so every run, by the cron or by hand, leaves a line here.
+ */
+model ShipSheetRun {
+  id         String    @id @default(cuid())
+  source     String // cron | manual | upload
+  ok         Boolean   @default(false)
+  sheetRows  Int       @default(0)
+  matched    Int       @default(0)
+  written    Int       @default(0)
+  unmatched  Int       @default(0)
+  error      String?
+  ranById    String?
+  ranBy      User?     @relation("ShipSheetRuns", fields: [ranById], references: [id])
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+
+  @@index([startedAt])
 }
 
 model EtaRevision {

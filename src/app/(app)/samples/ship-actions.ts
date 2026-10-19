@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { del } from "@vercel/blob";
 import { assertRole } from "@/lib/session";
-import { fetchShipWorkbook, previewShipSheet, applyShipUpdates, SHIP_SHEET_URL_VAR } from "@/lib/ship-sync";
+import { fetchShipWorkbook, previewShipSheet, applyShipUpdates, lastShipSheetRun, recordShipRun, SHIP_SHEET_URL_VAR } from "@/lib/ship-sync";
 import type { ShipSkip, ShipUpdate } from "@/lib/ship-status";
 
 export interface ShipPreview {
@@ -47,6 +47,32 @@ export async function previewShipSheetFromOneDrive(): Promise<ShipPreview> {
   return toPreview(await previewShipSheet(buffer), "OneDrive");
 }
 
+/** How the last read went — the line under the button. */
+export async function lastShipRun(): Promise<{
+  when: string;
+  source: string;
+  ok: boolean;
+  by: string | null;
+  sheetRows: number;
+  written: number;
+  unmatched: number;
+  error: string | null;
+} | null> {
+  await assertRole("member");
+  const run = await lastShipSheetRun();
+  if (!run) return null;
+  return {
+    when: (run.finishedAt ?? run.startedAt).toISOString(),
+    source: run.source,
+    ok: run.ok,
+    by: run.ranBy?.name ?? run.ranBy?.email ?? null,
+    sheetRows: run.sheetRows,
+    written: run.written,
+    unmatched: run.unmatched,
+    error: run.error,
+  };
+}
+
 /** Same, for a copy of the sheet dragged in by hand. */
 export async function previewShipSheetUpload(formData: FormData): Promise<ShipPreview> {
   await assertRole("member");
@@ -80,6 +106,7 @@ export async function applyShipSheet(updates: ShipUpdate[]): Promise<{ ok: boole
     clean.map((u) => ({ ...u, shippedDate: new Date(u.shippedDate), shippedNow: u.shippedNow ? new Date(u.shippedNow) : null })),
     user.id,
   );
+  await recordShipRun({ source: "manual", userId: user.id, written: updated, matched: clean.length });
   revalidatePath("/samples");
   return { ok: true, updated };
 }
