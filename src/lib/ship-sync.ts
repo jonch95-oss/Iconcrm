@@ -59,13 +59,18 @@ export async function fetchShipWorkbook(link = process.env[SHIP_SHEET_URL_VAR]):
     try {
       const res = await fetch(url, { redirect: "follow", headers: { accept: "*/*" } });
       if (!res.ok) {
-        lastError = `OneDrive answered ${res.status} for that link.`;
+        lastError =
+          res.status === 401 || res.status === 403
+            ? `OneDrive refused the link (${res.status}) — it's scoped to people who are signed in. Re-share it as "Anyone with the link".`
+            : `OneDrive answered ${res.status} for that link.`;
         continue;
       }
       const buffer = Buffer.from(await res.arrayBuffer());
       if (looksLikeXlsx(buffer)) return { buffer };
+      // A sign-in page, which is what a link scoped to "people in your
+      // organisation" gives a server that isn't signed in as anybody.
       lastError =
-        "That link gave back a web page rather than the file — in OneDrive use Share → Anyone with the link → Copy link, and paste that.";
+        "That link asked for a sign-in instead of giving back the file. The CRM has no Microsoft account, so the link has to be Share → Anyone with the link → Copy. If your tenant doesn't allow those, the file needs a Microsoft app registration instead — say the word and I'll build that path.";
     } catch (e) {
       lastError = e instanceof Error ? e.message.slice(0, 160) : lastError;
     }
