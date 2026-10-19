@@ -115,6 +115,25 @@ async function main() {
   assert.equal(by("v-sku")!.matchedOn, "SKU code");
   assert.equal(by("v-sku")!.tracking, "877956909160");
 
+  // Hyphens drift between the two systems; the letters and digits don't.
+  const drifted = matchShipRows(
+    [{ row: 2, style: "OW-BBPW-10001", skuCode: "", upc: "", material: "CANVAS", color: "Army", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false }],
+    [{ id: "d1", sampleNumber: "OW-BBPW10001", shippedDate: null, variants: [] }],
+  );
+  assert.equal(drifted.updates.length, 1);
+  assert.equal(drifted.updates[0].matchedOn, "style # (spacing ignored)");
+
+  // ...but only when one sample answers to it.
+  const twins = matchShipRows(
+    [{ row: 2, style: "OW BBPW 10002", skuCode: "", upc: "", material: "", color: "", shippedDate: new Date(Date.UTC(2026, 9, 12)), tracking: "", received: false }],
+    [
+      { id: "t1", sampleNumber: "OW-BBPW10002", shippedDate: null, variants: [] },
+      { id: "t2", sampleNumber: "OWBBPW-10002", shippedDate: null, variants: [] },
+    ],
+  );
+  assert.equal(twins.updates.length, 0);
+  assert.match(twins.skipped[0].reason, /too ambiguous/);
+
   // What it wouldn't guess at.
   const reason = (style: string) => report.skipped.find((s) => s.style === style)?.reason ?? "";
   assert.match(reason("OW-NOT-OURS"), /no sample with that number/);

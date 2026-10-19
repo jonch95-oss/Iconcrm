@@ -295,6 +295,30 @@ export function matchShipRows(rows: ShipRow[], samples: ShipSample[]): ShipRepor
     }
   }
 
+  // The same style gets written OW-BBPW-10001 here and OW-BBPW10001 there, so
+  // a last pass compares the letters and digits alone — and only when exactly
+  // one sample answers to it.
+  const loose = (v: string) => key(v).replace(/[^A-Z0-9]/g, "");
+  const byLoose = new Map<string, Set<ShipSample>>();
+  const looseVariantStyle = new Map<string, { sample: ShipSample; variant: ShipVariant }[]>();
+  for (const s of samples) {
+    for (const v of [s.sampleNumber, s.styleNumber]) {
+      if (!v) continue;
+      const k = loose(v);
+      if (!k) continue;
+      const set = byLoose.get(k) ?? new Set<ShipSample>();
+      set.add(s);
+      byLoose.set(k, set);
+    }
+    for (const variant of s.variants) {
+      if (!variant.styleNumber) continue;
+      const k = loose(variant.styleNumber);
+      const list = looseVariantStyle.get(k) ?? [];
+      list.push({ sample: s, variant });
+      looseVariantStyle.set(k, list);
+    }
+  }
+
   const resolve = (row: ShipRow): { sample?: ShipSample; variant?: ShipVariant; on?: string; ambiguous?: number } => {
     if (row.upc) {
       const hit = byUpc.get(key(row.upc));
@@ -314,6 +338,16 @@ export function matchShipRows(rows: ShipRow[], samples: ShipSample[]): ShipRepor
       const styled = byStyle.get(k);
       if (styled?.length === 1) return { sample: styled[0], on: "style #" };
       if (styled && styled.length > 1) return { ambiguous: styled.length };
+    }
+    for (const candidate of [row.style, styleHead(row.style)]) {
+      if (!candidate) continue;
+      const k = loose(candidate);
+      if (!k) continue;
+      const onColor = looseVariantStyle.get(k);
+      if (onColor?.length === 1) return { ...onColor[0], on: "TP style # on the color (spacing ignored)" };
+      const hits = byLoose.get(k);
+      if (hits?.size === 1) return { sample: [...hits][0], on: "style # (spacing ignored)" };
+      if (hits && hits.size > 1) return { ambiguous: hits.size };
     }
     return {};
   };
