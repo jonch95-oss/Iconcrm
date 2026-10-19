@@ -47,8 +47,7 @@ export async function previewShipSheetFromOneDrive(): Promise<ShipPreview> {
   return toPreview(await previewShipSheet(buffer), "OneDrive");
 }
 
-/** How the last read went — the line under the button. */
-export async function lastShipRun(): Promise<{
+export interface ShipRunLine {
   when: string;
   source: string;
   ok: boolean;
@@ -57,11 +56,13 @@ export async function lastShipRun(): Promise<{
   written: number;
   unmatched: number;
   error: string | null;
-} | null> {
+}
+
+/** How the last read went — the line above the buttons. */
+export async function lastShipRun(): Promise<{ succeeded: ShipRunLine | null; failing: ShipRunLine | null }> {
   await assertRole("member");
-  const run = await lastShipSheetRun();
-  if (!run) return null;
-  return {
+  const { newest, succeeded } = await lastShipSheetRun();
+  const line = (run: NonNullable<typeof newest>): ShipRunLine => ({
     when: (run.finishedAt ?? run.startedAt).toISOString(),
     source: run.source,
     ok: run.ok,
@@ -70,6 +71,11 @@ export async function lastShipRun(): Promise<{
     written: run.written,
     unmatched: run.unmatched,
     error: run.error,
+  });
+  return {
+    succeeded: succeeded ? line(succeeded) : null,
+    // Only worth saying when nothing has worked since.
+    failing: newest && !newest.ok && (!succeeded || newest.startedAt > succeeded.startedAt) ? line(newest) : null,
   };
 }
 

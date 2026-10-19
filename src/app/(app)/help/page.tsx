@@ -193,15 +193,15 @@ const SECTIONS: Section[] = [
     keywords: "shipped ship date tracking fedex onedrive status sheet factory weekly monday sample status tab courier receive",
     body: (
       <>
-        <p>The factory keeps its <B>Sample Status</B> tab in OneDrive and updates it on Mondays. The CRM reads it every morning and fills in the <B>Shipped</B> column: the date a sample left the factory, and the courier number where there is one.</p>
+        <p>The factory updates its <B>Sample Status</B> tab on Mondays. Drop a copy into Samples → <B>Shipping sheet</B> and it fills in the <B>Shipped</B> column: the date a sample left the factory, and the courier number where there is one. You see every date it would record, and what it couldn&apos;t place, before anything is written.</p>
         <Steps items={[
           <>Each row is matched to a sample — by <B>UPC</B> or <B>SKU code</B> where the sheet has them, otherwise the <B>style number</B> (the factory&apos;s description after it is ignored).</>,
           <>Within that style, the row&apos;s <B>colour</B> and <B>material</B> pick the colour it belongs to. A row with no colour is the whole style.</>,
           <>A style we don&apos;t carry, or a colour that isn&apos;t on the sample, is listed rather than guessed at — and never created.</>,
         ]} />
-        <p>Samples → <B>Shipping sheet</B> shows the same thing on demand: what Monday&apos;s update would change, old date → new, before anything is written. You can also drop a copy of the sheet into it if someone emails one.</p>
+        <p>It can also read the file straight from OneDrive each morning, which needs a link the CRM can open without signing in — a tenant set to &ldquo;only people in your organisation&rdquo; rules that out, and the dialog says so when it&apos;s tried. The other way round is a Microsoft app registration, which works whatever the sharing policy; ask and it can be built.</p>
         <Tip>Most rows say <B>Receive</B> where a courier number would go — those shipped and arrived with no number kept, so the date lands and there&apos;s nothing to chase. Where there <em>is</em> a number, the usual parcel sync follows it for a delivery date. A ship date never marks a sample received and never moves an ETA.</Tip>
-        <p className="mt-2 text-xs text-[var(--muted-foreground)]">Setup: in OneDrive, Share → Anyone with the link → Copy, and paste it into <code>ONEDRIVE_SHIP_SHEET_URL</code> in the deployment&apos;s environment settings. Until that&apos;s set, the dialog still reads a file you drop into it.</p>
+        <p className="mt-2 text-xs text-[var(--muted-foreground)]">The automatic read uses <code>ONEDRIVE_SHIP_SHEET_URL</code> in the deployment&apos;s environment settings. Whether it&apos;s set or not, dropping the file in always works.</p>
       </>
     ),
   },

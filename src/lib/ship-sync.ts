@@ -187,13 +187,20 @@ export async function recordShipRun(input: {
   });
 }
 
-/** How the last read went, for the line on the screen. */
+/**
+ * How the last read went, for the line on the screen: the last one that
+ * actually recorded something, and separately the newest attempt. They differ
+ * when the automatic read keeps failing on a link the tenant won't serve —
+ * in which case the useful line is still "you uploaded 400 dates on Monday",
+ * with the failure named underneath rather than in place of it.
+ */
 export async function lastShipSheetRun() {
-  return prisma.shipSheetRun.findFirst({
-    where: { NOT: { finishedAt: null } },
-    orderBy: { startedAt: "desc" },
-    include: { ranBy: { select: { name: true, email: true } } },
-  });
+  const include = { ranBy: { select: { name: true, email: true } } };
+  const [newest, succeeded] = await Promise.all([
+    prisma.shipSheetRun.findFirst({ where: { NOT: { finishedAt: null } }, orderBy: { startedAt: "desc" }, include }),
+    prisma.shipSheetRun.findFirst({ where: { ok: true }, orderBy: { startedAt: "desc" }, include }),
+  ]);
+  return { newest, succeeded };
 }
 
 /** Everything the matcher needs to know about what we already have. */

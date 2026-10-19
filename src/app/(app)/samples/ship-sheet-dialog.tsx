@@ -34,7 +34,7 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
   const [reading, startReading] = React.useTransition();
   const [applying, startApplying] = React.useTransition();
   const [dragging, setDragging] = React.useState(false);
-  const [lastRun, setLastRun] = React.useState<Awaited<ReturnType<typeof lastShipRun>>>(null);
+  const [lastRun, setLastRun] = React.useState<Awaited<ReturnType<typeof lastShipRun>>>({ succeeded: null, failing: null });
   const inputRef = React.useRef<HTMLInputElement>(null);
 
   // "Is it picking the sheet up?" should be answerable without reading server
@@ -106,39 +106,33 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
           <DialogTitle>Ship dates from the factory&apos;s status sheet</DialogTitle>
         </DialogHeader>
         <p className="text-sm text-[var(--muted-foreground)]">
-          The <strong>Sample Status</strong> tab, columns A–H. Dates land on the colour the row names; a style we don&apos;t
-          carry is listed, never created. This runs by itself every morning — use it here to see what Monday&apos;s update did.
+          The <strong>Sample Status</strong> tab, columns A–H. Dates land on the colour the row names; a style we
+          don&apos;t carry is listed, never created. Nothing is written until you&apos;ve seen what moves.
         </p>
 
         {!preview?.ok && (
           <div className="space-y-3">
-            <div className="rounded-md border border-[var(--border)] p-3 text-xs">
-              {lastRun ? (
-                <>
-                  <p className={lastRun.ok ? "" : "text-[var(--destructive)]"}>
-                    Last read {new Date(lastRun.when).toLocaleString()} ({lastRun.source}
-                    {lastRun.by ? ` · ${lastRun.by}` : ""}):{" "}
-                    {lastRun.ok
-                      ? `${lastRun.written} date${lastRun.written === 1 ? "" : "s"} recorded, ${lastRun.unmatched} not matched.`
-                      : lastRun.error}
-                  </p>
-                </>
+            <div className="space-y-1 rounded-md border border-[var(--border)] p-3 text-xs">
+              {lastRun.succeeded ? (
+                <p>
+                  Last read {new Date(lastRun.succeeded.when).toLocaleString()}
+                  {lastRun.succeeded.by ? ` by ${lastRun.succeeded.by}` : ` (${lastRun.succeeded.source})`}:{" "}
+                  {lastRun.succeeded.written} date{lastRun.succeeded.written === 1 ? "" : "s"} recorded,{" "}
+                  {lastRun.succeeded.unmatched} not matched.
+                </p>
               ) : (
                 <p className="text-[var(--muted-foreground)]">
-                  The sheet hasn&apos;t been read yet — the automatic read runs each morning, or press the button below.
+                  The sheet hasn&apos;t been read yet — drop Monday&apos;s copy below and you&apos;ll see what it would
+                  change before anything is written.
+                </p>
+              )}
+              {lastRun.failing && (
+                <p className="text-[var(--warning)]">
+                  The automatic read failed {new Date(lastRun.failing.when).toLocaleString()}:{" "}
+                  {lastRun.failing.error}
                 </p>
               )}
             </div>
-            <Button onClick={fromOneDrive} disabled={reading || !oneDriveReady} className="w-full">
-              <RefreshCw className={`h-4 w-4 ${reading ? "animate-spin" : ""}`} />
-              {reading ? "Reading the sheet…" : "Read it from OneDrive now"}
-            </Button>
-            {!oneDriveReady && (
-              <p className="text-xs text-[var(--warning)]">
-                No OneDrive link set yet — add <code>ONEDRIVE_SHIP_SHEET_URL</code> in the deployment&apos;s environment
-                settings. Until then, drop a copy of the sheet below.
-              </p>
-            )}
             <input ref={inputRef} type="file" accept=".xlsx,.xlsm" className="hidden" onChange={(e) => fromFile(e.target.files?.[0])} />
             <div
               role="button"
@@ -164,9 +158,18 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
                 dragging ? "border-[var(--primary)] bg-[var(--accent)]" : "border-[var(--border)] hover:border-[var(--primary)]"
               } ${reading ? "pointer-events-none opacity-60" : ""}`}
             >
-              <FileUp className="h-6 w-6 text-[var(--muted-foreground)]" />
-              <p className="text-sm font-medium">{dragging ? "Drop the sheet to read it" : "…or drop a copy of the sheet here"}</p>
+              <FileUp className="h-7 w-7 text-[var(--muted-foreground)]" />
+              <p className="text-sm font-medium">
+                {reading ? "Reading the sheet…" : dragging ? "Drop the sheet to read it" : "Drop Monday's sheet here"}
+              </p>
+              {!reading && <p className="text-xs text-[var(--muted-foreground)]">or click to choose · .xlsx</p>}
             </div>
+            {oneDriveReady && (
+              <Button variant="outline" onClick={fromOneDrive} disabled={reading} className="w-full">
+                <RefreshCw className={`h-4 w-4 ${reading ? "animate-spin" : ""}`} />
+                Try reading it from OneDrive
+              </Button>
+            )}
           </div>
         )}
 
