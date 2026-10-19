@@ -31,12 +31,48 @@ function directDownloadUrl(link: string): string {
   return url.toString();
 }
 
+/**
+ * SharePoint's own download endpoint for a share id. A link of the shape
+ * /:x:/p/moshe/IQBg… carries that id in its last segment, and this endpoint
+ * serves the bytes rather than the viewer page around them.
+ */
+export function shareIdDownloadUrl(link: string): string | null {
+  const url = new URL(link);
+  // A share link always begins /:x:/ (x for Excel, w for Word, and so on) and
+  // ends with the id itself, however many segments Microsoft puts in between.
+  if (!/^\/:[a-z]:\//i.test(url.pathname)) return null;
+  const id = url.pathname.split("/").filter(Boolean).pop();
+  if (!id) return null;
+  return `${url.origin}/_layouts/15/download.aspx?share=${encodeURIComponent(id)}`;
+}
+
 const looksLikeXlsx = (buf: Buffer) => buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b; // "PK" — a zip, which an .xlsx is
 
 /**
- * Fetch the workbook. Share links come in two flavours and neither announces
- * itself, so both are tried; a sign-in page comes back as HTML, which is the
- * one failure worth explaining properly.
+ * Follow the redirects ourselves, a few hops at most, keeping a note of where
+ * each one went. Microsoft bounces these links between hosts — the viewer, the
+ * tenant, the CDN that actually holds the bytes — and when one of those hops
+ * refuses, the status on its own ("308") says nothing about which. The hop
+ * list is hosts and statuses only: the URLs in between carry access tokens.
+ */
+async function fetchFollowing(url: string, hops: string[], limit = 6): Promise<Response | null> {
+  let current = url;
+  for (let i = 0; i < limit; i += 1) {
+    const res = await fetch(current, { redirect: "manual", headers: { accept: "*/*" } });
+    hops.push(`${new URL(current).hostname} ${res.status}`);
+    if (res.status < 300 || res.status >= 400) return res;
+    const location = res.headers.get("location");
+    if (!location) return res; // a redirect with nowhere to go
+    current = new URL(location, current).toString();
+  }
+  hops.push("gave up after too many redirects");
+  return null;
+}
+
+/**
+ * Fetch the workbook. Share links come in several flavours and none of them
+ * announces itself, so each is tried in turn; a sign-in page comes back as
+ * HTML, which is the one failure worth explaining properly.
  */
 export async function fetchShipWorkbook(link = process.env[SHIP_SHEET_URL_VAR]): Promise<{ buffer?: Buffer; error?: string }> {
   if (!link) {
@@ -50,32 +86,42 @@ export async function fetchShipWorkbook(link = process.env[SHIP_SHEET_URL_VAR]):
   }
   if (parsed.protocol !== "https:") return { error: "The OneDrive link has to be https." };
 
-  const candidates = /sharepoint\.com$/i.test(parsed.hostname) || parsed.hostname.endsWith("sharepoint.com")
-    ? [directDownloadUrl(link), sharesApiUrl(link)]
-    : [sharesApiUrl(link), directDownloadUrl(link)];
+  const sharePoint = parsed.hostname.endsWith("sharepoint.com");
+  const candidates = (
+    sharePoint
+      ? [shareIdDownloadUrl(link), directDownloadUrl(link), sharesApiUrl(link)]
+      : [sharesApiUrl(link), directDownloadUrl(link), shareIdDownloadUrl(link)]
+  ).filter((u): u is string => Boolean(u));
 
-  let lastError = "Could not download the file.";
+  const tried: string[] = [];
+  let signIn = false;
   for (const url of candidates) {
+    const hops: string[] = [];
     try {
-      const res = await fetch(url, { redirect: "follow", headers: { accept: "*/*" } });
-      if (!res.ok) {
-        lastError =
-          res.status === 401 || res.status === 403
-            ? `OneDrive refused the link (${res.status}) — it's scoped to people who are signed in. Re-share it as "Anyone with the link".`
-            : `OneDrive answered ${res.status} for that link.`;
-        continue;
+      const res = await fetchFollowing(url, hops);
+      if (res?.ok) {
+        const buffer = Buffer.from(await res.arrayBuffer());
+        if (looksLikeXlsx(buffer)) return { buffer };
+        // HTML back instead of a workbook: a sign-in page, which is what a
+        // link scoped to "people in your organisation" gives a server that
+        // isn't signed in as anybody.
+        signIn = true;
       }
-      const buffer = Buffer.from(await res.arrayBuffer());
-      if (looksLikeXlsx(buffer)) return { buffer };
-      // A sign-in page, which is what a link scoped to "people in your
-      // organisation" gives a server that isn't signed in as anybody.
-      lastError =
-        "That link asked for a sign-in instead of giving back the file. The CRM has no Microsoft account, so the link has to be Share → Anyone with the link → Copy. If your tenant doesn't allow those, the file needs a Microsoft app registration instead — say the word and I'll build that path.";
+      if (res && (res.status === 401 || res.status === 403)) signIn = true;
     } catch (e) {
-      lastError = e instanceof Error ? e.message.slice(0, 160) : lastError;
+      hops.push(e instanceof Error ? e.message.slice(0, 60) : "failed");
     }
+    tried.push(hops.join(" → "));
   }
-  return { error: lastError };
+
+  if (signIn) {
+    return {
+      error:
+        "That link asks for a Microsoft sign-in, and the CRM hasn't got one. Re-share the file as Share → Anyone with the link → Copy, or say the word and I'll build the app-registration path your tenant will allow. " +
+        `(Tried: ${tried.join(" | ")})`,
+    };
+  }
+  return { error: `Could not download the file. (Tried: ${tried.join(" | ")})` };
 }
 
 /**
