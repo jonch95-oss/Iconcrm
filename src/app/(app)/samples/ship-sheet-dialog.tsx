@@ -4,7 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { upload } from "@vercel/blob/client";
 import { toast } from "sonner";
-import { Truck, FileUp, RefreshCw } from "lucide-react";
+import { Truck, FileUp, RefreshCw, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { describeActionError } from "@/lib/action-error";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -71,6 +71,31 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
         if (inputRef.current) inputRef.current.value = "";
       }
     });
+  };
+
+  /**
+   * The rows it couldn't place, as a spreadsheet. On a first read that's
+   * hundreds of lines, and each one is a thing to fix in one system or the
+   * other — not something to squint at through a scrollbar.
+   */
+  const downloadUnmatched = async () => {
+    if (!preview?.skipped.length) return;
+    try {
+      const res = await fetch("/api/samples/ship-unmatched", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ rows: preview.skipped }),
+      });
+      if (!res.ok) throw new Error("Could not build the file.");
+      const url = URL.createObjectURL(await res.blob());
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `ship-sheet-not-matched-${new Date().toISOString().slice(0, 10)}.xlsx`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(describeActionError(e, "Could not build the file."));
+    }
   };
 
   const apply = () => {
@@ -229,6 +254,9 @@ export function ShipSheetDialog({ oneDriveReady }: { oneDriveReady: boolean }) {
                 <summary className="cursor-pointer font-medium">
                   {preview.skipped.length} row{preview.skipped.length === 1 ? "" : "s"} not matched — open to see why
                 </summary>
+                <Button variant="outline" className="mt-2 h-8" onClick={downloadUnmatched}>
+                  <Download className="h-4 w-4" /> Download them as Excel
+                </Button>
                 <div className="mt-2 max-h-48 space-y-1 overflow-y-auto text-[var(--muted-foreground)]">
                   {preview.skipped.slice(0, 400).map((s, i) => (
                     <div key={`${s.style}-${i}`}>

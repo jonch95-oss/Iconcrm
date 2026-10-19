@@ -77,6 +77,19 @@ test("ship dates from the factory sheet land on the right colour", async ({ page
   await dialog.getByText(/not matched — open to see why/).click();
   await expect(dialog.getByText(new RegExp(`${number}-NOPE.*no sample with that number`))).toBeVisible();
 
+  // The rows it couldn't place come out as a spreadsheet to work through.
+  const download = page.waitForEvent("download");
+  await dialog.getByRole("button", { name: /Download them as Excel/ }).click();
+  const downloaded = await download;
+  expect(downloaded.suggestedFilename()).toMatch(/ship-sheet-not-matched-\d{4}-\d{2}-\d{2}\.xlsx/);
+  const saved = await downloaded.path();
+  const back = new ExcelJS.Workbook();
+  await back.xlsx.readFile(saved);
+  const sheet = back.worksheets[0];
+  expect(sheet.getRow(1).values).toEqual([undefined, "Style #", "Colour", "Why it didn't match", "Detail"]);
+  expect(sheet.rowCount).toBe(2); // the header, and the style we don't carry
+  expect(String(sheet.getRow(2).getCell(1).value)).toContain(number);
+
   await dialog.getByRole("button", { name: /Record 2 ship dates/ }).click();
   await expect(page.getByText("2 ship dates recorded.")).toBeVisible();
 
