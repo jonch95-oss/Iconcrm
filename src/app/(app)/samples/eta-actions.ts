@@ -5,9 +5,9 @@ import { prisma } from "@/lib/db";
 import { assertRole, getCurrentUser } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
-import { canApproveEta, etaDiffers, etaFromRequested, REQUESTED_ETA_WEEKS } from "@/lib/eta-approval";
+import { canApproveEta, defaultEta, etaDiffers, DEFAULT_ETA_WEEKS } from "@/lib/eta-approval";
 import { advanceSampleStatus } from "@/lib/status";
-import { parseDayInput } from "@/lib/date";
+import { parseDateInput } from "@/lib/date";
 
 export interface EtaActionResult {
   ok: boolean;
@@ -127,8 +127,8 @@ export async function submitEtaChangeRequest(formData: FormData): Promise<EtaAct
   const raw = String(formData.get("eta") ?? "").trim();
   if (!sampleId) return { ok: false, error: "Which sample?" };
   if (!reason) return { ok: false, error: "Say why the date is moving." };
-  const proposedEta = raw ? new Date(`${raw}T00:00:00.000Z`) : null;
-  if (raw && Number.isNaN(proposedEta!.getTime())) return { ok: false, error: "That date doesn't read as a date." };
+  const proposedEta = parseDateInput(raw);
+  if (raw && !proposedEta) return { ok: false, error: "That date doesn't read as a date." };
 
   const current = skuVariantId
     ? (await prisma.skuVariant.findUnique({ where: { id: skuVariantId }, select: { sampleEta: true } }))?.sampleEta ?? null
@@ -263,8 +263,8 @@ export async function withdrawEtaChange(requestId: string): Promise<EtaActionRes
 
 /**
  * Move the date a sample was asked for, and re-date everything that hangs off
- * it: six weeks from the new request date, on the sample and on every color
- * that carries its own date.
+ * it: the standard lead time from the new request date, on the sample and on
+ * every color that carries its own date.
  *
  * Only the owner and Moshe can do this. It isn't an ETA request that waits for
  * a yes — the people who would be approving one are the only people who can
@@ -281,7 +281,7 @@ export async function setRequestedDate(formData: FormData): Promise<EtaActionRes
   const raw = String(formData.get("requestedAt") ?? "").trim();
   if (!sampleId) return { ok: false, error: "Which sample?" };
   if (!raw) return { ok: false, error: "A sample has to have been asked for on some date." };
-  const requestedAt = parseDayInput(raw);
+  const requestedAt = parseDateInput(raw);
   if (!requestedAt) return { ok: false, error: "That date doesn't read as a date." };
 
   const sample = await prisma.sample.findUnique({
@@ -298,9 +298,9 @@ export async function setRequestedDate(formData: FormData): Promise<EtaActionRes
     return { ok: false, error: "That's the date it already has." };
   }
 
-  const nextEta = etaFromRequested(requestedAt);
+  const nextEta = defaultEta(requestedAt);
   const day = (d: Date) => d.toISOString().slice(0, 10);
-  const reason = `Requested date moved to ${day(requestedAt)} — ETA ${REQUESTED_ETA_WEEKS} weeks out`;
+  const reason = `Requested date moved to ${day(requestedAt)} — ETA ${DEFAULT_ETA_WEEKS} weeks out`;
 
   await prisma.sample.update({ where: { id: sampleId }, data: { requestedAt } });
   await applyEta({ sampleId }, nextEta, reason, user.id);

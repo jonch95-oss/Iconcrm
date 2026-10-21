@@ -13,7 +13,7 @@ import { setRequestedDate } from "@/app/(app)/samples/eta-actions";
 /** The implied ETA for a yyyy-mm-dd, for the line under the field. */
 function impliedEta(requested: string, weeks: number): string {
   if (!requested) return "";
-  const d = new Date(`${requested}T00:00:00.000Z`);
+  const d = new Date(`${requested}T12:00:00.000Z`);
   if (Number.isNaN(d.getTime())) return "";
   d.setUTCDate(d.getUTCDate() + weeks * 7);
   return d.toISOString().slice(0, 10);

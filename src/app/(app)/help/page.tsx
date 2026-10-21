@@ -223,7 +223,7 @@ const SECTIONS: Section[] = [
           <li><B>The dates the system sets:</B> an import, a factory&apos;s emailed request sheet, the <B>8 weeks</B> a revision resets to, the clear that follows putting a sample on hold, and the 100 days for Produced without Sample.</li>
         </ul>
         <h3 className="mt-4 font-semibold">Moving the requested date re-dates the sample</h3>
-        <p>Next to <B>Requested at</B> on a sample, you and Moshe get a <B>Change</B> button — nobody else does. Set a new date there and the ETA is re-dated to <B>6 weeks</B> from it, on the sample and on every color that carries its own date. The dialog shows the new ETA before you save, it goes live as you save it, and anything that was waiting on <B>ETA changes</B> for that sample is withdrawn, since it was an argument about the old date.</p>
+        <p>Next to <B>Requested at</B> on a sample, you and Moshe get a <B>Change</B> button — nobody else does. Set a new date there and the ETA is re-dated to <B>8 weeks</B> from it, on the sample and on every color that carries its own date. The dialog shows the new ETA before you save, it goes live as you save it, and anything that was waiting on <B>ETA changes</B> for that sample is withdrawn, since it was an argument about the old date.</p>
         <Tip>Anyone can be made an approver (or either of you removed) with the ETA approver checkbox under <B>Settings › Users &amp; Roles</B>. Every request, decision, undo and requested-date move is in the sample&apos;s Audit tab with the name against it.</Tip>
       </>
     ),

@@ -10,8 +10,6 @@ import {
   describeEtaChange,
   defaultEta,
   DEFAULT_ETA_WEEKS,
-  etaFromRequested,
-  REQUESTED_ETA_WEEKS,
 } from "../src/lib/eta-approval";
 
 const OWNER = process.env.ADMIN_EMAIL ?? "jonc@iconluxurygroup.com";
@@ -65,30 +63,23 @@ assert.equal(describeEtaChange(nov12, null, day), "2026-11-12 → cleared");
 assert.equal(describeEtaChange(null, dec03, day), "no date → 2026-12-03");
 
 // --- the date the system sets itself -----------------------------------------
-// Eight weeks, counted from the day the sheet lands (or the email was sent),
-// and the same eight everywhere: import, emailed request sheet, revision reset.
+// Eight weeks, and the same eight everywhere: an import, an emailed request
+// sheet, a revision reset, and an approver moving the date a sample was asked
+// for. Counted from the day it starts on, and landing on a day, not an instant.
 assert.equal(DEFAULT_ETA_WEEKS, 8);
 const sent = new Date("2026-01-05T09:30:00.000Z");
-assert.equal(defaultEta(sent).toISOString(), "2026-03-02T09:30:00.000Z");
+assert.equal(defaultEta(sent).toISOString(), "2026-03-02T12:00:00.000Z");
 assert.equal(Math.round((defaultEta(sent).getTime() - sent.getTime()) / 86_400_000), 56);
 // Counting from a given day never moves that day.
 assert.equal(sent.toISOString(), "2026-01-05T09:30:00.000Z");
 
-// --- six weeks from the day it was asked for ---------------------------------
-// What an approver moving the requested date re-dates the sample to. Counted
-// in UTC days, because the date comes off a date picker as midnight UTC and
-// has to come back out as the same day everywhere.
-assert.equal(REQUESTED_ETA_WEEKS, 6);
-const requested = new Date("2026-10-21T00:00:00.000Z");
-assert.equal(etaFromRequested(requested).toISOString(), "2026-12-02T00:00:00.000Z");
-assert.equal(day(etaFromRequested(new Date("2026-12-24T00:00:00.000Z"))), "2027-02-04");
-// Over a US daylight-saving boundary it's still the same count of days.
-assert.equal(
-  Math.round((etaFromRequested(requested).getTime() - requested.getTime()) / 86_400_000),
-  42,
-);
-assert.equal(day(etaFromRequested(new Date("2026-02-28T00:00:00.000Z"))), "2026-04-11");
-// Counting from a given day never moves that day.
-assert.equal(requested.toISOString(), "2026-10-21T00:00:00.000Z");
+// Midday, so the day survives being read in New York: stored at midnight UTC
+// it would show as the day before, which is how a date typed as the 2nd used
+// to come back out of the page as the 1st.
+assert.equal(defaultEta(new Date("2026-10-21T00:00:00.000Z")).toISOString(), "2026-12-16T12:00:00.000Z");
+assert.equal(defaultEta(new Date("2026-10-21T23:59:59.000Z")).toISOString(), "2026-12-16T12:00:00.000Z");
+assert.equal(day(defaultEta(new Date("2026-12-24T00:00:00.000Z"))), "2027-02-18");
+// A leap day counts like any other day.
+assert.equal(day(defaultEta(new Date("2028-02-29T00:00:00.000Z"))), "2028-04-25");
 
 console.log("eta-approval: all tests passed");

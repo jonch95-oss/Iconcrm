@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { canApproveEta, REQUESTED_ETA_WEEKS } from "@/lib/eta-approval";
+import { canApproveEta, DEFAULT_ETA_WEEKS } from "@/lib/eta-approval";
 import { ChangeEtaButton } from "./change-eta-button";
 import { ChangeRequestedDateButton } from "./change-requested-date-button";
 import { requireUser, hasRole } from "@/lib/session";
@@ -292,7 +292,7 @@ export default async function SampleDetailPage({
                       sampleNumber={sample.sampleNumber}
                       requestedAt={sample.requestedAt.toISOString().slice(0, 10)}
                       colorsWithEta={sample.skuVariants.filter((v) => v.sampleEta).length}
-                      etaWeeks={REQUESTED_ETA_WEEKS}
+                      etaWeeks={DEFAULT_ETA_WEEKS}
                     />
                   )}
                 </span>

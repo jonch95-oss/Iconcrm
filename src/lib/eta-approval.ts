@@ -24,26 +24,14 @@ import { isOwner } from "@/lib/owner";
 export const DEFAULT_ETA_WEEKS = 8;
 export const DEFAULT_ETA_DAYS = DEFAULT_ETA_WEEKS * 7;
 
-/** That date, counted from now (or from when an email was sent). */
+/**
+ * That date, counted from a day: now, when an email was sent, or the day a
+ * sample was asked for. An ETA is a day, so it comes back as one.
+ */
 export function defaultEta(from: Date = new Date()): Date {
   const eta = new Date(from);
-  eta.setDate(eta.getDate() + DEFAULT_ETA_DAYS);
-  return eta;
-}
-
-/**
- * How far out a sample is dated from the day it was asked for. Separate from
- * DEFAULT_ETA_WEEKS on purpose: that one dates a sample from today because
- * nobody told us when it was asked for, while this one counts from a request
- * date an approver has just set, which is a firmer thing to count from.
- */
-export const REQUESTED_ETA_WEEKS = 6;
-export const REQUESTED_ETA_DAYS = REQUESTED_ETA_WEEKS * 7;
-
-/** The ETA a requested-on date implies: six weeks after it. */
-export function etaFromRequested(requestedAt: Date): Date {
-  const eta = new Date(requestedAt);
-  eta.setUTCDate(eta.getUTCDate() + REQUESTED_ETA_DAYS);
+  eta.setUTCDate(eta.getUTCDate() + DEFAULT_ETA_DAYS);
+  eta.setUTCHours(12, 0, 0, 0);
   return eta;
 }
 

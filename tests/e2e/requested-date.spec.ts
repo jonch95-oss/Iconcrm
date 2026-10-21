@@ -2,7 +2,8 @@ import { test, expect, type Page } from "@playwright/test";
 
 /**
  * Moving the date a sample was asked for. Only the owner and Moshe get the
- * button, and using it re-dates the sample to six weeks from the new date.
+ * button, and using it re-dates the sample to the standard lead time (eight
+ * weeks) from the new date.
  *
  * Requires the dev server running and the database seeded.
  * Run with: npm run test:e2e
@@ -56,7 +57,7 @@ test("the owner and Moshe move the requested date, and the ETA follows it", asyn
 
   // Moshe moves it, and the dialog says what the ETA becomes before he saves.
   const requested = "2026-03-02";
-  const expectedEta = day(requested, 42);
+  const expectedEta = day(requested, 56);
   await loginAs(page, MOSHE);
   await page.goto(url);
   await page.getByRole("button", { name: "Change the requested date" }).click();
@@ -70,7 +71,7 @@ test("the owner and Moshe move the requested date, and the ETA follows it", asyn
   const requestedRow = page.locator("div", { hasText: /^Requested at/ }).last();
   await expect(requestedRow).toContainText("Mar 2, 2026");
   const etaRow = page.locator("div", { hasText: /^Sample ETA/ }).last();
-  await expect(etaRow).toContainText("Apr 13, 2026");
+  await expect(etaRow).toContainText("Apr 27, 2026");
 
   // And the move is on the record, not just on the sample.
   await page.goto(`${url}?tab=eta`);

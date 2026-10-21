@@ -14,7 +14,7 @@ import { normalizeSeason } from "@/lib/catalog";
 import { autoSkuCode, skuBase, deriveColorCode } from "@/lib/sku";
 import { Prisma } from "@prisma/client";
 import { toDecimal } from "@/lib/money";
-import { parseDateInput } from "@/lib/date";
+import { asDay, parseDateInput } from "@/lib/date";
 import { commentImages, MAX_COMMENT_IMAGES } from "@/lib/comment-images";
 import {
   sampleCreateSchema,
@@ -199,7 +199,7 @@ export async function updateSample(formData: FormData): Promise<ActionResult> {
   // "Produced without sample" implies a long lead time: set the ETA to 100 days
   // out when first entering this status (logged as a revision, never silent).
   if (status === "produced_without_sample" && before.status !== "produced_without_sample") {
-    const eta100 = new Date(Date.now() + 100 * 24 * 60 * 60 * 1000);
+    const eta100 = asDay(new Date(Date.now() + 100 * 24 * 60 * 60 * 1000))!;
     await changeEta({
       parentType: "sample",
       parentId: before.id,

@@ -1,5 +1,6 @@
 import ExcelJS from "exceljs";
 import { detectCarrier } from "@/lib/parcel";
+import { asDay } from "@/lib/date";
 
 /**
  * Reading the factory's weekly status sheet.
@@ -53,14 +54,14 @@ const cellText = (cell: ExcelJS.Cell): string => {
 
 const cellDate = (cell: ExcelJS.Cell): Date | null => {
   const v = cell.value;
-  if (v instanceof Date) return v;
+  if (v instanceof Date) return asDay(v);
   const text = cellText(cell);
   // A date typed as text ("10/12/26", "2026-10-12") still counts.
   const m = text.match(/^(\d{1,4})[/-](\d{1,2})[/-](\d{1,4})$/);
   if (!m) return null;
   const [a, b, c] = [m[1], m[2], m[3]].map(Number);
   const [y, mo, d] = a > 31 ? [a, b, c] : [c < 100 ? 2000 + c : c, a, b];
-  const date = new Date(Date.UTC(y, mo - 1, d));
+  const date = new Date(Date.UTC(y, mo - 1, d, 12));
   return Number.isNaN(date.getTime()) ? null : date;
 };
 
