@@ -31,6 +31,22 @@ export function defaultEta(from: Date = new Date()): Date {
   return eta;
 }
 
+/**
+ * How far out a sample is dated from the day it was asked for. Separate from
+ * DEFAULT_ETA_WEEKS on purpose: that one dates a sample from today because
+ * nobody told us when it was asked for, while this one counts from a request
+ * date an approver has just set, which is a firmer thing to count from.
+ */
+export const REQUESTED_ETA_WEEKS = 6;
+export const REQUESTED_ETA_DAYS = REQUESTED_ETA_WEEKS * 7;
+
+/** The ETA a requested-on date implies: six weeks after it. */
+export function etaFromRequested(requestedAt: Date): Date {
+  const eta = new Date(requestedAt);
+  eta.setUTCDate(eta.getUTCDate() + REQUESTED_ETA_DAYS);
+  return eta;
+}
+
 /** Approvers by default, until someone is switched on or off by hand. */
 const DEFAULT_APPROVER_NAMES = ["moshe nahum"];
 

@@ -1,8 +1,9 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { prisma } from "@/lib/db";
-import { canApproveEta } from "@/lib/eta-approval";
+import { canApproveEta, REQUESTED_ETA_WEEKS } from "@/lib/eta-approval";
 import { ChangeEtaButton } from "./change-eta-button";
+import { ChangeRequestedDateButton } from "./change-requested-date-button";
 import { requireUser, hasRole } from "@/lib/session";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -280,7 +281,23 @@ export default async function SampleDetailPage({
             <Detail label="Received" value={formatDate(sample.sampleReceivedDate)} />
             <Detail label="Sample room" value={sample.sampleRoom ?? "—"} />
             <Detail label="Requested by" value={sample.requestedBy?.name ?? sample.requestedByExternal ?? "—"} />
-            <Detail label="Requested at" value={formatDate(sample.requestedAt)} />
+            <Detail
+              label="Requested at"
+              value={
+                <span className="flex flex-wrap items-center justify-end gap-2">
+                  {formatDate(sample.requestedAt)}
+                  {viewerApprovesEta && (
+                    <ChangeRequestedDateButton
+                      sampleId={sample.id}
+                      sampleNumber={sample.sampleNumber}
+                      requestedAt={sample.requestedAt.toISOString().slice(0, 10)}
+                      colorsWithEta={sample.skuVariants.filter((v) => v.sampleEta).length}
+                      etaWeeks={REQUESTED_ETA_WEEKS}
+                    />
+                  )}
+                </span>
+              }
+            />
             {sample.status === "dropped" && (
               <Detail label="Dropped reason" value={DROPPED_REASON_LABEL[sample.droppedReason ?? "other"]} />
             )}

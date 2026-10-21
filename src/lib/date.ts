@@ -47,6 +47,21 @@ export function isOverdue(eta: Date | string | null | undefined): boolean {
   return days !== null && days < 0;
 }
 
+/**
+ * Parse a yyyy-mm-dd (from a date picker) into the middle of that UTC day.
+ *
+ * A day stored at midnight UTC reads as the day before once it's shown in New
+ * York time — midnight UTC is 7pm the previous evening there — so a date typed
+ * as the 2nd comes back out of the page as the 1st. Midday survives being read
+ * in any timezone this business works in, and still slices back to the same
+ * yyyy-mm-dd for comparisons and for date inputs.
+ */
+export function parseDayInput(value: string | null | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(`${value}T12:00:00.000Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 /** Parse a yyyy-mm-dd (from a date input) into a UTC Date at midnight. */
 export function parseDateInput(value: string | null | undefined): Date | null {
   if (!value) return null;

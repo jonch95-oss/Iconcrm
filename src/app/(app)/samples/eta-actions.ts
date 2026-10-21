@@ -5,8 +5,9 @@ import { prisma } from "@/lib/db";
 import { assertRole, getCurrentUser } from "@/lib/session";
 import { logAudit } from "@/lib/audit";
 import { changeEta } from "@/lib/eta";
-import { canApproveEta, etaDiffers } from "@/lib/eta-approval";
+import { canApproveEta, etaDiffers, etaFromRequested, REQUESTED_ETA_WEEKS } from "@/lib/eta-approval";
 import { advanceSampleStatus } from "@/lib/status";
+import { parseDayInput } from "@/lib/date";
 
 export interface EtaActionResult {
   ok: boolean;
@@ -257,5 +258,81 @@ export async function withdrawEtaChange(requestId: string): Promise<EtaActionRes
   });
   revalidatePath("/eta-changes");
   revalidatePath(`/samples/${request.sampleId}`);
+  return { ok: true };
+}
+
+/**
+ * Move the date a sample was asked for, and re-date everything that hangs off
+ * it: six weeks from the new request date, on the sample and on every color
+ * that carries its own date.
+ *
+ * Only the owner and Moshe can do this. It isn't an ETA request that waits for
+ * a yes — the people who would be approving one are the only people who can
+ * get here, and the whole point is that one edit re-dates the sample.
+ */
+export async function setRequestedDate(formData: FormData): Promise<EtaActionResult> {
+  const user = await assertRole("member");
+  const prefs = await prisma.user.findUnique({ where: { id: user.id }, select: { notificationPrefs: true } });
+  if (!canApproveEta(user, prefs?.notificationPrefs)) {
+    return { ok: false, error: "Only the owner or Moshe can move a sample's requested date." };
+  }
+
+  const sampleId = String(formData.get("sampleId") ?? "");
+  const raw = String(formData.get("requestedAt") ?? "").trim();
+  if (!sampleId) return { ok: false, error: "Which sample?" };
+  if (!raw) return { ok: false, error: "A sample has to have been asked for on some date." };
+  const requestedAt = parseDayInput(raw);
+  if (!requestedAt) return { ok: false, error: "That date doesn't read as a date." };
+
+  const sample = await prisma.sample.findUnique({
+    where: { id: sampleId },
+    select: {
+      requestedAt: true,
+      sampleEta: true,
+      status: true,
+      skuVariants: { select: { id: true, color: true, sampleEta: true } },
+    },
+  });
+  if (!sample) return { ok: false, error: "Sample not found." };
+  if (!etaDiffers(sample.requestedAt, requestedAt)) {
+    return { ok: false, error: "That's the date it already has." };
+  }
+
+  const nextEta = etaFromRequested(requestedAt);
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+  const reason = `Requested date moved to ${day(requestedAt)} — ETA ${REQUESTED_ETA_WEEKS} weeks out`;
+
+  await prisma.sample.update({ where: { id: sampleId }, data: { requestedAt } });
+  await applyEta({ sampleId }, nextEta, reason, user.id);
+  // Colors that carry their own date are working to the same request, so they
+  // move with it. A color with no date of its own stays without one rather
+  // than being given a date nobody asked for.
+  for (const v of sample.skuVariants) {
+    if (v.sampleEta) await applyEta({ sampleId, skuVariantId: v.id }, nextEta, reason, user.id);
+  }
+
+  // Anything waiting on a decision was an argument about the old date.
+  await prisma.etaChangeRequest.updateMany({
+    where: { sampleId, status: "pending" },
+    data: {
+      status: "withdrawn",
+      decidedById: user.id,
+      decidedAt: new Date(),
+      decisionNote: "Requested date moved — ETA re-dated from it",
+    },
+  });
+
+  await logAudit({
+    entityType: "sample",
+    entityId: sampleId,
+    action: "requested_date_changed",
+    userId: user.id,
+    before: { requestedAt: sample.requestedAt, eta: sample.sampleEta },
+    after: { requestedAt, eta: nextEta },
+  });
+
+  revalidatePath("/eta-changes");
+  revalidatePath("/samples");
+  revalidatePath(`/samples/${sampleId}`);
   return { ok: true };
 }
